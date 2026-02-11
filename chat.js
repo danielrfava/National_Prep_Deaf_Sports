@@ -5,16 +5,22 @@ class ChatBot {
         this.userInput = document.getElementById('userInput');
         this.sendButton = document.getElementById('sendButton');
         
+        // Configuration
+        this.config = {
+            contactEmail: 'info@nationalprepdeafsports.org',
+            organizationName: 'National Prep Deaf Sports'
+        };
+        
         this.responses = {
-            'hello': 'Hello! Welcome to National Prep Deaf Sports. How can I assist you today?',
-            'hi': 'Hi there! What would you like to know about National Prep Deaf Sports?',
-            'help': 'I can help you with information about National Prep Deaf Sports, including programs, events, and sports activities for deaf students.',
+            'hello': `Hello! Welcome to ${this.config.organizationName}. How can I assist you today?`,
+            'hi': `Hi there! What would you like to know about ${this.config.organizationName}?`,
+            'help': `I can help you with information about ${this.config.organizationName}, including programs, events, and sports activities for deaf students.`,
             'sports': 'We offer various sports programs including basketball, volleyball, soccer, track and field, and more for deaf and hard-of-hearing students.',
-            'programs': 'National Prep Deaf Sports provides comprehensive sports programs designed specifically for deaf students to excel in athletics.',
-            'contact': 'For contact information, please visit our main website or email us at info@nationalprepdeafsports.org',
-            'about': 'National Prep Deaf Sports is dedicated to providing athletic opportunities for deaf and hard-of-hearing students across the nation.',
+            'programs': `${this.config.organizationName} provides comprehensive sports programs designed specifically for deaf students to excel in athletics.`,
+            'contact': `For contact information, please visit our main website or email us at ${this.config.contactEmail}`,
+            'about': `${this.config.organizationName} is dedicated to providing athletic opportunities for deaf and hard-of-hearing students across the nation.`,
             'events': 'We host regular tournaments, training camps, and competitive events throughout the year. Check our calendar for upcoming events!',
-            'join': 'To join National Prep Deaf Sports programs, please visit our registration page or contact us for more information.',
+            'join': `To join ${this.config.organizationName} programs, please visit our registration page or contact us for more information.`,
             'default': 'Thank you for your message! For specific inquiries, please contact us directly. I can help with general questions about sports, programs, events, and more.'
         };
         
