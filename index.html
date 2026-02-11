@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>National Prep Deaf Sports - AI Chat</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>National Prep Deaf Sports</h1>
+            <p>AI Chat Assistant</p>
+        </header>
+        
+        <div class="chat-container">
+            <div id="chatMessages" class="chat-messages" role="log" aria-live="polite" aria-label="Chat conversation">
+                <div class="message bot-message">
+                    <div class="message-content">
+                        <strong>AI Assistant:</strong> Welcome to National Prep Deaf Sports! How can I help you today?
+                    </div>
+                </div>
+            </div>
+            
+            <div class="chat-input-container">
+                <label for="userInput" class="sr-only">Type your message</label>
+                <input 
+                    type="text" 
+                    id="userInput" 
+                    placeholder="Type your message here..." 
+                    autocomplete="off"
+                />
+                <button id="sendButton" aria-label="Send message">Send</button>
+            </div>
+        </div>
+    </div>
+    
+    <script src="chat.js"></script>
+</body>
+</html>
