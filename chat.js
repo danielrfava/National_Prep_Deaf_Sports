@@ -57,11 +57,11 @@ class ChatBot {
         const contentDiv = document.createElement('div');
         contentDiv.className = 'message-content';
         
-        if (sender === 'bot') {
-            contentDiv.innerHTML = `<strong>AI Assistant:</strong> ${text}`;
-        } else {
-            contentDiv.innerHTML = `<strong>You:</strong> ${text}`;
-        }
+        const strongElement = document.createElement('strong');
+        strongElement.textContent = sender === 'bot' ? 'AI Assistant:' : 'You:';
+        
+        contentDiv.appendChild(strongElement);
+        contentDiv.appendChild(document.createTextNode(' ' + text));
         
         messageDiv.appendChild(contentDiv);
         this.chatMessages.appendChild(messageDiv);
@@ -73,9 +73,9 @@ class ChatBot {
     generateResponse(message) {
         const lowerMessage = message.toLowerCase();
         
-        // Check for keyword matches
+        // Check for keyword matches (excluding 'default' keyword)
         for (const [keyword, response] of Object.entries(this.responses)) {
-            if (lowerMessage.includes(keyword)) {
+            if (keyword !== 'default' && lowerMessage.includes(keyword)) {
                 return response;
             }
         }
