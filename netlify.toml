@@ -1,0 +1,7 @@
+[build]
+  publish = "src"
+  command = "node scripts/build-env.js"
+
+[dev]
+  publish = "src"
+  autoLaunch = false

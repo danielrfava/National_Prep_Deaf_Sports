@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Deaf Sports History</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar-container">
+        <div class="brand">
+          <div class="logo" aria-label="Logo">NP</div>
+          <div class="brand-text">
+            <div class="brand-title">National Prep Deaf Sports</div>
+            <div class="brand-tag">Deaf High School Athletics</div>
+          </div>
+        </div>
+
+        <nav class="nav" aria-label="Primary">
+          <a class="nav-link" href="/">Home</a>
+
+          <div class="sports-wrap">
+            <details id="sportsMenu" class="sports-details">
+              <summary class="nav-link summary">
+                Sports <span class="caret">&#9662;</span>
+              </summary>
+
+              <div class="mega-menu" role="menu" aria-label="Sports menu">
+                <div id="sportsMenuGrid" class="grid"></div>
+                <div class="menu-footnote">Phase labels shown where applicable.</div>
+              </div>
+            </details>
+          </div>
+
+          <a class="nav-link" href="/deaflympics">Deaflympics</a>
+          <a class="nav-link" href="/tournaments">Tournaments</a>
+          <a class="nav-link" href="/teams">Schools</a>
+          <a class="nav-link" href="/about">About</a>
+        </nav>
+
+        <div class="search">
+          <label class="sr-only" for="athleteFilter">Search athletes, teams, or sports</label>
+          <input
+            id="athleteFilter"
+            type="search"
+            placeholder="Search players, teams, or sports"
+            autocomplete="off"
+          />
+        </div>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="filters" aria-label="Filters">
+        <div class="filter-grid">
+          <div class="filter-field">
+            <label for="schoolFilter">School</label>
+            <select id="schoolFilter">
+              <option value="">All schools</option>
+            </select>
+          </div>
+          <div class="filter-field">
+            <label for="divisionFilter">Division</label>
+            <select id="divisionFilter">
+              <option value="">All divisions</option>
+              <option value="d1">Division 1</option>
+              <option value="d2">Division 2</option>
+            </select>
+          </div>
+          <div class="filter-field">
+            <label for="sportFilter">Sport</label>
+            <select id="sportFilter">
+              <option value="">All sports</option>
+            </select>
+          </div>
+          <div class="filter-field">
+            <label for="genderFilter">Girls/Boys</label>
+            <select id="genderFilter">
+              <option value="">All</option>
+              <option value="girls">Girls</option>
+              <option value="boys">Boys</option>
+            </select>
+          </div>
+          <div class="filter-field">
+            <label for="deaflympicsFilter">Deaflympics</label>
+            <select id="deaflympicsFilter">
+              <option value="">All</option>
+              <option value="true">Yes</option>
+              <option value="false">No</option>
+            </select>
+          </div>
+          <div class="filter-field">
+            <label for="recordScopeFilter">Record scope</label>
+            <select id="recordScopeFilter">
+              <option value="">All records</option>
+              <option value="all-time">All-time</option>
+              <option value="season">Season</option>
+              <option value="game">Game</option>
+            </select>
+          </div>
+        </div>
+        <p id="status" class="status" aria-live="polite"></p>
+      </section>
+
+      <section>
+        <h2>Featured Records</h2>
+        <div id="records" class="records"></div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="container">
+        <p>Built with HTML, JavaScript, and CSS. Data powered by Supabase.</p>
+      </div>
+    </footer>
+
+    <script src="./env.js"></script>
+    <script type="module" src="./supabaseClient.js"></script>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>
