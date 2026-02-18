@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin - Review Submissions</title>
+  <link rel="stylesheet" href="../styles.css">
+  <style>
+    .admin-container {
+      max-width: 1400px;
+      margin: 40px auto;
+      padding: 20px;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+
+    .stat-card {
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: 700;
+      color: #2d3748;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      color: #718096;
+      margin-top: 4px;
+    }
+
+    .pending-section {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      padding: 32px;
+    }
+
+    .review-card {
+      border: 2px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      transition: all 0.2s;
+    }
+
+    .review-card:hover {
+      border-color: #4299e1;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    .review-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: start;
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 2px solid #f7fafc;
+    }
+
+    .review-title {
+      font-size: 20px;
+      font-weight: 600;
+      color: #2d3748;
+      margin-bottom: 8px;
+    }
+
+    .review-meta {
+      display: flex;
+      gap: 16px;
+      font-size: 14px;
+      color: #718096;
+      flex-wrap: wrap;
+    }
+
+    .game-details {
+      background: #f7fafc;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .detail-row:last-child {
+      border-bottom: none;
+    }
+
+    .detail-label {
+      font-weight: 600;
+      color: #4a5568;
+    }
+
+    .detail-value {
+      color: #2d3748;
+    }
+
+    .players-section {
+      margin-top: 20px;
+    }
+
+    .players-section h4 {
+      font-size: 16px;
+      color: #2d3748;
+      margin-bottom: 12px;
+    }
+
+    .player-list {
+      max-height: 200px;
+      overflow-y: auto;
+      background: #f7fafc;
+      border-radius: 6px;
+      padding: 12px;
+    }
+
+    .player-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px;
+      border-bottom: 1px solid #e2e8f0;
+      font-size: 14px;
+    }
+
+    .player-row:last-child {
+      border-bottom: none;
+    }
+
+    .player-name {
+      font-weight: 600;
+      color: #2d3748;
+    }
+
+    .player-stats {
+      color: #718096;
+      font-family: monospace;
+    }
+
+    .action-buttons {
+      display: flex;
+      gap: 12px;
+      margin-top: 20px;
+    }
+
+    .btn {
+      flex: 1;
+      padding: 12px 24px;
+      border-radius: 6px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+    }
+
+    .btn-approve {
+      background: #48bb78;
+      color: white;
+    }
+
+    .btn-approve:hover {
+      background: #38a169;
+    }
+
+    .btn-reject {
+      background: #f56565;
+      color: white;
+    }
+
+    .btn-reject:hover {
+      background: #e53e3e;
+    }
+
+    .btn-details {
+      background: #4299e1;
+      color: white;
+    }
+
+    .btn-details:hover {
+      background: #3182ce;
+    }
+
+    .btn:disabled {
+      background: #a0aec0;
+      cursor: not-allowed;
+    }
+
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal.show {
+      display: flex;
+    }
+
+    .modal-content {
+      background: white;
+      border-radius: 12px;
+      padding: 32px;
+      max-width: 500px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+
+    .modal-header {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-group label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .form-group textarea {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #cbd5e0;
+      border-radius: 6px;
+      min-height: 100px;
+      font-family: inherit;
+      resize: vertical;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #a0aec0;
+    }
+
+    .empty-icon {
+      font-size: 64px;
+      margin-bottom: 16px;
+    }
+
+    .logout-btn {
+      padding: 8px 16px;
+      background: #e2e8f0;
+      color: #2d3748;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+
+    @media (max-width: 768px) {
+      .review-header {
+        flex-direction: column;
+      }
+
+      .action-buttons {
+        flex-direction: column;
+      }
+
+      .btn {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-container">
+      <div class="brand">
+        <div class="logo">NP</div>
+        <div class="brand-text">
+          <div class="brand-title">Admin - Review Panel</div>
+        </div>
+      </div>
+      <nav class="nav">
+        <a href="../index.html" style="color: white; margin-right: 16px;">View Public Site</a>
+        <button id="logoutBtn" class="logout-btn">Logout</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="admin-container">
+    <!-- Stats Overview -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value" id="pendingCount">0</div>
+        <div class="stat-label">Pending Review</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="approvedToday">0</div>
+        <div class="stat-label">Approved Today</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="totalSubmissions">0</div>
+        <div class="stat-label">Total Submissions</div>
+      </div>
+    </div>
+
+    <!-- Pending Submissions -->
+    <div class="pending-section">
+      <h2 style="margin-bottom: 24px;">Pending Submissions</h2>
+      <div id="submissionsContainer">
+        <div class="empty-state">
+          <div class="empty-icon">⏳</div>
+          <p>Loading submissions...</p>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Reject Modal -->
+  <div id="rejectModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">Reject Submission</div>
+      <form id="rejectForm">
+        <div class="form-group">
+          <label for="rejectReason">Reason for rejection:</label>
+          <textarea id="rejectReason" placeholder="Please explain why this submission is being rejected..." required></textarea>
+        </div>
+        <div class="action-buttons">
+          <button type="submit" class="btn btn-reject">Confirm Rejection</button>
+          <button type="button" class="btn" style="background: #e2e8f0; color: #2d3748;" onclick="closeRejectModal()">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="../env.js"></script>
+  <script type="module">
+    import { supabase } from '../supabaseClient.js';
+
+    let currentUser = null;
+    let currentSubmissionId = null;
+
+    // Initialize
+    window.addEventListener('DOMContentLoaded', async () => {
+      // Check authentication
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        window.location.href = '../portal/login.html';
+        return;
+      }
+
+      // Get user profile
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('id', session.user.id)
+        .single();
+
+      if (!profile || profile.role !== 'admin') {
+        alert('Access denied. Admin privileges required.');
+        window.location.href = '../portal/dashboard.html';
+        return;
+      }
+
+      currentUser = profile;
+
+      // Load data
+      await loadStats();
+      await loadPendingSubmissions();
+
+      // Setup logout
+      document.getElementById('logoutBtn').addEventListener('click', async () => {
+        await supabase.auth.signOut();
+        window.location.href = '../portal/login.html';
+      });
+
+      // Setup reject form
+      document.getElementById('rejectForm').addEventListener('submit', handleReject);
+    });
+
+    async function loadStats() {
+      try {
+        // Pending count
+        const { count: pendingCount } = await supabase
+          .from('game_submissions')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', 'pending');
+
+        document.getElementById('pendingCount').textContent = pendingCount || 0;
+
+        // Approved today
+        const today = new Date().toISOString().split('T')[0];
+        const { count: approvedToday } = await supabase
+          .from('game_submissions')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', 'approved')
+          .gte('reviewed_at', today);
+
+        document.getElementById('approvedToday').textContent = approvedToday || 0;
+
+        // Total submissions
+        const { count: totalSubmissions } = await supabase
+          .from('game_submissions')
+          .select('*', { count: 'exact', head: true });
+
+        document.getElementById('totalSubmissions').textContent = totalSubmissions || 0;
+
+      } catch (error) {
+        console.error('Error loading stats:', error);
+      }
+    }
+
+    async function loadPendingSubmissions() {
+      const container = document.getElementById('submissionsContainer');
+      
+      try {
+        const { data: submissions, error } = await supabase
+          .from('game_submissions')
+          .select('*, user_profiles!submitted_by(full_name, school_name)')
+          .eq('status', 'pending')
+          .order('created_at', { ascending: true });
+
+        if (error) throw error;
+
+        if (!submissions || submissions.length === 0) {
+          container.innerHTML = `
+            <div class="empty-state">
+              <div class="empty-icon">✅</div>
+              <h3>All caught up!</h3>
+              <p>No pending submissions to review.</p>
+            </div>
+          `;
+          return;
+        }
+
+        container.innerHTML = submissions.map(sub => renderReviewCard(sub)).join('');
+
+        // Add event listeners to buttons
+        submissions.forEach(sub => {
+          document.getElementById(`approve-${sub.id}`)?.addEventListener('click', () => handleApprove(sub.id));
+          document.getElementById(`reject-${sub.id}`)?.addEventListener('click', () => openRejectModal(sub.id));
+        });
+
+      } catch (error) {
+        console.error('Error loading submissions:', error);
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-icon">⚠️</div>
+            <p>Error loading submissions. Please refresh the page.</p>
+          </div>
+        `;
+      }
+    }
+
+    function renderReviewCard(submission) {
+      const submitter = submission.user_profiles || {};
+      const gameData = submission.game_data || {};
+      const game = gameData.game || {};
+      const players = gameData.players || [];
+      
+      const submittedDate = new Date(submission.created_at).toLocaleString();
+      const gameDate = submission.game_date ? new Date(submission.game_date).toLocaleDateString() : 'N/A';
+
+      return `
+        <div class="review-card">
+          <div class="review-header">
+            <div>
+              <div class="review-title">
+                ${submission.sport || 'Game'} - ${game.home_team?.name || 'Home'} vs ${game.away_team?.name || 'Away'}
+              </div>
+              <div class="review-meta">
+                <span>👤 ${submitter.full_name || 'Unknown'} (${submitter.school_name || 'Unknown School'})</span>
+                <span>📅 Game: ${gameDate}</span>
+                <span>⏰ Submitted: ${submittedDate}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="game-details">
+            <div class="detail-row">
+              <span class="detail-label">Sport:</span>
+              <span class="detail-value">${submission.sport || 'N/A'} (${submission.gender || 'N/A'})</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">Teams:</span>
+              <span class="detail-value">${game.home_team?.name || submission.home_team_id || 'Home'} vs ${game.away_team?.name || submission.away_team_id || 'Away'}</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">Final Score:</span>
+              <span class="detail-value">${game.home_team?.score || submission.home_score || '?'} - ${game.away_team?.score || submission.away_score || '?'}</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">Location:</span>
+              <span class="detail-value">${submission.location || 'N/A'}</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">Submission Method:</span>
+              <span class="detail-value">${submission.submission_method?.replace('_', ' ') || 'Manual'}</span>
+            </div>
+          </div>
+
+          ${players.length > 0 ? `
+            <div class="players-section">
+              <h4>Player Statistics (${players.length} players)</h4>
+              <div class="player-list">
+                ${players.map(p => `
+                  <div class="player-row">
+                    <span class="player-name">${p.name}</span>
+                    <span class="player-stats">${formatStats(p.stats)}</span>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          ` : `
+            <p style="color: #a0aec0; font-style: italic;">No player stats included</p>
+          `}
+
+          <div class="action-buttons">
+            <button id="approve-${submission.id}" class="btn btn-approve">
+              ✓ Approve & Publish
+            </button>
+            <button id="reject-${submission.id}" class="btn btn-reject">
+              ✗ Reject
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    function formatStats(stats) {
+      if (!stats) return 'No stats';
+      return Object.entries(stats)
+        .map(([key, val]) => `${key}: ${val}`)
+        .join(', ');
+    }
+
+    async function handleApprove(submissionId) {
+      if (!confirm('Approve this submission and publish to the public site?')) {
+        return;
+      }
+
+      const btn = document.getElementById(`approve-${submissionId}`);
+      const originalText = btn.textContent;
+      btn.textContent = '⏳ Approving...';
+      btn.disabled = true;
+
+      try {
+        // Call the approval function
+        const { data, error } = await supabase.rpc('approve_game_submission', {
+          submission_id: submissionId
+        });
+
+        if (error) throw error;
+
+        alert('✅ Submission approved and published!');
+        
+        // Reload
+        await loadStats();
+        await loadPendingSubmissions();
+
+      } catch (error) {
+        console.error('Approval error:', error);
+        alert('Error approving submission: ' + error.message);
+        btn.textContent = originalText;
+        btn.disabled = false;
+      }
+    }
+
+    function openRejectModal(submissionId) {
+      currentSubmissionId = submissionId;
+      document.getElementById('rejectModal').classList.add('show');
+      document.getElementById('rejectReason').value = '';
+      document.getElementById('rejectReason').focus();
+    }
+
+    window.closeRejectModal = function() {
+      document.getElementById('rejectModal').classList.remove('show');
+      currentSubmissionId = null;
+    }
+
+    async function handleReject(e) {
+      e.preventDefault();
+      
+      const reason = document.getElementById('rejectReason').value.trim();
+      if (!reason) {
+        alert('Please provide a reason for rejection');
+        return;
+      }
+
+      try {
+        const { error } = await supabase
+          .from('game_submissions')
+          .update({
+            status: 'rejected',
+            rejection_reason: reason,
+            reviewed_by: currentUser.id,
+            reviewed_at: new Date().toISOString()
+          })
+          .eq('id', currentSubmissionId);
+
+        if (error) throw error;
+
+        alert('✓ Submission rejected');
+        closeRejectModal();
+        
+        // Reload
+        await loadStats();
+        await loadPendingSubmissions();
+
+      } catch (error) {
+        console.error('Rejection error:', error);
+        alert('Error rejecting submission: ' + error.message);
+      }
+    }
+  </script>
+</body>
+</html>

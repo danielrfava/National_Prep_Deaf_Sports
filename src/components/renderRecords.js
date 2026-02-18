@@ -1,31 +1,693 @@
-export function renderRecords(records, container) {
-  if (!records.length) {
+let currentSort = { column: null, ascending: true };
+let currentRecords = [];
+let currentPage = 1;
+let recordsPerPage = 25;
+let currentStatsView = 'season';
+let currentStatCategory = 'batting'; // For baseball/softball: 'batting' or 'pitching'; For football: 'passing', 'rushing', or 'defense'
+let currentFilters = {}; // Store current filters for re-rendering
+
+// Sport-specific column configurations
+const sportColumns = {
+  basketball: [
+    { key: 'gp', label: 'GP', type: 'number', field: 'GP' },
+    { key: 'pts', label: 'PTS', type: 'number', field: 'PTS' },
+    { key: 'ppg', label: 'PPG', type: 'number', field: 'PPG' },
+    { key: 'rpg', label: 'RPG', type: 'number', field: 'RPG' },
+    { key: 'apg', label: 'APG', type: 'number', field: 'APG' },
+    { key: 'spg', label: 'SPG', type: 'number', field: 'SPG' },
+    { key: 'bpg', label: 'BPG', type: 'number', field: 'BPG' },
+    { key: 'tpg', label: 'TPG', type: 'number', field: 'TPG' },
+    { key: 'offr', label: 'OFFR', type: 'number', field: 'OFFR' },
+    { key: 'defr', label: 'DEFR', type: 'number', field: 'DEFR' },
+    { key: 'pfpg', label: 'PF', type: 'number', field: 'PFPG' }
+  ],
+  volleyball: [
+    { key: 'gp', label: 'GP', type: 'number', field: 'GP' },
+    { key: 'k', label: 'K', type: 'number', field: 'K' },
+    { key: 'kpg', label: 'K/G', type: 'number', field: 'K/G' },
+    { key: 'dig', label: 'DIG', type: 'number', field: 'DIG' },
+    { key: 'dpg', label: 'D/G', type: 'number', field: 'D/G' },
+    { key: 'ace', label: 'ACE', type: 'number', field: 'ACE' },
+    { key: 'apg', label: 'A/G', type: 'number', field: 'A/G' },
+    { key: 'blk', label: 'BLK', type: 'number', field: 'BLK' },
+    { key: 'bpg', label: 'B/G', type: 'number', field: 'B/G' },
+    { key: 'ast', label: 'AST', type: 'number', field: 'AST' },
+    { key: 'aspg', label: 'AS/G', type: 'number', field: 'AS/G' }
+  ],
+  football_passing: [
+    { key: 'gp', label: 'GP', type: 'number', field: 'GP' },
+    { key: 'comp', label: 'COMP', type: 'number', field: 'COMP' },
+    { key: 'att', label: 'ATT', type: 'number', field: 'ATT' },
+    { key: 'pct', label: 'PCT', type: 'number', field: 'PCT' },
+    { key: 'yds', label: 'YDS', type: 'number', field: 'YDS' },
+    { key: 'ypg', label: 'YPG', type: 'number', field: 'YPG' },
+    { key: 'td', label: 'TD', type: 'number', field: 'TD' },
+    { key: 'int', label: 'INT', type: 'number', field: 'INT' },
+    { key: 'qbr', label: 'QBR', type: 'number', field: 'QBR' },
+    { key: 'rating', label: 'Rating', type: 'number', field: 'Rating' }
+  ],
+  football_rushing: [
+    { key: 'gp', label: 'GP', type: 'number', field: 'GP' },
+    { key: 'att', label: 'ATT', type: 'number', field: 'ATT' },
+    { key: 'yds', label: 'YDS', type: 'number', field: 'YDS' },
+    { key: 'avg', label: 'AVG', type: 'number', field: 'AVG' },
+    { key: 'ypg', label: 'YPG', type: 'number', field: 'YPG' },
+    { key: 'td', label: 'TD', type: 'number', field: 'TD' },
+    { key: 'long', label: 'Long', type: 'number', field: 'Long' },
+    { key: 'fum', label: 'FUM', type: 'number', field: 'FUM' },
+    { key: 'rec', label: 'REC', type: 'number', field: 'REC' },
+    { key: 'recyds', label: 'Rec YDS', type: 'number', field: 'Rec YDS' },
+    { key: 'rectd', label: 'Rec TD', type: 'number', field: 'Rec TD' }
+  ],
+  football_defense: [
+    { key: 'gp', label: 'GP', type: 'number', field: 'GP' },
+    { key: 'tackles', label: 'Tackles', type: 'number', field: 'Tackles' },
+    { key: 'solo', label: 'Solo', type: 'number', field: 'Solo' },
+    { key: 'ast', label: 'AST', type: 'number', field: 'AST' },
+    { key: 'tfl', label: 'TFL', type: 'number', field: 'TFL' },
+    { key: 'sacks', label: 'Sacks', type: 'number', field: 'Sacks' },
+    { key: 'int', label: 'INT', type: 'number', field: 'INT' },
+    { key: 'pd', label: 'PD', type: 'number', field: 'PD' },
+    { key: 'ff', label: 'FF', type: 'number', field: 'FF' },
+    { key: 'fr', label: 'FR', type: 'number', field: 'FR' },
+    { key: 'td', label: 'TD', type: 'number', field: 'TD' }
+  ],
+  baseball_batting: [
+    { key: 'gp', label: 'GP', type: 'number', field: 'GP' },
+    { key: 'avg', label: 'AVG', type: 'number', field: 'AVG' },
+    { key: 'ab', label: 'AB', type: 'number', field: 'AB' },
+    { key: 'h', label: 'H', type: 'number', field: 'H' },
+    { key: '2b', label: '2B', type: 'number', field: '2B' },
+    { key: '3b', label: '3B', type: 'number', field: '3B' },
+    { key: 'hr', label: 'HR', type: 'number', field: 'HR' },
+    { key: 'rbi', label: 'RBI', type: 'number', field: 'RBI' },
+    { key: 'r', label: 'R', type: 'number', field: 'R' },
+    { key: 'sb', label: 'SB', type: 'number', field: 'SB' },
+    { key: 'bb', label: 'BB', type: 'number', field: 'BB' },
+    { key: 'so', label: 'SO', type: 'number', field: 'SO' },
+    { key: 'obp', label: 'OBP', type: 'number', field: 'OBP' },
+    { key: 'slg', label: 'SLG', type: 'number', field: 'SLG' }
+  ],
+  baseball_pitching: [
+    { key: 'gp', label: 'GP', type: 'number', field: 'GP' },
+    { key: 'w', label: 'W', type: 'number', field: 'W' },
+    { key: 'l', label: 'L', type: 'number', field: 'L' },
+    { key: 'era', label: 'ERA', type: 'number', field: 'ERA' },
+    { key: 'ip', label: 'IP', type: 'number', field: 'IP' },
+    { key: 'h', label: 'H', type: 'number', field: 'H' },
+    { key: 'r', label: 'R', type: 'number', field: 'R' },
+    { key: 'er', label: 'ER', type: 'number', field: 'ER' },
+    { key: 'bb', label: 'BB', type: 'number', field: 'BB' },
+    { key: 'so', label: 'SO', type: 'number', field: 'SO' },
+    { key: 'sv', label: 'SV', type: 'number', field: 'SV' },
+    { key: 'whip', label: 'WHIP', type: 'number', field: 'WHIP' }
+  ],
+  softball_batting: [
+    { key: 'gp', label: 'GP', type: 'number', field: 'GP' },
+    { key: 'avg', label: 'AVG', type: 'number', field: 'AVG' },
+    { key: 'ab', label: 'AB', type: 'number', field: 'AB' },
+    { key: 'h', label: 'H', type: 'number', field: 'H' },
+    { key: '2b', label: '2B', type: 'number', field: '2B' },
+    { key: '3b', label: '3B', type: 'number', field: '3B' },
+    { key: 'hr', label: 'HR', type: 'number', field: 'HR' },
+    { key: 'rbi', label: 'RBI', type: 'number', field: 'RBI' },
+    { key: 'r', label: 'R', type: 'number', field: 'R' },
+    { key: 'sb', label: 'SB', type: 'number', field: 'SB' },
+    { key: 'bb', label: 'BB', type: 'number', field: 'BB' },
+    { key: 'so', label: 'SO', type: 'number', field: 'SO' },
+    { key: 'obp', label: 'OBP', type: 'number', field: 'OBP' },
+    { key: 'slg', label: 'SLG', type: 'number', field: 'SLG' }
+  ],
+  softball_pitching: [
+    { key: 'gp', label: 'GP', type: 'number', field: 'GP' },
+    { key: 'w', label: 'W', type: 'number', field: 'W' },
+    { key: 'l', label: 'L', type: 'number', field: 'L' },
+    { key: 'era', label: 'ERA', type: 'number', field: 'ERA' },
+    { key: 'ip', label: 'IP', type: 'number', field: 'IP' },
+    { key: 'h', label: 'H', type: 'number', field: 'H' },
+    { key: 'r', label: 'R', type: 'number', field: 'R' },
+    { key: 'er', label: 'ER', type: 'number', field: 'ER' },
+    { key: 'bb', label: 'BB', type: 'number', field: 'BB' },
+    { key: 'so', label: 'SO', type: 'number', field: 'SO' },
+    { key: 'sv', label: 'SV', type: 'number', field: 'SV' },
+    { key: 'whip', label: 'WHIP', type: 'number', field: 'WHIP' }
+  ]
+};
+
+function detectSportType(sport) {
+  const sportLower = (sport || '').toLowerCase();
+  if (sportLower.includes('basketball')) return 'basketball';
+  if (sportLower.includes('volleyball')) return 'volleyball';
+  if (sportLower.includes('football')) return 'football';
+  if (sportLower.includes('baseball')) return 'baseball';
+  if (sportLower.includes('softball')) return 'softball';
+  return 'basketball'; // default
+}
+
+function getSportColumns(sport, statCategory = 'batting') {
+  const sportType = detectSportType(sport);
+  
+  // For baseball, softball, and football - append the stat category
+  if (sportType === 'baseball' || sportType === 'softball') {
+    const key = `${sportType}_${statCategory}`;
+    return sportColumns[key] || sportColumns[`${sportType}_batting`];
+  }
+  
+  if (sportType === 'football') {
+    const key = `${sportType}_${statCategory}`;
+    return sportColumns[key] || sportColumns['football_rushing'];
+  }
+  
+  return sportColumns[sportType] || sportColumns.basketball;
+}
+
+function sportNeedsCategories(sport) {
+  const sportType = detectSportType(sport);
+  return sportType === 'baseball' || sportType === 'softball' || sportType === 'football';
+}
+
+function getCategoriesForSport(sport) {
+  const sportType = detectSportType(sport);
+  
+  if (sportType === 'baseball' || sportType === 'softball') {
+    return [
+      { key: 'batting', label: 'Batting' },
+      { key: 'pitching', label: 'Pitching' }
+    ];
+  }
+  
+  if (sportType === 'football') {
+    return [
+      { key: 'passing', label: 'Passing' },
+      { key: 'rushing', label: 'Rushing' },
+      { key: 'defense', label: 'Defense' }
+    ];
+  }
+  
+  return [];
+}
+
+const schoolAbbreviations = {
+  // Big 6 Conference - Division 1
+  'Maryland School for the Deaf': 'MSD',
+  'Model Secondary School for the Deaf': 'MSSD',
+  'California School for the Deaf, Fremont': 'CSDF',
+  'California School for the Deaf-Fremont': 'CSDF',
+  'California School for the Deaf, Riverside': 'CSDR',
+  'California School for the Deaf-Riverside': 'CSDR',
+  'Indiana School for the Deaf': 'ISD',
+  'Texas School for the Deaf': 'TSD',
+  
+  // ESDAA Conference - Division 2
+  'Lexington School for the Deaf': 'LSD',
+  'Ohio School for the Deaf': 'OSD',
+  'American School for the Deaf': 'ASD',
+  'Delaware School for the Deaf': 'DelSD',
+  'Marie H. Katzenbach School for the Deaf': 'KSD',
+  'The Learning Center for the Deaf': 'TLC',
+  'Western Pennsylvania School for the Deaf': 'WPSD',
+  'Governor Baxter School for the Deaf': 'GBSD',
+  'New York State School for the Deaf': 'NYSSD',
+  'Rochester School for the Deaf': 'RSD',
+  'West Virginia Schools for the Deaf and Blind': 'WVSDB',
+  
+  // GPSD Conference - Division 2
+  'Arkansas School for the Deaf': 'ASD-AR',
+  'Iowa School for the Deaf': 'ISD-IA',
+  'Kansas State School for the Deaf': 'KSSD',
+  'Minnesota State Academy for the Deaf': 'MSAD',
+  'Missouri School for the Deaf': 'MSD-MO',
+  'New Mexico School for the Deaf': 'NMSD',
+  'North Dakota School for the Deaf': 'NDSD',
+  'Oklahoma School for the Deaf': 'OSD-OK',
+  'Wisconsin School for the Deaf': 'WSD',
+  
+  // MDSDAA Conference - Division 2
+  'Alabama Institute for the Deaf and Blind': 'AIDB',
+  'Eastern North Carolina School for the Deaf': 'ENCSD',
+  'Florida School for the Deaf and Blind': 'FSDB',
+  'Georgia School for the Deaf': 'GSD',
+  'Kentucky School for the Deaf': 'KSD-KY',
+  'Louisiana School for the Deaf': 'LSD-LA',
+  'Mississippi School for the Deaf': 'MSD-MS',
+  'North Carolina School for the Deaf': 'NCSD',
+  'South Carolina School for the Deaf and Blind': 'SCSDB',
+  'Tennessee School for the Deaf': 'TSD-TN',
+  'Virginia School for the Deaf and the Blind': 'VSDB',
+  
+  // Independent - Division 2
+  'Colorado School for the Deaf and Blind': 'CSDB',
+  'Hawaii School for the Deaf and the Blind': 'HSDB',
+  'Illinois School for the Deaf': 'ISD-IL',
+  'Michigan School for the Deaf': 'MSD-MI'
+};
+
+function getSchoolAbbrev(fullSchool) {
+  if (!fullSchool) return '';
+  
+  console.log('Getting abbreviation for:', fullSchool);
+  
+  // Direct match first
+  if (schoolAbbreviations[fullSchool]) {
+    console.log('  -> Found direct match:', schoolAbbreviations[fullSchool]);
+    return schoolAbbreviations[fullSchool];
+  }
+  
+  // Normalize school name: remove punctuation, extra spaces, lowercase
+  const normalizeSchool = (name) => {
+    return name.toLowerCase()
+      .replace(/[,.\-\s]+/g, ' ')  // Replace punctuation and multiple spaces with single space
+      .trim()
+      .replace(/\s+/g, '');  // Remove all spaces
+  };
+  
+  const normalizedInput = normalizeSchool(fullSchool);
+  
+  // Try to find a match
+  for (const [key, value] of Object.entries(schoolAbbreviations)) {
+    if (normalizeSchool(key) === normalizedInput) {
+      console.log('  -> Found normalized match:', value);
+      return value;
+    }
+  }
+  
+  // If no match, try to extract abbreviation from school name
+  // e.g., "California School for the Deaf-Riverside" -> "CSDR"
+  const words = fullSchool.split(/[\s\-,]+/);
+  const hasRiverside = fullSchool.toLowerCase().includes('riverside');
+  const hasFremont = fullSchool.toLowerCase().includes('fremont');
+  
+  if (fullSchool.toLowerCase().includes('california') && fullSchool.toLowerCase().includes('deaf')) {
+    if (hasRiverside) {
+      console.log('  -> Extracted: CSDR');
+      return 'CSDR';
+    }
+    if (hasFremont) {
+      console.log('  -> Extracted: CSDF');
+      return 'CSDF';
+    }
+  }
+  
+  if (fullSchool.toLowerCase().includes('indiana') && fullSchool.toLowerCase().includes('deaf')) {
+    console.log('  -> Extracted: ISD');
+    return 'ISD';
+  }
+  
+  if (fullSchool.toLowerCase().includes('maryland') && fullSchool.toLowerCase().includes('deaf')) {
+    console.log('  -> Extracted: MSD');
+    return 'MSD';
+  }
+  
+  if (fullSchool.toLowerCase().includes('texas') && fullSchool.toLowerCase().includes('deaf')) {
+    console.log('  -> Extracted: TSD');
+    return 'TSD';
+  }
+  
+  // Return original name if no match found
+  console.log('  -> No match found, returning original');
+  return fullSchool;
+}
+
+function aggregateCareerStats(records) {
+  const playerMap = new Map();
+  
+  // Detect sport type from records
+  const sportType = records.length > 0 ? detectSportType(records[0].sport) : 'basketball';
+  const columns = getSportColumns(records[0]?.sport || 'basketball', currentStatCategory);
+  
+  records.forEach(record => {
+    const rawName = record.stat_row?.["Athlete Name"];
+    if (!rawName) return;
+    
+    // Strip year designation (Fr, So, Jr, Sr) from name for aggregation
+    // e.g., "A. Senics(Fr)" -> "A. Senics"
+    const cleanName = rawName.replace(/\((Fr|So|Jr|Sr)\)/i, '').trim();
+    
+    const key = `${cleanName}|${record.school}|${record.sport}`; // Key by name + school + sport
+    if (!playerMap.has(key)) {
+      const statTotals = {};
+      columns.forEach(col => {
+        statTotals[col.field] = 0;
+      });
+      
+      playerMap.set(key, {
+        name: cleanName,
+        school: record.school,
+        sport: record.sport,
+        seasons: new Set(),
+        seasonData: new Map(), // Track data per season to avoid duplicates
+        totalGP: 0,
+        statTotals
+      });
+    }
+    
+    const player = playerMap.get(key);
+    const season = record.season || 'unknown';
+    
+    // Only process each season once (avoid duplicates)
+    if (!player.seasonData.has(season)) {
+      player.seasons.add(season);
+      
+      const gp = parseFloat(record.stat_row?.["GP"]) || 0;
+      player.totalGP += gp;
+      
+      // Store season data
+      player.seasonData.set(season, {
+        gp: gp,
+        processed: true
+      });
+      
+      // Aggregate all stat fields dynamically
+      columns.forEach(col => {
+        if (col.key === 'gp') return; // Skip GP, we handle it separately
+        
+        let value = parseFloat(record.stat_row?.[col.field]) || 0;
+        
+        // Special handling for PTS - calculate from PPG if PTS is missing
+        if (col.key === 'pts' && value === 0 && sportType === 'basketball') {
+          const ppg = parseFloat(record.stat_row?.["PPG"]) || 0;
+          value = ppg * gp; // Total points for this season
+        }
+        
+        // For per-game stats (ending in /G or PG), multiply by GP to get totals
+        if (col.label.endsWith('/G') || col.label.endsWith('PG')) {
+          player.statTotals[col.field] += value * gp;
+        } else {
+          // For counting stats, just add them
+          player.statTotals[col.field] += value;
+        }
+      });
+    }
+  });
+  
+  return Array.from(playerMap.values()).map(player => {
+    // Format season range
+    const seasonArray = Array.from(player.seasons).sort();
+    let seasonDisplay = '';
+    
+    if (seasonArray.length === 0) {
+      seasonDisplay = '';
+    } else if (seasonArray.length === 1) {
+      seasonDisplay = seasonArray[0];
+    } else {
+      const firstSeason = seasonArray[0];
+      const lastSeason = seasonArray[seasonArray.length - 1];
+      const firstYear = firstSeason.split('-')[0];
+      const lastYear = lastSeason.split('-')[0];
+      seasonDisplay = `${firstYear}-${lastYear}`;
+    }
+    
+    // Build career stat_row
+    const careerStats = {
+      "Athlete Name": player.name,
+      "GP": player.totalGP.toFixed(0)
+    };
+    
+    // Calculate career averages or totals for each stat
+    columns.forEach(col => {
+      if (col.key === 'gp') return; // Already handled
+      
+      const total = player.statTotals[col.field];
+      
+      // For per-game stats, calculate career average
+      if (col.label.endsWith('/G') || col.label.endsWith('PG')) {
+        careerStats[col.field] = player.totalGP > 0 
+          ? (total / player.totalGP).toFixed(1) 
+          : '0.0';
+      } else if (col.label === 'AVG') {
+        // Batting average stays as average
+        const count = player.seasons.size;
+        careerStats[col.field] = count > 0 
+          ? (total / count).toFixed(3)
+          : '.000';
+      } else {
+        // For counting stats (K, DIG, ACE, H, HR, etc), show career totals
+        careerStats[col.field] = total.toFixed(0);
+      }
+    });
+    
+    return {
+      stat_row: careerStats,
+      school: getSchoolAbbrev(player.school), // Use abbreviation
+      sport: player.sport,
+      season: seasonDisplay
+    };
+  });
+}
+
+export function setStatsView(view) {
+  currentStatsView = view;
+}
+
+export function setStatCategory(category) {
+  currentStatCategory = category;
+}
+
+export function getStatCategory() {
+  return currentStatCategory;
+}
+
+export function renderRecords(records, container, statsView = 'season', filters = {}) {
+  currentStatsView = statsView;
+  currentFilters = filters; // Store filters for re-rendering
+  
+  // Aggregate career stats if needed
+  const displayRecords = statsView === 'career' ? aggregateCareerStats(records) : records;
+  
+  // Determine which columns to hide based on filters
+  const hideSchool = filters.schoolId && filters.schoolId !== '';
+  const hideSport = filters.sport && filters.sport !== '';
+  
+  // Set default stat category based on sport if not already set appropriately
+  if (displayRecords.length > 0) {
+    const sportType = detectSportType(displayRecords[0].sport);
+    if (sportType === 'football' && ['batting', 'pitching'].includes(currentStatCategory)) {
+      currentStatCategory = 'rushing'; // Default for football
+    } else if ((sportType === 'baseball' || sportType === 'softball') && 
+               ['passing', 'rushing', 'defense'].includes(currentStatCategory)) {
+      currentStatCategory = 'batting'; // Default for baseball/softball
+    }
+  }
+  
+  currentRecords = displayRecords;
+  currentPage = 1; // Reset to first page on new data
+
+  if (!displayRecords.length) {
     container.innerHTML = "<p>No records found.</p>";
     return;
   }
 
-  container.innerHTML = records
-    .map((record) => {
-      const school = record.school_name || record.school || record.school_id || "N/A";
-      const team = record.team || "N/A";
-      const division = record.division || "N/A";
-      const gender = record.gender || "N/A";
-      const deaflympics =
-        record.deaflympics === true ? "Yes" : record.deaflympics === false ? "No" : "N/A";
+  // Detect sport type from first record
+  const sportType = displayRecords.length > 0 ? detectSportType(displayRecords[0].sport) : 'basketball';
+  const columns = getSportColumns(displayRecords[0]?.sport || 'basketball', currentStatCategory);
+  const needsCategories = displayRecords.length > 0 ? sportNeedsCategories(displayRecords[0].sport) : false;
+
+  const totalPages = Math.ceil(displayRecords.length / recordsPerPage);
+  const start = (currentPage - 1) * recordsPerPage;
+  const end = start + recordsPerPage;
+  const pageRecords = displayRecords.slice(start, end);
+
+  // Generate dynamic table headers
+  const statHeaders = columns.map(col => 
+    `<th data-sort="${col.key}">${col.label}</th>`
+  ).join('');
+
+  // Generate stat category tabs for baseball/softball/football
+  const categoryTabsHTML = needsCategories ? `
+    <div class="stat-category-tabs">
+      ${getCategoriesForSport(displayRecords[0]?.sport).map(cat => `
+        <button class="stat-tab ${currentStatCategory === cat.key ? 'active' : ''}" data-category="${cat.key}">
+          ${cat.label}
+        </button>
+      `).join('')}
+    </div>
+  ` : '';
+
+  const tableHTML = `
+    ${categoryTabsHTML}
+    <div class="pagination-controls">
+      <div class="pagination-info">
+        Showing ${start + 1}-${Math.min(end, displayRecords.length)} of ${displayRecords.length} ${statsView === 'career' ? 'players' : 'records'}
+      </div>
+      <div class="pagination-actions">
+        <label for="perPage">Show:</label>
+        <select id="perPage" class="per-page-selector">
+          <option value="25" ${recordsPerPage === 25 ? 'selected' : ''}>25</option>
+          <option value="50" ${recordsPerPage === 50 ? 'selected' : ''}>50</option>
+          <option value="100" ${recordsPerPage === 100 ? 'selected' : ''}>100</option>
+        </select>
+        <div class="page-nav">
+          <button class="prev-page" ${currentPage === 1 ? 'disabled' : ''}>← Prev</button>
+          <span class="page-numbers">Page ${currentPage} of ${totalPages}</span>
+          <button class="next-page" ${currentPage === totalPages ? 'disabled' : ''}>Next →</button>
+        </div>
+      </div>
+    </div>
+    <div class="stats-table-container">
+      <table class="stats-table">
+        <thead>
+          <tr>
+            <th data-sort="rank">#</th>
+            <th data-sort="name">Player</th>
+            ${hideSchool ? '' : '<th data-sort="school">School</th>'}
+            ${hideSport ? '' : '<th data-sort="sport">Sport</th>'}
+            <th data-sort="season">Season</th>
+            ${statHeaders}
+          </tr>
+        </thead>
+        <tbody>
+          ${renderTableRows(pageRecords, start, sportType, hideSchool, hideSport)}
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  container.innerHTML = tableHTML;
+
+  // Add click handlers to table headers for sorting
+  container.querySelectorAll("th[data-sort]").forEach((th) => {
+    th.addEventListener("click", () => {
+      const column = th.dataset.sort;
+      sortTable(column, container);
+    });
+  });
+
+  // Add click handlers to stat category tabs
+  container.querySelectorAll(".stat-tab").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      const category = tab.dataset.category;
+      if (category !== currentStatCategory) {
+        currentStatCategory = category;
+        renderRecords(currentRecords, container, currentStatsView, currentFilters);
+      }
+    });
+  });
+
+  // Pagination controls
+  const perPageSelector = container.querySelector("#perPage");
+  if (perPageSelector) {
+    perPageSelector.addEventListener("change", (e) => {
+      recordsPerPage = parseInt(e.target.value);
+      currentPage = 1;
+      renderRecords(currentRecords, container, currentStatsView, currentFilters);
+    });
+  }
+
+  const prevButton = container.querySelector(".prev-page");
+  if (prevButton) {
+    prevButton.addEventListener("click", () => {
+      if (currentPage > 1) {
+        currentPage--;
+        renderRecords(currentRecords, container, currentStatsView, currentFilters);
+      }
+    });
+  }
+
+  const nextButton = container.querySelector(".next-page");
+  if (nextButton) {
+    nextButton.addEventListener("click", () => {
+      const totalPages = Math.ceil(currentRecords.length / recordsPerPage);
+      if (currentPage < totalPages) {
+        currentPage++;
+        renderRecords(currentRecords, container, currentStatsView, currentFilters);
+      }
+    });
+  }
+}
+
+function renderTableRows(records, startIndex = 0, sportType = 'basketball', hideSchool = false, hideSport = false) {
+  const columns = getSportColumns(records[0]?.sport || 'basketball', currentStatCategory);
+  
+  return records
+    .map((record, index) => {
+      const athleteName = record.stat_row?.["Athlete Name"] || "Unknown";
+      const fullSchool = record.school || "";
+      const school = getSchoolAbbrev(fullSchool);
+      const sport = record.sport || "";
+      const season = record.season || "";
+      
+      // Generate dynamic stat cells based on sport columns
+      const statCells = columns.map(col => {
+        let value = record.stat_row?.[col.field] || "";
+        
+        // Special handling for PTS column in basketball
+        if (col.key === 'pts' && !value && currentStatsView === 'season' && sportType === 'basketball') {
+          const gp = parseFloat(record.stat_row?.["GP"]) || 0;
+          const ppg = parseFloat(record.stat_row?.["PPG"]) || 0;
+          value = gp > 0 && ppg > 0 ? (gp * ppg).toFixed(0) : "";
+        }
+        
+        return `<td>${value}</td>`;
+      }).join('');
 
       return `
-        <article class="record">
-          <h3>${record.name ?? "Unknown"}</h3>
-          <p><strong>School:</strong> ${school}</p>
-          <p><strong>Team:</strong> ${team}</p>
-          <p><strong>Sport:</strong> ${record.sport ?? "N/A"}</p>
-          <p><strong>Division:</strong> ${division}</p>
-          <p><strong>Girls/Boys:</strong> ${gender}</p>
-          <p><strong>Deaflympics:</strong> ${deaflympics}</p>
-          <p><strong>Year:</strong> ${record.year ?? "N/A"}</p>
-          <p><strong>Location:</strong> ${record.location ?? "N/A"}</p>
-        </article>
+        <tr>
+          <td>${startIndex + index + 1}</td>
+          <td class="athlete-name">${athleteName}</td>
+          ${hideSchool ? '' : `<td>${school}</td>`}
+          ${hideSport ? '' : `<td>${sport}</td>`}
+          <td>${season}</td>
+          ${statCells}
+        </tr>
       `;
     })
     .join("");
+}
+
+function sortTable(column, container) {
+  if (currentSort.column === column) {
+    currentSort.ascending = !currentSort.ascending;
+  } else {
+    currentSort.column = column;
+    currentSort.ascending = false;
+  }
+
+  const sorted = [...currentRecords].sort((a, b) => {
+    let aVal, bVal;
+
+    switch (column) {
+      case "rank":
+        return 0;
+      case "name":
+        aVal = a.stat_row?.["Athlete Name"] || "";
+        bVal = b.stat_row?.["Athlete Name"] || "";
+        break;
+      case "school":
+        aVal = a.school || "";
+        bVal = b.school || "";
+        break;
+      case "sport":
+        aVal = a.sport || "";
+        bVal = b.sport || "";
+        break;
+      case "season":
+        aVal = a.season || "";
+        bVal = b.season || "";
+        break;
+      default:
+        // Dynamic column lookup - find the field mapping from sport columns
+        const sportType = a.sport ? detectSportType(a.sport) : 'basketball';
+        const columns = getSportColumns(a.sport || 'basketball', currentStatCategory);
+        const colConfig = columns.find(c => c.key === column);
+        
+        if (colConfig) {
+          aVal = parseFloat(a.stat_row?.[colConfig.field]) || 0;
+          bVal = parseFloat(b.stat_row?.[colConfig.field]) || 0;
+        } else {
+          return 0;
+        }
+    }
+
+    if (typeof aVal === "string") {
+      return currentSort.ascending
+        ? aVal.localeCompare(bVal)
+        : bVal.localeCompare(aVal);
+    } else {
+      return currentSort.ascending ? aVal - bVal : bVal - aVal;
+    }
+  });
+
+  currentRecords = sorted;
+  currentPage = 1; // Reset to first page after sorting
+  renderRecords(sorted, container, currentStatsView, currentFilters);
 }

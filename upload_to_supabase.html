@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload Stats to Supabase</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .config-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+        }
+
+        .config-section h2 {
+            font-size: 18px;
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .input-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .help-text {
+            font-size: 12px;
+            color: #888;
+            margin-top: 5px;
+        }
+
+        .file-upload {
+            border: 3px dashed #667eea;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 20px;
+        }
+
+        .file-upload:hover {
+            background: #f0f4ff;
+            border-color: #764ba2;
+        }
+
+        .file-upload.dragover {
+            background: #e8f0fe;
+            border-color: #764ba2;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .upload-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+
+        .upload-text {
+            color: #667eea;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .upload-hint {
+            color: #888;
+            font-size: 12px;
+        }
+
+        .file-name {
+            margin-top: 15px;
+            padding: 10px;
+            background: #e8f5e9;
+            border-radius: 6px;
+            color: #2e7d32;
+            font-size: 14px;
+            display: none;
+        }
+
+        .file-name.show {
+            display: block;
+        }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .progress {
+            margin-top: 20px;
+            display: none;
+        }
+
+        .progress.show {
+            display: block;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            width: 0%;
+            transition: width 0.3s;
+        }
+
+        .progress-text {
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+        }
+
+        .log {
+            margin-top: 20px;
+            max-height: 300px;
+            overflow-y: auto;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            display: none;
+        }
+
+        .log.show {
+            display: block;
+        }
+
+        .log-entry {
+            margin-bottom: 5px;
+            padding: 5px;
+        }
+
+        .log-entry.success {
+            color: #2e7d32;
+        }
+
+        .log-entry.error {
+            color: #c62828;
+        }
+
+        .log-entry.info {
+            color: #1976d2;
+        }
+
+        .summary {
+            margin-top: 20px;
+            padding: 20px;
+            background: #e8f5e9;
+            border-radius: 6px;
+            display: none;
+        }
+
+        .summary.show {
+            display: block;
+        }
+
+        .summary h3 {
+            color: #2e7d32;
+            margin-bottom: 10px;
+        }
+
+        .summary-item {
+            margin: 5px 0;
+            color: #555;
+        }
+
+        .test-btn {
+            margin-top: 15px;
+            padding: 10px 20px;
+            background: #2196f3;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+
+        .test-btn:hover {
+            background: #1976d2;
+        }
+
+        .test-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .connection-status {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 6px;
+            display: none;
+            font-size: 14px;
+        }
+
+        .connection-status.show {
+            display: block;
+        }
+
+        .connection-status.success {
+            background: #e8f5e9;
+            color: #2e7d32;
+            border: 1px solid #4caf50;
+        }
+
+        .connection-status.error {
+            background: #ffebee;
+            color: #c62828;
+            border: 1px solid #f44336;
+        }
+
+        .connection-status.info {
+            background: #e3f2fd;
+            color: #1976d2;
+            border: 1px solid #2196f3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 Upload Stats to Supabase</h1>
+        <p class="subtitle">Upload your MaxPreps JSON file to import player statistics</p>
+
+        <div class="config-section">
+            <h2>Supabase Configuration</h2>
+            <div class="input-group">
+                <label for="supabaseUrl">Supabase Project URL</label>
+                <input type="text" id="supabaseUrl" value="https://qsxbtgkezugiaovkxrup.supabase.co" placeholder="https://xxxxx.supabase.co">
+                <div class="help-text">Get this from: Supabase Dashboard > Settings > API</div>
+            </div>
+            <div class="input-group">
+                <label for="supabaseKey">Supabase API Key (anon public)</label>
+                <input type="text" id="supabaseKey" value="sb_publishable_ayQtCDTXE-1N7S0Guu2AUA_UYRJ1T05" placeholder="eyJhbGc... or sb_publishable_...">
+                <div class="help-text">Use the "anon public" or "publishable" key (starts with eyJ or sb_publishable_), not the service role key</div>
+            </div>
+            <button id="testConnectionBtn" class="test-btn">🔍 Test Connection</button>
+            <div id="connectionStatus" class="connection-status"></div>
+        </div>
+
+        <div class="file-upload" id="fileUpload">
+            <div class="upload-icon">📁</div>
+            <div class="upload-text">Click to select JSON file</div>
+            <div class="upload-hint">or drag and drop here</div>
+            <input type="file" id="fileInput" accept=".json">
+        </div>
+
+        <div class="file-name" id="fileName"></div>
+
+        <button id="uploadBtn" disabled>Upload to Supabase</button>
+
+        <div class="progress" id="progress">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <div class="progress-text" id="progressText">0%</div>
+        </div>
+
+        <div class="log" id="log"></div>
+
+        <div class="summary" id="summary">
+            <h3>✓ Upload Complete!</h3>
+            <div class="summary-item" id="summaryContent"></div>
+        </div>
+    </div>
+
+    <script>
+        let supabaseClient = null;
+        let selectedFile = null;
+        let uploadedRecords = new Set(); // Track uploaded records to prevent duplicates
+
+        // Initialize
+        document.getElementById('fileInput').addEventListener('change', handleFileSelect);
+        document.getElementById('fileUpload').addEventListener('click', () => document.getElementById('fileInput').click());
+        document.getElementById('uploadBtn').addEventListener('click', startUpload);
+
+        // Drag and drop
+        const fileUpload = document.getElementById('fileUpload');
+        fileUpload.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            fileUpload.classList.add('dragover');
+        });
+        fileUpload.addEventListener('dragleave', () => {
+            fileUpload.classList.remove('dragover');
+        });
+        fileUpload.addEventListener('drop', (e) => {
+            e.preventDefault();
+            fileUpload.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0 && files[0].name.endsWith('.json')) {
+                handleFile(files[0]);
+            }
+        });
+
+        function handleFileSelect(e) {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        }
+
+        function handleFile(file) {
+            selectedFile = file;
+            document.getElementById('fileName').textContent = `Selected: ${file.name}`;
+            document.getElementById('fileName').classList.add('show');
+            checkReady();
+        }
+
+        function checkReady() {
+            const url = document.getElementById('supabaseUrl').value.trim();
+            const key = document.getElementById('supabaseKey').value.trim();
+            const btn = document.getElementById('uploadBtn');
+            
+            if (url && key && selectedFile) {
+                btn.disabled = false;
+                // Initialize Supabase client
+                supabaseClient = window.supabase.createClient(url, key);
+            } else {
+                btn.disabled = true;
+            }
+        }
+
+        document.getElementById('supabaseUrl').addEventListener('input', checkReady);
+        document.getElementById('supabaseKey').addEventListener('input', checkReady);
+        document.getElementById('testConnectionBtn').addEventListener('click', testConnection);
+
+        async function testConnection() {
+            const url = document.getElementById('supabaseUrl').value.trim();
+            const key = document.getElementById('supabaseKey').value.trim();
+            const statusDiv = document.getElementById('connectionStatus');
+            const testBtn = document.getElementById('testConnectionBtn');
+
+            if (!url || !key) {
+                statusDiv.textContent = '⚠ Please enter both URL and API key';
+                statusDiv.className = 'connection-status show error';
+                return;
+            }
+
+            // Validate URL format
+            if (!url.startsWith('https://') || !url.includes('.supabase.co')) {
+                statusDiv.textContent = '⚠ Invalid Supabase URL format. Should be: https://xxxxx.supabase.co';
+                statusDiv.className = 'connection-status show error';
+                return;
+            }
+
+            // Validate API key format (accepts both eyJ JWT format and sb_publishable_ format)
+            if (!key.startsWith('eyJ') && !key.startsWith('sb_publishable_')) {
+                statusDiv.textContent = '⚠ API key format looks incorrect. Should start with "eyJ" or "sb_publishable_"';
+                statusDiv.className = 'connection-status show error';
+                return;
+            }
+
+            testBtn.disabled = true;
+            statusDiv.textContent = '🔄 Testing connection...';
+            statusDiv.className = 'connection-status show info';
+
+            try {
+                // Initialize test client
+                const testClient = window.supabase.createClient(url, key);
+                
+                // Try a simple query to test the connection
+                const { data, error } = await testClient
+                    .from('raw_stat_rows')
+                    .select('id')
+                    .limit(1);
+
+                if (error) {
+                    if (error.message.includes('Invalid API key') || error.message.includes('JWT')) {
+                        statusDiv.innerHTML = `
+                            ✗ <strong>Invalid API Key</strong><br>
+                            Please check:<br>
+                            • Go to Supabase Dashboard > Settings > API<br>
+                            • Copy the <strong>"anon public"</strong> or <strong>"publishable"</strong> key (not service_role)<br>
+                            • Make sure there are no extra spaces<br>
+                            • The key should start with "eyJ" or "sb_publishable_"
+                        `;
+                    } else if (error.message.includes('permission') || error.message.includes('RLS')) {
+                        statusDiv.innerHTML = `
+                            ⚠ <strong>Connection works but RLS may be blocking</strong><br>
+                            Error: ${error.message}<br>
+                            You may need to disable Row Level Security temporarily.
+                        `;
+                    } else {
+                        statusDiv.innerHTML = `
+                            ⚠ <strong>Connection issue:</strong><br>
+                            ${error.message}
+                        `;
+                    }
+                    statusDiv.className = 'connection-status show error';
+                } else {
+                    statusDiv.innerHTML = `
+                        ✓ <strong>Connection successful!</strong><br>
+                        API key is valid. You can proceed with upload.
+                    `;
+                    statusDiv.className = 'connection-status show success';
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `
+                    ✗ <strong>Connection failed:</strong><br>
+                    ${error.message || error.toString()}<br>
+                    Check your URL and API key.
+                `;
+                statusDiv.className = 'connection-status show error';
+            } finally {
+                testBtn.disabled = false;
+            }
+        }
+
+        async function startUpload() {
+            const url = document.getElementById('supabaseUrl').value.trim();
+            const key = document.getElementById('supabaseKey').value.trim();
+
+            if (!url || !key || !selectedFile) {
+                alert('Please fill in all fields and select a file');
+                return;
+            }
+
+            // Validate before starting
+            if (!url.startsWith('https://') || !url.includes('.supabase.co')) {
+                alert('Invalid Supabase URL. Should be: https://xxxxx.supabase.co');
+                return;
+            }
+
+            if (!key.startsWith('eyJ') && !key.startsWith('sb_publishable_')) {
+                alert('API key format looks incorrect. Should start with "eyJ" or "sb_publishable_". Please check your key.');
+                return;
+            }
+
+            // Initialize Supabase
+            supabaseClient = window.supabase.createClient(url, key);
+
+            // Test connection first before processing
+            addLog('Testing connection...', 'info');
+            try {
+                const { error: testError } = await supabaseClient
+                    .from('raw_stat_rows')
+                    .select('id')
+                    .limit(1);
+
+                if (testError) {
+                    if (testError.message.includes('Invalid API key') || testError.message.includes('JWT')) {
+                        addLog('✗ ERROR: Invalid API key!', 'error');
+                        addLog('Please check your API key in Supabase Dashboard > Settings > API', 'error');
+                        addLog('Make sure you are using the "anon public" key (not service_role)', 'error');
+                        document.getElementById('uploadBtn').disabled = false;
+                        return;
+                    }
+                    // Other errors might be okay (like RLS), continue
+                    addLog('⚠ Connection warning: ' + testError.message, 'error');
+                } else {
+                    addLog('✓ Connection verified', 'success');
+                }
+            } catch (error) {
+                addLog('✗ Connection test failed: ' + error.message, 'error');
+                document.getElementById('uploadBtn').disabled = false;
+                return;
+            }
+
+            // Show progress
+            document.getElementById('progress').classList.add('show');
+            document.getElementById('log').classList.add('show');
+            document.getElementById('uploadBtn').disabled = true;
+            document.getElementById('summary').classList.remove('show');
+
+            // Clear log
+            document.getElementById('log').innerHTML = '';
+
+            try {
+                // Read file
+                addLog('Reading JSON file...', 'info');
+                const fileContent = await selectedFile.text();
+                const data = JSON.parse(fileContent);
+
+                // Load existing records to check for duplicates
+                addLog('Checking for existing records...', 'info');
+                await loadExistingRecords(data.school || 'Unknown School');
+
+                // Process data
+                addLog('Starting import...', 'info');
+                await processData(data);
+
+            } catch (error) {
+                addLog(`Error: ${error.message}`, 'error');
+                console.error(error);
+            } finally {
+                document.getElementById('uploadBtn').disabled = false;
+            }
+        }
+
+        async function loadExistingRecords(school) {
+            try {
+                addLog('Loading existing records from database...', 'info');
+                
+                // Load existing raw_stat_rows to check for duplicates
+                const { data: existingStats, error } = await supabaseClient
+                    .from('raw_stat_rows')
+                    .select('school, sport, season, stat_row')
+                    .eq('school', school);
+
+                if (error) {
+                    addLog(`Warning: Could not load existing records: ${error.message}`, 'error');
+                    addLog('Will continue without duplicate checking...', 'info');
+                    return;
+                }
+
+                // Create set of unique identifiers
+                if (existingStats && existingStats.length > 0) {
+                    existingStats.forEach(stat => {
+                        // Create key from school, sport, season, and the stat_row content
+                        const statEntryKey = JSON.stringify(stat.stat_row);
+                        const key = `${stat.school}|${stat.sport}|${stat.season}|${statEntryKey}`;
+                        uploadedRecords.add(key);
+                    });
+                    addLog(`✓ Found ${existingStats.length} existing records. Duplicates will be skipped.`, 'info');
+                } else {
+                    addLog('✓ No existing records found. All records will be imported.', 'info');
+                }
+            } catch (error) {
+                addLog(`Warning: Could not check existing records: ${error.message}`, 'error');
+                addLog('Will continue without duplicate checking...', 'info');
+                // Continue anyway
+            }
+        }
+
+        function createRecordKey(playerName, sport, season, school) {
+            return `${playerName}|${sport}|${season}|${school}`;
+        }
+
+        function normalizePlayerName(name) {
+            if (!name) return "";
+            // Remove extra whitespace
+            name = name.trim().replace(/\s+/g, ' ');
+            // Remove suffixes like (Fr), (So), (Jr), (Sr)
+            name = name.replace(/\s*\([^)]+\)\s*/g, '');
+            return name.trim();
+        }
+
+        function extractStatValue(statDict, key, defaultVal = null) {
+            if (key in statDict) {
+                const val = statDict[key];
+                if (val && val !== '' && String(val).toLowerCase() !== 'n/a') {
+                    return val;
+                }
+            }
+            // Case-insensitive search
+            for (const k in statDict) {
+                if (k.toLowerCase() === key.toLowerCase()) {
+                    const val = statDict[k];
+                    if (val && val !== '' && String(val).toLowerCase() !== 'n/a') {
+                        return val;
+                    }
+                }
+            }
+            return defaultVal;
+        }
+
+        function parseNumeric(value) {
+            if (value === null || value === '' || String(value).toLowerCase() === 'n/a') {
+                return null;
+            }
+            try {
+                if (typeof value === 'string') {
+                    value = value.replace(/,/g, '').trim();
+                }
+                const num = parseFloat(value);
+                return num >= 0 ? num : null;
+            } catch {
+                return null;
+            }
+        }
+
+        function parseInteger(value) {
+            const num = parseNumeric(value);
+            return num !== null ? Math.floor(num) : null;
+        }
+
+        function isTeamTotal(statEntry) {
+            const playerName = extractStatValue(statEntry, 'Athlete Name') || 
+                             extractStatValue(statEntry, 'Player') || 
+                             extractStatValue(statEntry, 'Name') || '';
+            const nameLower = playerName.toLowerCase();
+            return ['total', 'season total', 'team total', 'totals'].some(term => nameLower.includes(term));
+        }
+
+        // Helper function to extract gender and level from sport name
+        function parseSport(sportName) {
+            // Examples: "Girls Basketball" -> {gender: "Girls", level: "Basketball"}
+            //           "Boys Football" -> {gender: "Boys", level: "Football"}
+            const parts = sportName.split(' ');
+            if (parts.length >= 2 && (parts[0] === 'Girls' || parts[0] === 'Boys')) {
+                return {
+                    gender: parts[0],
+                    level: parts.slice(1).join(' ')
+                };
+            }
+            // Default if format doesn't match
+            return {
+                gender: null,
+                level: sportName
+            };
+        }
+
+        // Helper function to create a school_id from school name
+        function createSchoolId(schoolName) {
+            // Simple slug generation - you can customize this
+            return schoolName.toLowerCase()
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/^-+|-+$/g, '');
+        }
+
+        // Helper function to extract gender and level from sport name
+        function parseSport(sportName) {
+            // Examples: "Girls Basketball" -> {gender: "Girls", level: "Basketball"}
+            //           "Boys Football" -> {gender: "Boys", level: "Football"}
+            const parts = sportName.split(' ');
+            if (parts.length >= 2 && (parts[0] === 'Girls' || parts[0] === 'Boys')) {
+                return {
+                    gender: parts[0],
+                    level: parts.slice(1).join(' ')
+                };
+            }
+            // Default if format doesn't match
+            return {
+                gender: null,
+                level: sportName
+            };
+        }
+
+        async function processData(data) {
+            const school = data.school || 'Unknown School';
+            const sports = data.sports || [];
+
+            let totalStats = 0;
+            let skippedDuplicates = 0;
+            let skippedTeamTotals = 0;
+            let errors = 0;
+
+            const totalItems = sports.reduce((sum, sport) => 
+                sum + sport.seasons.reduce((s, season) => s + (season.stats?.length || 0), 0), 0);
+            let processedItems = 0;
+
+            // Track if we've shown the first detailed error
+            let firstErrorShown = false;
+
+            // Process each sport
+            for (let sportIdx = 0; sportIdx < sports.length; sportIdx++) {
+                const sportData = sports[sportIdx];
+                const sport = sportData.sport || 'Unknown';
+                const historyUrl = sportData.history_url || '';
+                const seasons = sportData.seasons || [];
+
+                addLog(`\n[${sportIdx + 1}/${sports.length}] Processing ${sport}...`, 'info');
+
+                // Process each season
+                for (const seasonData of seasons) {
+                    const season = seasonData.season || 'Unknown';
+                    const sourceUrl = seasonData.url || '';
+                    const stats = seasonData.stats || [];
+
+                    if (stats.length === 0) continue;
+
+                    // Process each stat entry - store EXACTLY as it appears in JSON
+                    for (const statEntry of stats) {
+                        processedItems++;
+                        updateProgress((processedItems / totalItems) * 100);
+
+                        // Skip team totals (optional - you can remove this if you want to keep them)
+                        if (isTeamTotal(statEntry)) {
+                            skippedTeamTotals++;
+                            continue;
+                        }
+
+                        // Create a unique key for duplicate checking
+                        // Use the entire stat entry as part of the key since structure varies
+                        const statEntryKey = JSON.stringify(statEntry);
+                        const recordKey = `${school}|${sport}|${season}|${statEntryKey}`;
+                        
+                        if (uploadedRecords.has(recordKey)) {
+                            skippedDuplicates++;
+                            continue;
+                        }
+
+                        // Prepare record for raw_stat_rows table
+                        // Store the EXACT stat entry as JSONB - matches JSON structure exactly
+                        const record = {
+                            school: school,                    // From JSON root
+                            sport: sport,                      // From sports[].sport
+                            season: season,                    // From seasons[].season
+                            source_url: sourceUrl,             // From seasons[].url
+                            history_url: historyUrl,           // From sports[].history_url
+                            stat_row: statEntry                // The entire stat object as JSONB
+                        };
+
+                        try {
+                            // Insert into raw_stat_rows table
+                            const { data: insertData, error } = await supabaseClient
+                                .from('raw_stat_rows')
+                                .insert(record)
+                                .select();
+
+                            if (error) {
+                                // Log full error details
+                                const fullError = {
+                                    ...error,
+                                    code: error.code,
+                                    message: error.message,
+                                    details: error.details,
+                                    hint: error.hint,
+                                    status: error.status,
+                                    statusText: error.statusText
+                                };
+                                console.error('Supabase insert error (full):', fullError);
+                                console.error('Record being inserted:', JSON.stringify(record, null, 2));
+                                throw error;
+                            }
+
+                            // Mark as uploaded
+                            uploadedRecords.add(recordKey);
+                            totalStats++;
+                            
+                            // Log progress every 50 records
+                            if (totalStats % 50 === 0) {
+                                addLog(`  ✓ Imported ${totalStats} records so far...`, 'success');
+                            }
+
+                        } catch (error) {
+                            errors++;
+                            
+                            // Show first error in full detail
+                            if (!firstErrorShown) {
+                                firstErrorShown = true;
+                                addLog(`\n⚠ FIRST ERROR DETAILS (for debugging):`, 'error');
+                                addLog(`  Sport: ${sport}, Season: ${season}`, 'error');
+                                addLog(`  Error Code: ${error.code || 'N/A'}`, 'error');
+                                addLog(`  Error Message: ${error.message || 'N/A'}`, 'error');
+                                addLog(`  Error Details: ${error.details || 'N/A'}`, 'error');
+                                addLog(`  Error Hint: ${error.hint || 'N/A'}`, 'error');
+                                addLog(`  Record being sent: ${JSON.stringify(record, null, 2)}`, 'error');
+                                addLog(`\n(Subsequent errors will be summarized)`, 'info');
+                            }
+                            
+                            // Show all errors with full details
+                            let errorMsg = error.message || error.toString();
+                            if (error.code) errorMsg += ` [Code: ${error.code}]`;
+                            if (error.details) errorMsg += ` - ${error.details}`;
+                            if (error.hint) errorMsg += ` (${error.hint})`;
+                            
+                            // Show first few errors in detail, then summarize
+                            if (errors <= 10) {
+                                const playerName = statEntry['Athlete Name'] || statEntry['Player'] || statEntry['Name'] || 'Unknown';
+                                addLog(`  ✗ ${playerName} (${sport} ${season}): ${errorMsg}`, 'error');
+                            } else if (errors === 11) {
+                                addLog(`  ... (showing first 10 errors, ${errors} total so far)`, 'info');
+                            }
+                            
+                            console.error('Upload error details:', {
+                                error: error,
+                                code: error.code,
+                                message: error.message,
+                                details: error.details,
+                                hint: error.hint,
+                                record: record,
+                                sport: sport,
+                                season: season
+                            });
+                        }
+                    }
+                }
+            }
+
+            // Show summary
+            addLog(`\n=== Processing Complete ===`, 'info');
+            addLog(`Total items processed: ${processedItems}`, 'info');
+            addLog(`Successfully imported: ${totalStats}`, 'success');
+            addLog(`Duplicates skipped: ${skippedDuplicates}`, 'info');
+            addLog(`Team totals skipped: ${skippedTeamTotals}`, 'info');
+            if (errors > 0) {
+                addLog(`ERRORS: ${errors} records failed to import`, 'error');
+                addLog(`Check the log above for details`, 'error');
+            }
+            
+            showSummary({
+                totalStats,
+                skippedDuplicates,
+                skippedTeamTotals,
+                errors,
+                totalProcessed: processedItems
+            });
+        }
+
+        function updateProgress(percent) {
+            document.getElementById('progressFill').style.width = percent + '%';
+            document.getElementById('progressText').textContent = Math.round(percent) + '%';
+        }
+
+        function addLog(message, type = 'info') {
+            const log = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = message;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        function showSummary(stats) {
+            const summary = document.getElementById('summary');
+            const content = document.getElementById('summaryContent');
+            
+            content.innerHTML = `
+                <div class="summary-item">✓ Stat rows imported: ${stats.totalStats}</div>
+                <div class="summary-item">⚠ Duplicates skipped: ${stats.skippedDuplicates}</div>
+                <div class="summary-item">⚠ Team totals skipped: ${stats.skippedTeamTotals}</div>
+                <div class="summary-item">📊 Total items processed: ${stats.totalProcessed || 'N/A'}</div>
+                ${stats.errors > 0 ? `<div class="summary-item" style="color: #c62828;">✗ Errors: ${stats.errors} (see log above)</div>` : ''}
+            `;
+            
+            summary.classList.add('show');
+            addLog('\n✓ Upload complete!', 'success');
+        }
+    </script>
+</body>
+</html>

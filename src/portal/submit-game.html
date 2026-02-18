@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Submit Game - NPDS Portal</title>
+  <link rel="stylesheet" href="../styles.css">
+  <style>
+    .portal-container {
+      max-width: 900px;
+      margin: 40px auto;
+      padding: 20px;
+    }
+
+    .submit-card {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      padding: 32px;
+      margin-bottom: 24px;
+    }
+
+    .method-selector {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+
+    .method-card {
+      border: 2px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .method-card:hover {
+      border-color: #4299e1;
+      background: #ebf8ff;
+    }
+
+    .method-card.active {
+      border-color: #4299e1;
+      background: #ebf8ff;
+    }
+
+    .method-icon {
+      font-size: 48px;
+      margin-bottom: 12px;
+    }
+
+    .method-card h3 {
+      font-size: 18px;
+      margin-bottom: 8px;
+      color: #2d3748;
+    }
+
+    .method-card p {
+      font-size: 14px;
+      color: #718096;
+    }
+
+    .upload-area {
+      display: none;
+    }
+
+    .upload-area.active {
+      display: block;
+    }
+
+    .textarea-large {
+      width: 100%;
+      min-height: 300px;
+      padding: 16px;
+      border: 2px dashed #cbd5e0;
+      border-radius: 8px;
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
+      resize: vertical;
+    }
+
+    .textarea-large:focus {
+      outline: none;
+      border-color: #4299e1;
+    }
+
+    .file-upload {
+      border: 2px dashed #cbd5e0;
+      border-radius: 8px;
+      padding: 60px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .file-upload:hover {
+      border-color: #4299e1;
+      background: #f7fafc;
+    }
+
+    .file-upload.dragover {
+      border-color: #48bb78;
+      background: #f0fff4;
+    }
+
+    .upload-icon {
+      font-size: 64px;
+      color: #a0aec0;
+      margin-bottom: 16px;
+    }
+
+    .btn {
+      padding: 12px 24px;
+      border-radius: 6px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: #4299e1;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #3182ce;
+    }
+
+    .btn-success { 
+      background: #48bb78;
+      color: white;
+    }
+
+    .btn-success:hover {
+      background: #38a169;
+    }
+
+    .btn-secondary {
+      background: #e2e8f0;
+      color: #2d3748;
+    }
+
+    .btn-secondary:hover {
+      background: #cbd5e0;
+    }
+
+    .preview-card {
+      background: #f7fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 24px;
+      margin: 24px 0;
+    }
+
+    .preview-card h3 {
+      color: #2d3748;
+      margin-bottom: 16px;
+    }
+
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .button-group {
+      display: flex;
+      gap: 12px;
+      margin-top: 24px;
+    }
+
+    .confidence-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .confidence-high {
+      background: #c6f6d5;
+      color: #22543d;
+    }
+
+    .confidence-medium {
+      background: #feebc8;
+      color: #7c2d12;
+    }
+
+    .confidence-low {
+      background: #fed7d7;
+      color: #9b2c2c;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-group label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .form-group input, .form-group select {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #cbd5e0;
+      border-radius: 6px;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+    }
+
+    @media (max-width: 768px) {
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
+      
+      .method-selector {
+        grid-template-columns: 1fr;
+      }
+
+      .button-group {
+        flex-direction: column;
+      }
+
+      .btn {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-container">
+      <div class="brand">
+        <div class="logo">NP</div>
+        <div class="brand-text">
+          <div class="brand-title">Submit Game Results</div>
+        </div>
+      </div>
+      <nav class="nav">
+        <a href="dashboard.html">← Back to Dashboard</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="portal-container">
+    <div class="submit-card">
+      <h2>Choose Submission Method</h2>
+      <p style="color: #718096; margin-bottom: 24px;">Select how you'd like to submit your game data</p>
+
+      <!-- Method Selection -->
+      <div class="method-selector">
+        <div class="method-card active" data-method="text">
+          <div class="method-icon">📋</div>
+          <h3>Paste Box Score</h3>
+          <p>Copy from MaxPreps/Hudl and paste</p>
+        </div>
+
+        <div class="method-card" data-method="csv">
+          <div class="method-icon">📁</div>
+          <h3>Upload CSV</h3>
+          <p>Upload CSV file from your system</p>
+        </div>
+
+        <div class="method-card" data-method="manual">
+          <div class="method-icon">✍️</div>
+          <h3>Manual Entry</h3>
+          <p>Fill out form manually</p>
+        </div>
+      </div>
+
+      <!-- TEXT PASTE AREA -->
+      <div id="textArea" class="upload-area active">
+        <h3>Paste Box Score</h3>
+        <p style="color: #718096; margin-bottom: 16px;">
+          Copy the box score from MaxPreps, Hudl, or your stats system and paste below:
+        </p>
+        <textarea 
+          id="textInput" 
+          class="textarea-large" 
+          placeholder="Example:
+MSD 78, ISD 65
+February 16, 2026 - Boys Basketball
+
+Maryland Scoring:
+John Smith: 24 points, 8 rebounds, 3 assists
+Mike Jones: 18 points, 5 rebounds
+
+Indiana Scoring:
+Tom Wilson: 20 points, 7 rebounds"
+        ></textarea>
+
+        <div class="button-group">
+          <button id="parseTextBtn" class="btn btn-primary">Parse & Preview</button>
+        </div>
+      </div>
+
+      <!-- CSV UPLOAD AREA -->
+      <div id="csvArea" class="upload-area">
+        <h3>Upload CSV File</h3>
+        <p style="color: #718096; margin-bottom: 16px;">
+          Upload a CSV file exported from MaxPreps, Hudl, or Excel
+        </p>
+
+        <div class="file-upload" id="csvDropZone">
+          <div class="upload-icon">☁️</div>
+          <h3>Drop CSV file here</h3>
+          <p>or click to browse</p>
+          <input type="file" id="csvInput" accept=".csv" style="display: none;">
+        </div>
+
+        <div id="csvFileName" style="margin-top: 16px; display: none;"></div>
+
+        <div class="button-group">
+          <button id="parseCSVBtn" class="btn btn-primary" style="display: none;">Parse & Preview</button>
+        </div>
+      </div>
+
+      <!-- MANUAL FORM AREA -->
+      <div id="manualArea" class="upload-area">
+        <h3>Manual Entry</h3>
+        
+        <form id="manualForm">
+          <h4>Game Information</h4>
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="gameDate">Game Date*</label>
+              <input type="date" id="gameDate" required>
+            </div>
+            
+            <div class="form-group">
+              <label for="sport">Sport*</label>
+              <select id="sport" required>
+                <option value="basketball">Basketball</option>
+                <option value="volleyball">Volleyball</option>
+                <option value="football">Football</option>
+                <option value="soccer">Soccer</option>
+                <option value="baseball">Baseball</option>
+                <option value="softball">Softball</option>
+                <option value="track">Track & Field</option>
+                <option value="cross country">Cross Country</option>
+                <option value="wrestling">Wrestling</option>
+                <option value="swimming">Swimming</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="gender">Gender*</label>
+              <select id="gender" required>
+                <option value="boys">Boys</option>
+                <option value="girls">Girls</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="location">Location</label>
+              <input type="text" id="location" placeholder="City, State">
+            </div>
+          </div>
+
+          <h4 style="margin-top: 24px;">Teams & Score</h4>
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="homeTeam">Home Team*</label>
+              <input type="text" id="homeTeam" required>
+            </div>
+
+            <div class="form-group">
+              <label for="homeScore">Home Score*</label>
+              <input type="number" id="homeScore" required min="0">
+            </div>
+
+            <div class="form-group">
+              <label for="awayTeam">Away Team*</label>
+              <input type="text" id="awayTeam" required>
+            </div>
+
+            <div class="form-group">
+              <label for="awayScore">Away Score*</label>
+              <input type="number" id="awayScore" required min="0">
+            </div>
+          </div>
+
+          <div class="button-group">
+            <button type="submit" class="btn btn-primary">Preview Submission</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- PREVIEW SECTION (Hidden until data is parsed) -->
+    <div id="previewSection" style="display: none;">
+      <div class="submit-card">
+        <h2>Preview Your Submission</h2>
+        <div id="previewContent"></div>
+
+        <div class="button-group">
+          <button id="submitBtn" class="btn btn-success">✓ Submit for Review</button>
+          <button id="editBtn" class="btn btn-secondary">← Edit</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="../env.js"></script>
+  <script type="module" src="submit-game.js"></script>
+</body>
+</html>

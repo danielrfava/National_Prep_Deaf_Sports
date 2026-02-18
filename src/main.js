@@ -5,11 +5,10 @@ const filterInput = document.querySelector("#athleteFilter");
 const status = document.querySelector("#status");
 const recordsContainer = document.querySelector("#records");
 const schoolFilter = document.querySelector("#schoolFilter");
-const divisionFilter = document.querySelector("#divisionFilter");
 const sportFilter = document.querySelector("#sportFilter");
-const genderFilter = document.querySelector("#genderFilter");
-const deaflympicsFilter = document.querySelector("#deaflympicsFilter");
-const recordScopeFilter = document.querySelector("#recordScopeFilter");
+const footballVariantFilter = document.querySelector("#footballVariantFilter");
+const footballVariantFilterField = document.querySelector("#footballVariantFilterField");
+const statsViewFilter = document.querySelector("#statsViewFilter");
 const sportsMenu = document.querySelector("#sportsMenu");
 const sportsMenuGrid = document.querySelector("#sportsMenuGrid");
 
@@ -131,14 +130,29 @@ function setupSportsMenu() {
 }
 
 function buildFilters() {
-  return {
+  const filters = {
     schoolId: schoolFilter.value,
-    division: divisionFilter.value,
     sport: sportFilter.value,
-    gender: genderFilter.value,
-    deaflympics: deaflympicsFilter.value,
-    recordScope: recordScopeFilter.value
+    footballVariant: footballVariantFilter ? footballVariantFilter.value : ''
   };
+  console.log('Built filters:', filters);
+  console.log('  schoolFilter.value = "' + schoolFilter.value + '" (length: ' + schoolFilter.value.length + ')');
+  console.log('  sportFilter.value = "' + sportFilter.value + '" (length: ' + sportFilter.value.length + ')');
+  return filters;
+}
+
+function toggleFootballVariantFilter() {
+  if (!footballVariantFilterField || !sportFilter) return;
+  
+  const selectedSport = sportFilter.value.toLowerCase();
+  const isFootball = selectedSport.includes('football');
+  
+  footballVariantFilterField.style.display = isFootball ? 'flex' : 'none';
+  
+  // Reset filter when hiding
+  if (!isFootball && footballVariantFilter) {
+    footballVariantFilter.value = '';
+  }
 }
 
 function setOptions(select, options, getLabel) {
@@ -162,7 +176,8 @@ async function runSearch(query) {
       return;
     }
 
-    renderRecords(records, recordsContainer);
+    const statsView = statsViewFilter ? statsViewFilter.value : 'season';
+    renderRecords(records, recordsContainer, statsView, filters);
     updateStatus(query ? `${records.length} record(s) match.` : "");
   } catch (error) {
     if (requestId !== activeRequest) {
@@ -207,19 +222,35 @@ async function init() {
       sports.map((sport) => ({ value: sport, label: sport })),
       (option) => option.label
     );
+    
+    console.log('After setOptions - schoolFilter options count:', schoolFilter.options.length);
+    console.log('After setOptions - schoolFilter.selectedIndex:', schoolFilter.selectedIndex);
+    console.log('After setOptions - schoolFilter.value:', schoolFilter.value);
+    console.log('After setOptions - First option value:', schoolFilter.options[0]?.value);
+    console.log('After setOptions - First option text:', schoolFilter.options[0]?.text);
+    
+    // Ensure filters are reset to "All" after loading options
+    setTimeout(() => {
+      schoolFilter.selectedIndex = 0; // Select first option ("All schools")
+      sportFilter.selectedIndex = 0; // Select first option ("All sports")
+      console.log('Reset filters - schoolFilter.selectedIndex:', schoolFilter.selectedIndex, 'value:', schoolFilter.value);
+      console.log('Reset filters - sportFilter.selectedIndex:', sportFilter.selectedIndex, 'value:', sportFilter.value);
+      runSearch("");
+    }, 100);
   } catch (error) {
     console.error(error);
   }
-
-  runSearch("");
 }
 
 filterInput.addEventListener("input", applyFilter);
 schoolFilter.addEventListener("change", () => runSearch(filterInput.value.trim()));
-divisionFilter.addEventListener("change", () => runSearch(filterInput.value.trim()));
-sportFilter.addEventListener("change", () => runSearch(filterInput.value.trim()));
-genderFilter.addEventListener("change", () => runSearch(filterInput.value.trim()));
-deaflympicsFilter.addEventListener("change", () => runSearch(filterInput.value.trim()));
-recordScopeFilter.addEventListener("change", () => runSearch(filterInput.value.trim()));
+sportFilter.addEventListener("change", () => {
+  toggleFootballVariantFilter();
+  runSearch(filterInput.value.trim());
+});
+if (footballVariantFilter) {
+  footballVariantFilter.addEventListener("change", () => runSearch(filterInput.value.trim()));
+}
+statsViewFilter.addEventListener("change", () => runSearch(filterInput.value.trim()));
 
 init();

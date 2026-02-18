@@ -1,0 +1,62 @@
+┌─────────────────────────────────────────────────────────────┐
+│                    QUICK FIX NEEDED                         │
+└─────────────────────────────────────────────────────────────┘
+
+YOUR ISSUE:
+✗ No schools showing in dropdown
+✗ Sports menu is empty  
+✗ Cannot search for Indiana School for the Deaf athletes
+
+ROOT CAUSE:
+✗ Supabase credentials are EMPTY in src/env.js
+
+┌─────────────────────────────────────────────────────────────┐
+│              3-STEP FIX (5 minutes)                         │
+└─────────────────────────────────────────────────────────────┘
+
+STEP 1: Get Supabase Credentials
+────────────────────────────────────────────────────────────────
+Go to: https://supabase.com
+→ Your Project → Settings → API
+→ Copy: "Project URL" 
+→ Copy: "anon public" key
+
+STEP 2: Create Database Tables
+────────────────────────────────────────────────────────────────
+In Supabase dashboard:
+→ SQL Editor → New Query
+→ Run: schools-data.sql (creates schools table)
+→ Run: sports-records-schema.sql (creates sports table with data)
+
+STEP 3: Update src/env.js
+────────────────────────────────────────────────────────────────
+Replace this:
+  window.ENV = {
+    SUPABASE_URL: "",
+    SUPABASE_ANON_KEY: ""
+  };
+
+With your credentials:
+  window.ENV = {
+    SUPABASE_URL: "https://xxx.supabase.co",
+    SUPABASE_ANON_KEY: "eyJ..."
+  };
+
+Then REFRESH your browser!
+
+┌─────────────────────────────────────────────────────────────┐
+│                     WHAT YOU'LL SEE                         │
+└─────────────────────────────────────────────────────────────┘
+
+After fix:
+✓ School dropdown shows: Indiana School for the Deaf, Maryland School for the Deaf, etc.
+✓ Sports filter shows: Basketball, Track, Swimming, Volleyball, etc.
+✓ Search works: Try "John Smith" or "Indiana"
+
+┌─────────────────────────────────────────────────────────────┐
+│                        NEED HELP?                           │
+└─────────────────────────────────────────────────────────────┘
+
+Read: SUPABASE_SETUP_GUIDE.md (detailed instructions)
+
+Don't have Supabase yet? → https://supabase.com (free tier available)

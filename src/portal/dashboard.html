@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - NPDS Portal</title>
+  <link rel="stylesheet" href="../styles.css">
+  <style>
+    .portal-container {
+      max-width: 1200px;
+      margin: 40px auto;
+      padding: 20px;
+    }
+
+    .welcome-card {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      padding: 32px;
+      margin-bottom: 24px;
+    }
+
+    .welcome-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+
+    .welcome-header h1 {
+      color: #2d3748;
+      font-size: 28px;
+    }
+
+    .school-badge {
+      display: inline-block;
+      padding: 8px 16px;
+      background: #667eea;
+      color: white;
+      border-radius: 20px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .action-buttons {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+
+    .action-card {
+      border: 2px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: white;
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .action-card:hover {
+      border-color: #4299e1;
+      background: #ebf8ff;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+
+    .action-icon {
+      font-size: 48px;
+      margin-bottom: 12px;
+    }
+
+    .action-card h3 {
+      font-size: 18px;
+      margin-bottom: 8px;
+      color: #2d3748;
+    }
+
+    .action-card p {
+      font-size: 14px;
+      color: #718096;
+    }
+
+    .submissions-section {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      padding: 32px;
+    }
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      al ign-items: center;
+      margin-bottom: 24px;
+    }
+
+    .tab-buttons {
+      display: flex;
+      gap: 8px;
+    }
+
+    .tab-btn {
+      padding: 8px 16px;
+      border: 2px solid #e2e8f0;
+      background: white;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+
+    .tab-btn.active {
+      background: #4299e1;
+      color: white;
+      border-color: #4299e1;
+    }
+
+    .submission-card {
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 16px;
+      transition: all 0.2s;
+    }
+
+    .submission-card:hover {
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .submission-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .submission-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: #2d3748;
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .status-pending {
+      background: #fef5e7;
+      color: #d68910;
+    }
+
+    .status-approved {
+      background: #c6f6d5;
+      color: #22543d;
+    }
+
+    .status-rejected {
+      background: #fed7d7;
+      color: #9b2c2c;
+    }
+
+    .submission-meta {
+      display: flex;
+      gap: 16px;
+      font-size: 14px;
+      color: #718096;
+      margin-bottom: 8px;
+    }
+
+    .submission-details {
+      font-size: 14px;
+      color: #4a5568;
+    }
+
+    .logout-btn {
+      padding: 8px 16px;
+      background: #e2e8f0;
+      color: #2d3748;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: background 0.2s;
+    }
+
+    .logout-btn:hover {
+      background: #cbd5e0;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #a0aec0;
+    }
+
+    .empty-icon {
+      font-size: 64px;
+      margin-bottom: 16px;
+    }
+
+    @media (max-width: 768px) {
+      .welcome-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 16px;
+      }
+
+      .action-buttons {
+        grid-template-columns: 1fr;
+      }
+
+      .submission-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-container">
+      <div class="brand">
+        <div class="logo">NP</div>
+        <div class="brand-text">
+          <div class="brand-title">Athletic Director Dashboard</div>
+        </div>
+      </div>
+      <nav class="nav">
+        <button id="logoutBtn" class="logout-btn">Logout</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="portal-container">
+    <div class="welcome-card">
+      <div class="welcome-header">
+        <div>
+          <h1>Welcome, <span id="userName">Loading...</span>!</h1>
+          <p style="color: #718096; margin-top: 8px;">
+            <span class="school-badge" id="schoolName">Loading...</span>
+          </p>
+        </div>
+      </div>
+
+      <div class="action-buttons">
+        <a href="submit-game.html" class="action-card">
+          <div class="action-icon">📊</div>
+          <h3>Submit Game Results</h3>
+          <p>Upload new game statistics</p>
+        </a>
+
+        <a href="../index.html" class="action-card">
+          <div class="action-icon">🏠</div>
+          <h3>View Public Site</h3>
+          <p>See published statistics</p>
+        </a>
+
+        <a href="#" class="action-card" onclick="alert('Coming soon!'); return false;">
+          <div class="action-icon">📈</div>
+          <h3>School Stats</h3>
+          <p>View your school's data</p>
+        </a>
+      </div>
+    </div>
+
+    <div class="submissions-section">
+      <div class="section-header">
+        <h2>Your Submissions</h2>
+        <div class="tab-buttons">
+          <button class="tab-btn active" data-status="all">All</button>
+          <button class="tab-btn" data-status="pending">Pending</button>
+          <button class="tab-btn" data-status="approved">Approved</button>
+          <button class="tab-btn" data-status="rejected">Rejected</button>
+        </div>
+      </div>
+
+      <div id="submissionsContainer">
+        <div class="empty-state">
+          <div class="empty-icon">⏳</div>
+          <p>Loading submissions...</p>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="../env.js"></script>
+  <script type="module">
+    import { supabase } from '../supabaseClient.js';
+
+    let currentUser = null;
+    let currentFilter = 'all';
+
+    // Initialize
+    window.addEventListener('DOMContentLoaded', async () => {
+      // Check authentication
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        window.location.href = 'login.html';
+        return;
+      }
+
+      // Get user profile
+      const { data: profile, error } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('id', session.user.id)
+        .single();
+
+      if (error || !profile) {
+        console.error('Error loading profile:', error);
+        alert('Error loading your profile. Please try logging in again.');
+        await supabase.auth.signOut();
+        window.location.href = 'login.html';
+        return;
+      }
+
+      currentUser = profile;
+      
+      // Update UI
+      document.getElementById('userName').textContent = profile.full_name;
+      document.getElementById('schoolName').textContent = profile.school_name || 'Your School';
+
+      // Load submissions
+      await loadSubmissions();
+
+      // Setup tab filters
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          currentFilter = btn.dataset.status;
+          loadSubmissions();
+        });
+      });
+
+      // Setup logout
+      document.getElementById('logoutBtn').addEventListener('click', async () => {
+        await supabase.auth.signOut();
+        window.location.href = 'login.html';
+      });
+    });
+
+    async function loadSubmissions() {
+      const container = document.getElementById('submissionsContainer');
+      container.innerHTML = '<div class="empty-state"><div class="empty-icon">⏳</div><p>Loading submissions...</p></div>';
+
+      try {
+        let query = supabase
+          .from('game_submissions')
+          .select('*')
+          .eq('submitted_by', currentUser.id)
+          .order('created_at', { ascending: false });
+
+        if (currentFilter !== 'all') {
+          query = query.eq('status', currentFilter);
+        }
+
+        const { data: submissions, error } = await query;
+
+        if (error) throw error;
+
+        if (!submissions || submissions.length === 0) {
+          container.innerHTML = `
+            <div class="empty-state">
+              <div class="empty-icon">📭</div>
+              <h3>No submissions yet</h3>
+              <p>Click "Submit Game Results" above to add your first game!</p>
+            </div>
+          `;
+          return;
+        }
+
+        // Render submissions
+        container.innerHTML = submissions.map(sub => renderSubmission(sub)).join('');
+
+      } catch (error) {
+        console.error('Error loading submissions:', error);
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-icon">⚠️</div>
+            <p>Error loading submissions. Please refresh the page.</p>
+          </div>
+        `;
+      }
+    }
+
+    function renderSubmission(submission) {
+      const gameData = submission.game_data || {};
+      const game = gameData.game || {};
+      const date = new Date(submission.created_at).toLocaleDateString();
+      const gameDate = submission.game_date ? new Date(submission.game_date).toLocaleDateString() : 'N/A';
+
+      let statusClass = 'status-pending';
+      let statusText = 'Pending Review';
+      if (submission.status === 'approved') {
+        statusClass = 'status-approved';
+        statusText = '✓ Approved';
+      } else if (submission.status === 'rejected') {
+        statusClass = 'status-rejected';
+        statusText = '✗ Rejected';
+      }
+
+      return `
+        <div class="submission-card">
+          <div class="submission-header">
+            <div class="submission-title">
+              ${submission.sport || 'Game'} - ${game.home_team?.name || submission.home_team_id || 'Home'} vs ${game.away_team?.name || submission.away_team_id || 'Away'}
+            </div>
+            <span class="status-badge ${statusClass}">${statusText}</span>
+          </div>
+          
+          <div class="submission-meta">
+            <span>📅 Game Date: ${gameDate}</span>
+            <span>⏰ Submitted: ${date}</span>
+            <span>📊 ${submission.submission_method?.replace('_', ' ') || 'Manual'}</span>
+          </div>
+          
+          <div class="submission-details">
+            <strong>Score:</strong> ${game.home_team?.score || submission.home_score || '?'} - ${game.away_team?.score || submission.away_score || '?'}
+            ${submission.rejection_reason ? `<br><strong style="color: #c62828;">Reason:</strong> ${submission.rejection_reason}` : ''}
+          </div>
+        </div>
+      `;
+    }
+  </script>
+</body>
+</html>

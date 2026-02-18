@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Deaf Sports History</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar-container">
+        <div class="brand">
+          <div class="logo" aria-label="Logo">NP</div>
+          <div class="brand-text">
+            <div class="brand-title">National Prep Deaf Sports</div>
+            <div class="brand-tag">Deaf High School Athletics</div>
+          </div>
+        </div>
+
+        <nav class="nav" aria-label="Primary">
+          <a class="nav-link" href="/">Home</a>
+
+          <div class="sports-wrap">
+            <details id="sportsMenu" class="sports-details">
+              <summary class="nav-link summary">
+                Sports <span class="caret">&#9662;</span>
+              </summary>
+
+              <div class="mega-menu" role="menu" aria-label="Sports menu">
+                <div id="sportsMenuGrid" class="grid"></div>
+                <div class="menu-footnote">Phase labels shown where applicable.</div>
+              </div>
+            </details>
+          </div>
+
+          <a class="nav-link" href="/deaflympics">Deaflympics</a>
+          <a class="nav-link" href="/tournaments">Tournaments</a>
+          <a class="nav-link" href="/teams">Schools</a>
+          <a class="nav-link" href="/about">About</a>
+        </nav>
+
+        <div class="search-auth-group">
+          <div class="search">
+            <label class="sr-only" for="athleteFilter">Search athletes, teams, or sports</label>
+            <input
+              id="athleteFilter"
+              type="search"
+              placeholder="Search players, teams, or sports"
+              autocomplete="off"
+            />
+          </div>
+
+          <div class="auth-section">
+            <a href="portal/login.html" class="login-btn" title="Athletic Director / Admin Login">
+              <span class="login-icon">👤</span>
+              <span class="login-text">Login</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="filters" aria-label="Filters">
+        <div class="filter-grid">
+          <div class="filter-field">
+            <label for="schoolFilter">School</label>
+            <select id="schoolFilter">
+              <option value="">All schools</option>
+            </select>
+          </div>
+          <div class="filter-field">
+            <label for="sportFilter">Sport</label>
+            <select id="sportFilter">
+              <option value="">All sports</option>
+            </select>
+          </div>
+          <div class="filter-field" id="footballVariantFilterField" style="display: none;">
+            <label for="footballVariantFilter">Football Type</label>
+            <select id="footballVariantFilter">
+              <option value="">All Types</option>
+              <option value="8-man">8-Man</option>
+              <option value="11-man">11-Man</option>
+            </select>
+          </div>
+          <div class="filter-field">
+            <label for="statsViewFilter">Stats View</label>
+            <select id="statsViewFilter">
+              <option value="season">Season Stats</option>
+              <option value="career">Career Stats</option>
+            </select>
+          </div>
+        </div>
+        <p id="status" class="status" aria-live="polite"></p>
+      </section>
+
+      <section>
+        <h2>Player Statistics</h2>
+        <div id="records"></div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="container">
+        <p>Built with HTML, JavaScript, and CSS. Data powered by Supabase.</p>
+      </div>
+    </footer>
+
+    <script src="./env.js"></script>
+    <script type="module" src="./supabaseClient.js"></script>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

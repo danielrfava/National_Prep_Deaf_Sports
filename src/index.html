@@ -3,120 +3,81 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Deaf Sports History</title>
+    <title>National Prep Deaf Sports - History & Statistics</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
-  <body>
-    <header class="topbar">
-      <div class="topbar-container">
-        <div class="brand">
-          <div class="logo" aria-label="Logo">NP</div>
-          <div class="brand-text">
-            <div class="brand-title">National Prep Deaf Sports</div>
-            <div class="brand-tag">Deaf High School Athletics</div>
-          </div>
+  <body class="landing-page">
+    <!-- Video Background Container -->
+    <div class="video-background">
+      <!-- Background Video - Loops automatically -->
+      <video autoplay muted loop playsinline id="bgVideo">
+        <source src="./assets/videos/video_1.mp4" type="video/mp4">
+        Your browser does not support the video tag.
+      </video>
+      
+      <!-- Dark overlay for text readability -->
+      <div class="video-overlay"></div>
+    </div>
+
+    <!-- Landing Content -->
+    <div class="landing-content">
+      <div class="landing-center">
+        <!-- Logo -->
+        <div class="landing-logo">
+          <div class="logo-circle">NP</div>
         </div>
-
-        <nav class="nav" aria-label="Primary">
-          <a class="nav-link" href="/">Home</a>
-
-          <div class="sports-wrap">
-            <details id="sportsMenu" class="sports-details">
-              <summary class="nav-link summary">
-                Sports <span class="caret">&#9662;</span>
-              </summary>
-
-              <div class="mega-menu" role="menu" aria-label="Sports menu">
-                <div id="sportsMenuGrid" class="grid"></div>
-                <div class="menu-footnote">Phase labels shown where applicable.</div>
-              </div>
-            </details>
-          </div>
-
-          <a class="nav-link" href="/deaflympics">Deaflympics</a>
-          <a class="nav-link" href="/tournaments">Tournaments</a>
-          <a class="nav-link" href="/teams">Schools</a>
-          <a class="nav-link" href="/about">About</a>
-        </nav>
-
-        <div class="search">
-          <label class="sr-only" for="athleteFilter">Search athletes, teams, or sports</label>
-          <input
-            id="athleteFilter"
-            type="search"
-            placeholder="Search players, teams, or sports"
-            autocomplete="off"
-          />
+        
+        <!-- Title -->
+        <h1 class="landing-title">National Prep Deaf Sports</h1>
+        
+        <!-- Tagline -->
+        <p class="landing-tagline">
+          Celebrating Deaf High School Athletics<br>
+          From Past to Present
+        </p>
+        
+        <!-- Call to Action Button -->
+        <a href="stats.html" class="enter-portal-btn">
+          <span class="btn-icon">📊</span>
+          <span class="btn-text">Enter Statistics Portal</span>
+        </a>
+        
+        <!-- Quick Links -->
+        <div class="quick-links">
+          <a href="stats.html" class="quick-link">View Records</a>
+          <span class="divider">•</span>
+          <a href="portal/login.html" class="quick-link">School Login</a>
+          <span class="divider">•</span>
+          <a href="stats.html#about" class="quick-link">About</a>
         </div>
       </div>
-    </header>
-
-    <main class="container">
-      <section class="filters" aria-label="Filters">
-        <div class="filter-grid">
-          <div class="filter-field">
-            <label for="schoolFilter">School</label>
-            <select id="schoolFilter">
-              <option value="">All schools</option>
-            </select>
-          </div>
-          <div class="filter-field">
-            <label for="divisionFilter">Division</label>
-            <select id="divisionFilter">
-              <option value="">All divisions</option>
-              <option value="d1">Division 1</option>
-              <option value="d2">Division 2</option>
-            </select>
-          </div>
-          <div class="filter-field">
-            <label for="sportFilter">Sport</label>
-            <select id="sportFilter">
-              <option value="">All sports</option>
-            </select>
-          </div>
-          <div class="filter-field">
-            <label for="genderFilter">Girls/Boys</label>
-            <select id="genderFilter">
-              <option value="">All</option>
-              <option value="girls">Girls</option>
-              <option value="boys">Boys</option>
-            </select>
-          </div>
-          <div class="filter-field">
-            <label for="deaflympicsFilter">Deaflympics</label>
-            <select id="deaflympicsFilter">
-              <option value="">All</option>
-              <option value="true">Yes</option>
-              <option value="false">No</option>
-            </select>
-          </div>
-          <div class="filter-field">
-            <label for="recordScopeFilter">Record scope</label>
-            <select id="recordScopeFilter">
-              <option value="">All records</option>
-              <option value="all-time">All-time</option>
-              <option value="season">Season</option>
-              <option value="game">Game</option>
-            </select>
-          </div>
-        </div>
-        <p id="status" class="status" aria-live="polite"></p>
-      </section>
-
-      <section>
-        <h2>Featured Records</h2>
-        <div id="records" class="records"></div>
-      </section>
-    </main>
-
-    <footer class="site-footer">
-      <div class="container">
-        <p>Built with HTML, JavaScript, and CSS. Data powered by Supabase.</p>
+      
+      <!-- Footer Note -->
+      <div class="landing-footer">
+        <p>Documenting the legacy of deaf athletes across America</p>
       </div>
-    </footer>
+    </div>
 
-    <script src="./env.js"></script>
-    <script type="module" src="./supabaseClient.js"></script>
-    <script type="module" src="./main.js"></script>
+    <script type="module">
+      // Optional: Add video fade-in effect when page loads
+      window.addEventListener('load', () => {
+        const video = document.getElementById('bgVideo');
+        if (video) {
+          video.style.opacity = '1';
+        }
+      });
+
+      // Optional: Pause video when user leaves tab (save resources)
+      document.addEventListener('visibilitychange', () => {
+        const video = document.getElementById('bgVideo');
+        if (video) {
+          if (document.hidden) {
+            video.pause();
+          } else {
+            video.play();
+          }
+        }
+      });
+    </script>
   </body>
 </html>

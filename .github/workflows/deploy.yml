@@ -1,0 +1,23 @@
+name: Trigger Netlify Deploy
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Netlify deploy hook
+        env:
+          NETLIFY_BUILD_HOOK_URL: ${{ secrets.NETLIFY_BUILD_HOOK_URL }}
+        run: |
+          if [ -z "$NETLIFY_BUILD_HOOK_URL" ]; then
+            echo "NETLIFY_BUILD_HOOK_URL secret is not configured."
+            exit 1
+          fi
+
+          curl -sS -X POST -d '{}' "$NETLIFY_BUILD_HOOK_URL"
+          echo "Netlify deploy hook triggered successfully."
