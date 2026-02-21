@@ -5,9 +5,16 @@ let recordsPerPage = 25;
 let currentStatsView = 'season';
 let currentStatCategory = 'batting'; // For baseball/softball: 'batting' or 'pitching'; For football: 'passing', 'rushing', or 'defense'
 let currentFilters = {}; // Store current filters for re-rendering
+let showAdvancedStats = false; // Basketball advanced stats toggle
 
 // Sport-specific column configurations
 const sportColumns = {
+    soccer: [
+      { key: 'gp', label: 'GP', type: 'number', field: 'GP' },
+      { key: 'g', label: 'Goals', type: 'number', field: 'G' },
+      { key: 'a', label: 'Assists', type: 'number', field: 'A' },
+      { key: 'sog', label: 'Shots on Goal', type: 'number', field: 'SOG' }
+    ],
   basketball: [
     { key: 'gp', label: 'GP', type: 'number', field: 'GP' },
     { key: 'pts', label: 'PTS', type: 'number', field: 'PTS' },
@@ -58,6 +65,16 @@ const sportColumns = {
     { key: 'rec', label: 'REC', type: 'number', field: 'REC' },
     { key: 'recyds', label: 'Rec YDS', type: 'number', field: 'Rec YDS' },
     { key: 'rectd', label: 'Rec TD', type: 'number', field: 'Rec TD' }
+  ],
+  football_receiving: [
+    { key: 'gp', label: 'GP', type: 'number', field: 'GP' },
+    { key: 'rec', label: 'REC', type: 'number', field: 'REC' },
+    { key: 'recyds', label: 'YDS', type: 'number', field: 'Rec YDS' },
+    { key: 'recypg', label: 'YPG', type: 'number', field: 'Rec YPG' },
+    { key: 'rectd', label: 'TD', type: 'number', field: 'Rec TD' },
+    { key: 'fum', label: 'FUM', type: 'number', field: 'FUM' },
+    { key: 'avg', label: 'AVG', type: 'number', field: 'AVG' },
+    { key: 'long', label: 'Long', type: 'number', field: 'Long' }
   ],
   football_defense: [
     { key: 'gp', label: 'GP', type: 'number', field: 'GP' },
@@ -134,8 +151,50 @@ const sportColumns = {
   ]
 };
 
+const basketballCoreColumns = [
+  { key: 'gp', label: 'GP', type: 'number', field: 'GP' },
+  { key: 'pts', label: 'PTS', type: 'number', field: 'PTS' },
+  { key: 'ppg', label: 'PPG', type: 'number', field: 'PPG' },
+  { key: 'reb', label: 'REB', type: 'number', field: 'REB', derivedRateField: 'RPG' },
+  { key: 'ast_total', label: 'AST', type: 'number', field: 'AST', derivedRateField: 'APG' },
+  { key: 'stl_total', label: 'STL', type: 'number', field: 'STL', derivedRateField: 'SPG' },
+  { key: 'blk_total', label: 'BLK', type: 'number', field: 'BLK', derivedRateField: 'BPG' }
+];
+
+const basketballAdvancedColumns = [
+  { key: 'rpg', label: 'RPG', type: 'number', field: 'RPG' },
+  { key: 'apg', label: 'APG', type: 'number', field: 'APG' },
+  { key: 'spg', label: 'SPG', type: 'number', field: 'SPG' },
+  { key: 'bpg', label: 'BPG', type: 'number', field: 'BPG' },
+  { key: 'tpg', label: 'TPG', type: 'number', field: 'TPG' },
+  { key: 'offr', label: 'OFFR', type: 'number', field: 'OFFR' },
+  { key: 'defr', label: 'DEFR', type: 'number', field: 'DEFR' },
+  { key: 'pfpg', label: 'PF', type: 'number', field: 'PFPG' }
+];
+
+const baseballSoftballBattingCoreKeys = ['gp', 'avg', 'hr', 'rbi'];
+const baseballSoftballPitchingCoreKeys = ['gp', 'w', 'l', 'era', 'ip', 'h', 'r', 'bb', 'so'];
+const footballCoreKeysByCategory = {
+  passing: ['gp', 'comp', 'att', 'yds', 'ypg', 'td', 'int'],
+  rushing: ['gp', 'att', 'yds', 'ypg', 'td', 'fum'],
+  receiving: ['gp', 'rec', 'recyds', 'recypg', 'rectd', 'fum'],
+  defense: ['gp', 'tackles', 'solo', 'ast', 'tfl', 'sacks', 'int']
+};
+
+function splitColumnsByCoreKeys(allColumns, coreKeys) {
+  const columnByKey = new Map(allColumns.map(col => [col.key, col]));
+  const coreColumns = coreKeys
+    .map(key => columnByKey.get(key))
+    .filter(Boolean);
+  const coreKeySet = new Set(coreColumns.map(col => col.key));
+  const advancedColumns = allColumns.filter(col => !coreKeySet.has(col.key));
+
+  return { coreColumns, advancedColumns };
+}
+
 function detectSportType(sport) {
   const sportLower = (sport || '').toLowerCase();
+  if (sportLower.includes('soccer')) return 'soccer';
   if (sportLower.includes('basketball')) return 'basketball';
   if (sportLower.includes('volleyball')) return 'volleyball';
   if (sportLower.includes('football')) return 'football';
@@ -161,6 +220,40 @@ function getSportColumns(sport, statCategory = 'batting') {
   return sportColumns[sportType] || sportColumns.basketball;
 }
 
+function getDisplayColumns(sport, statCategory = 'batting') {
+  const sportType = detectSportType(sport);
+
+  if (sportType === 'basketball') {
+    return showAdvancedStats
+      ? [...basketballCoreColumns, ...basketballAdvancedColumns]
+      : basketballCoreColumns;
+  }
+
+  if (sportType === 'baseball' || sportType === 'softball') {
+    const allColumns = getSportColumns(sport, statCategory);
+    const coreKeys = statCategory === 'pitching'
+      ? baseballSoftballPitchingCoreKeys
+      : baseballSoftballBattingCoreKeys;
+    const { coreColumns, advancedColumns } = splitColumnsByCoreKeys(allColumns, coreKeys);
+
+    return showAdvancedStats
+      ? [...coreColumns, ...advancedColumns]
+      : coreColumns;
+  }
+
+  if (sportType === 'football') {
+    const allColumns = getSportColumns(sport, statCategory);
+    const coreKeys = footballCoreKeysByCategory[statCategory] || footballCoreKeysByCategory.rushing;
+    const { coreColumns, advancedColumns } = splitColumnsByCoreKeys(allColumns, coreKeys);
+
+    return showAdvancedStats
+      ? [...coreColumns, ...advancedColumns]
+      : coreColumns;
+  }
+
+  return getSportColumns(sport, statCategory);
+}
+
 function sportNeedsCategories(sport) {
   const sportType = detectSportType(sport);
   return sportType === 'baseball' || sportType === 'softball' || sportType === 'football';
@@ -180,6 +273,7 @@ function getCategoriesForSport(sport) {
     return [
       { key: 'passing', label: 'Passing' },
       { key: 'rushing', label: 'Rushing' },
+      { key: 'receiving', label: 'Receiving' },
       { key: 'defense', label: 'Defense' }
     ];
   }
@@ -308,6 +402,124 @@ function getSchoolAbbrev(fullSchool) {
   return fullSchool;
 }
 
+function normalizeStatKey(key) {
+  return String(key || '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '');
+}
+
+const statAliases = {
+  AVG: ['BA', 'BAVG', 'BATTINGAVERAGE', 'BATTINGAVG'],
+  AB: ['ATBAT', 'ATBATS'],
+  H: ['HITS'],
+  GP: ['GAMESPLAYED'],
+  PTS: ['POINTS'],
+  REB: ['REBOUNDS', 'TRB', 'TOTREB'],
+  AST: ['ASSISTS'],
+  STL: ['STEALS'],
+  BLK: ['BLOCKS'],
+  COMP: ['COMPLETIONS'],
+  ATT: ['ATTEMPTS'],
+  YDS: ['YARDS'],
+  REC: ['RECEPTIONS'],
+  'Rec YDS': ['RECYDS', 'RECEIVINGYARDS'],
+  'Rec YPG': ['RECYPG', 'RECEIVINGYPG'],
+  'Rec TD': ['RECTD', 'RECEIVINGTD'],
+  INT: ['INTERCEPTIONS'],
+  FUM: ['FUMBLES'],
+  '2B': ['DOUBLES'],
+  '3B': ['TRIPLES']
+};
+
+function getStatAliases(field) {
+  return statAliases[field] || [];
+}
+
+function getRawStatValue(statRow, field, aliases = []) {
+  if (!statRow) return '';
+
+  if (statRow[field] !== undefined && statRow[field] !== null && statRow[field] !== '') {
+    return statRow[field];
+  }
+
+  const targets = new Set([
+    normalizeStatKey(field),
+    ...aliases.map(alias => normalizeStatKey(alias))
+  ]);
+
+  for (const [key, value] of Object.entries(statRow)) {
+    if (value === undefined || value === null || value === '') continue;
+    if (targets.has(normalizeStatKey(key))) {
+      return value;
+    }
+  }
+
+  return '';
+}
+
+function getNumericStatValue(statRow, field, aliases = []) {
+  const rawValue = getRawStatValue(statRow, field, aliases);
+  if (rawValue === '') return 0;
+
+  const numeric = parseFloat(String(rawValue).replace(/,/g, ''));
+  return Number.isFinite(numeric) ? numeric : 0;
+}
+
+function formatBattingAverage(hits, atBats) {
+  if (atBats <= 0) return '0.000';
+  return (hits / atBats).toFixed(3);
+}
+
+function getDerivedBasketballTotal(record, totalField, rateField) {
+  const explicitTotal = getNumericStatValue(record.stat_row, totalField, getStatAliases(totalField));
+  if (explicitTotal > 0) {
+    return explicitTotal;
+  }
+
+  const gp = getNumericStatValue(record.stat_row, 'GP', getStatAliases('GP'));
+  const perGameRate = getNumericStatValue(record.stat_row, rateField, getStatAliases(rateField));
+
+  if (gp <= 0 || perGameRate <= 0) {
+    return 0;
+  }
+
+  return gp * perGameRate;
+}
+
+function getColumnNumericValue(record, col, sportType) {
+  if (sportType === 'basketball' && col.derivedRateField) {
+    return getDerivedBasketballTotal(record, col.field, col.derivedRateField);
+  }
+
+  let value = getNumericStatValue(record.stat_row, col.field, getStatAliases(col.field));
+
+  if (sportType === 'basketball' && col.key === 'pts' && value === 0) {
+    const gp = getNumericStatValue(record.stat_row, 'GP', getStatAliases('GP'));
+    const ppg = getNumericStatValue(record.stat_row, 'PPG', getStatAliases('PPG'));
+    if (gp > 0 && ppg > 0) {
+      value = gp * ppg;
+    }
+  }
+
+  if (sportType === 'football' && col.key === 'recypg' && value === 0) {
+    const gp = getNumericStatValue(record.stat_row, 'GP', getStatAliases('GP'));
+    const receivingYards = getNumericStatValue(record.stat_row, 'Rec YDS', getStatAliases('Rec YDS'));
+    if (gp > 0 && receivingYards > 0) {
+      value = receivingYards / gp;
+    }
+  }
+
+  if (col.key === 'avg') {
+    const hits = getNumericStatValue(record.stat_row, 'H', getStatAliases('H'));
+    const atBats = getNumericStatValue(record.stat_row, 'AB', getStatAliases('AB'));
+    if (atBats > 0) {
+      value = parseFloat(formatBattingAverage(hits, atBats));
+    }
+  }
+
+  return value;
+}
+
 function aggregateCareerStats(records) {
   const playerMap = new Map();
   
@@ -361,7 +573,7 @@ function aggregateCareerStats(records) {
       columns.forEach(col => {
         if (col.key === 'gp') return; // Skip GP, we handle it separately
         
-        let value = parseFloat(record.stat_row?.[col.field]) || 0;
+        let value = getNumericStatValue(record.stat_row, col.field, getStatAliases(col.field));
         
         // Special handling for PTS - calculate from PPG if PTS is missing
         if (col.key === 'pts' && value === 0 && sportType === 'basketball') {
@@ -392,8 +604,10 @@ function aggregateCareerStats(records) {
     } else {
       const firstSeason = seasonArray[0];
       const lastSeason = seasonArray[seasonArray.length - 1];
-      const firstYear = firstSeason.split('-')[0];
-      const lastYear = lastSeason.split('-')[0];
+      const firstParts = firstSeason.split('-');
+      const lastParts = lastSeason.split('-');
+      const firstYear = firstParts[0] || firstSeason;
+      const lastYear = lastParts[1] || lastParts[0] || lastSeason;
       seasonDisplay = `${firstYear}-${lastYear}`;
     }
     
@@ -415,11 +629,18 @@ function aggregateCareerStats(records) {
           ? (total / player.totalGP).toFixed(1) 
           : '0.0';
       } else if (col.label === 'AVG') {
-        // Batting average stays as average
-        const count = player.seasons.size;
-        careerStats[col.field] = count > 0 
-          ? (total / count).toFixed(3)
-          : '.000';
+        // Compute batting average from H/AB whenever AB data exists
+        const hits = player.statTotals['H'] || 0;
+        const atBats = player.statTotals['AB'] || 0;
+        if (atBats > 0) {
+          careerStats[col.field] = formatBattingAverage(hits, atBats);
+        } else {
+          // For other AVG fields, keep existing averaging behavior
+          const count = player.seasons.size;
+          careerStats[col.field] = count > 0 
+            ? (total / count).toFixed(3)
+            : '0.000';
+        }
       } else {
         // For counting stats (K, DIG, ACE, H, HR, etc), show career totals
         careerStats[col.field] = total.toFixed(0);
@@ -479,8 +700,9 @@ export function renderRecords(records, container, statsView = 'season', filters 
 
   // Detect sport type from first record
   const sportType = displayRecords.length > 0 ? detectSportType(displayRecords[0].sport) : 'basketball';
-  const columns = getSportColumns(displayRecords[0]?.sport || 'basketball', currentStatCategory);
+  const columns = getDisplayColumns(displayRecords[0]?.sport || 'basketball', currentStatCategory);
   const needsCategories = displayRecords.length > 0 ? sportNeedsCategories(displayRecords[0].sport) : false;
+  const canShowAdvancedToggle = ['basketball', 'baseball', 'softball', 'football'].includes(sportType);
 
   const totalPages = Math.ceil(displayRecords.length / recordsPerPage);
   const start = (currentPage - 1) * recordsPerPage;
@@ -503,6 +725,12 @@ export function renderRecords(records, container, statsView = 'season', filters 
     </div>
   ` : '';
 
+  const advancedToggleHTML = canShowAdvancedToggle ? `
+    <button class="advanced-toggle" type="button" aria-expanded="${showAdvancedStats}">
+      ${showAdvancedStats ? '− Hide Advanced Stats' : '+ Advanced Stats'}
+    </button>
+  ` : '';
+
   const tableHTML = `
     ${categoryTabsHTML}
     <div class="pagination-controls">
@@ -510,6 +738,7 @@ export function renderRecords(records, container, statsView = 'season', filters 
         Showing ${start + 1}-${Math.min(end, displayRecords.length)} of ${displayRecords.length} ${statsView === 'career' ? 'players' : 'records'}
       </div>
       <div class="pagination-actions">
+        ${advancedToggleHTML}
         <label for="perPage">Show:</label>
         <select id="perPage" class="per-page-selector">
           <option value="25" ${recordsPerPage === 25 ? 'selected' : ''}>25</option>
@@ -536,7 +765,7 @@ export function renderRecords(records, container, statsView = 'season', filters 
           </tr>
         </thead>
         <tbody>
-          ${renderTableRows(pageRecords, start, sportType, hideSchool, hideSport)}
+          ${renderTableRows(pageRecords, start, sportType, hideSchool, hideSport, columns)}
         </tbody>
       </table>
     </div>
@@ -562,6 +791,14 @@ export function renderRecords(records, container, statsView = 'season', filters 
       }
     });
   });
+
+  const advancedToggle = container.querySelector('.advanced-toggle');
+  if (advancedToggle) {
+    advancedToggle.addEventListener('click', () => {
+      showAdvancedStats = !showAdvancedStats;
+      renderRecords(currentRecords, container, currentStatsView, currentFilters);
+    });
+  }
 
   // Pagination controls
   const perPageSelector = container.querySelector("#perPage");
@@ -595,8 +832,7 @@ export function renderRecords(records, container, statsView = 'season', filters 
   }
 }
 
-function renderTableRows(records, startIndex = 0, sportType = 'basketball', hideSchool = false, hideSport = false) {
-  const columns = getSportColumns(records[0]?.sport || 'basketball', currentStatCategory);
+function renderTableRows(records, startIndex = 0, sportType = 'basketball', hideSchool = false, hideSport = false, columns = []) {
   
   return records
     .map((record, index) => {
@@ -608,13 +844,43 @@ function renderTableRows(records, startIndex = 0, sportType = 'basketball', hide
       
       // Generate dynamic stat cells based on sport columns
       const statCells = columns.map(col => {
-        let value = record.stat_row?.[col.field] || "";
+        let value = getRawStatValue(record.stat_row, col.field, getStatAliases(col.field));
+
+        if (sportType === 'basketball' && col.derivedRateField) {
+          const derivedTotal = getDerivedBasketballTotal(record, col.field, col.derivedRateField);
+          value = derivedTotal > 0 ? derivedTotal.toFixed(0) : '';
+        }
         
         // Special handling for PTS column in basketball
         if (col.key === 'pts' && !value && currentStatsView === 'season' && sportType === 'basketball') {
           const gp = parseFloat(record.stat_row?.["GP"]) || 0;
           const ppg = parseFloat(record.stat_row?.["PPG"]) || 0;
           value = gp > 0 && ppg > 0 ? (gp * ppg).toFixed(0) : "";
+        }
+
+        // Display-only data quality hint for unusually high basketball career GP totals
+        if (col.key === 'gp' && currentStatsView === 'career' && sportType === 'basketball') {
+          const gpValue = parseFloat(value) || 0;
+          if (gpValue > 120) {
+            value = `${value} ⚠`;
+          }
+        }
+
+        // Derive AVG from H/AB whenever AB is available in row data
+        if (col.key === 'avg') {
+          const hits = getNumericStatValue(record.stat_row, 'H', getStatAliases('H'));
+          const atBats = getNumericStatValue(record.stat_row, 'AB', getStatAliases('AB'));
+          if (atBats > 0) {
+            value = formatBattingAverage(hits, atBats);
+          }
+        }
+
+        if (sportType === 'football' && col.key === 'recypg' && !value) {
+          const gp = getNumericStatValue(record.stat_row, 'GP', getStatAliases('GP'));
+          const receivingYards = getNumericStatValue(record.stat_row, 'Rec YDS', getStatAliases('Rec YDS'));
+          if (gp > 0 && receivingYards > 0) {
+            value = (receivingYards / gp).toFixed(1);
+          }
         }
         
         return `<td>${value}</td>`;
@@ -667,12 +933,12 @@ function sortTable(column, container) {
       default:
         // Dynamic column lookup - find the field mapping from sport columns
         const sportType = a.sport ? detectSportType(a.sport) : 'basketball';
-        const columns = getSportColumns(a.sport || 'basketball', currentStatCategory);
+        const columns = getDisplayColumns(a.sport || 'basketball', currentStatCategory);
         const colConfig = columns.find(c => c.key === column);
         
         if (colConfig) {
-          aVal = parseFloat(a.stat_row?.[colConfig.field]) || 0;
-          bVal = parseFloat(b.stat_row?.[colConfig.field]) || 0;
+          aVal = getColumnNumericValue(a, colConfig, sportType);
+          bVal = getColumnNumericValue(b, colConfig, sportType);
         } else {
           return 0;
         }

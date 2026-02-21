@@ -5,6 +5,49 @@
 
 ---
 
+## Version 4.1 - Modularity & All-Sports Fetch Safety
+
+**Release Date:** February 18, 2026  
+**Status:** ✅ Complete and Working
+
+### What changed
+- Refactored duplicated Supabase pagination loops into shared service helpers in `src/services/sportsService.js`.
+- Enforced all-sports fetch behavior to continue paging until final partial page (no hidden caps).
+- Added explicit modularity and anti-regression documentation in `MODULARITY_STANDARDS.md` and `README.md`.
+
+### Why
+- Prevents future regressions where only part of the dataset appears for certain sports/schools.
+- Makes fixes centralized: pagination/retry policy now updates in one helper path instead of multiple loops.
+
+---
+
+## Version 4.2 - Core vs Advanced Stats UX + Football Receiving Tab
+
+**Release Date:** February 18, 2026  
+**Status:** ✅ Complete and Working
+
+### What changed
+- Added **Core vs Advanced** stat display for key sports using `+ Advanced Stats` toggle.
+- Basketball now defaults to core totals-first columns (GP, PTS, PPG, REB, AST, STL, BLK) with existing extras under Advanced.
+- Baseball/Softball now default to compact core views:
+  - Batting core: GP, AVG, HR, RBI
+  - Pitching core: GP, W, L, ERA, IP, H, R, BB, SO
+- Football tabs expanded and reordered to: **Passing, Rushing, Receiving, Defense** (Defense last).
+- Football core defaults per tab:
+  - Passing: GP, COMP, ATT, YDS, YPG, TD, INT
+  - Rushing: GP, ATT, YDS, YPG, TD, FUM
+  - Receiving: GP, REC, YDS, YPG, TD, FUM
+  - Defense: GP, Tackles, Solo, AST, TFL, Sacks, INT
+- Kept existing extra fields available behind **Advanced Stats**.
+- Fixed filter/tab overlap behavior at zoom and long school-name scenarios with responsive constraints.
+
+### Why
+- Reduces table clutter for first view while preserving full stat depth.
+- Makes football navigation clearer with a dedicated Receiving tab.
+- Improves reliability of layout across zoom levels and long option labels.
+
+---
+
 ## 🎯 Major Changes
 
 ### 0. **Landing Page with Background Video** ⭐ NEW
@@ -360,4 +403,39 @@ If issues arise:
 
 ---
 
-**End of v4.0 Documentation**
+---
+
+# Version 4.2 - UI Consistency, Filter Row Enforcement, and Error-Proofing
+
+**Release Date:** February 21, 2026  
+**Status:** ✅ Complete and Working
+
+### What changed
+- Fixed duplicate filter row and duplicate login button on statistics page (`src/stats.html`).
+- Enforced single filter row policy and documented in `README.md`.
+- Fixed JavaScript errors in filter logic (`src/main.js`), ensuring dynamic population from Supabase.
+- Updated documentation for future maintainers to prevent regression.
+
+### Why
+- Prevents confusion and layout issues from duplicate UI elements.
+- Ensures all filters are dynamically populated and robust against future changes.
+- Makes it easy to spot and fix similar issues in future updates.
+
+---
+
+# Version 4.3 - Soccer Stat Columns & Sport Detection Fixes
+
+**Release Date:** February 21, 2026  
+**Status:** ⚠️ In Progress
+
+### What changed
+- Added proper soccer stat columns (GP, Goals, Assists, Shots on Goal) for both boys and girls soccer.
+- Improved sport detection logic so "Boys Soccer" and "Girls Soccer" use soccer columns, not basketball columns.
+- Removed irrelevant soccer columns (Minutes, Yellow Cards, Red Cards).
+- Updated frontend to match Supabase data structure for soccer stats.
+
+### Why
+- Ensures soccer stats display correctly and are not mixed with basketball categories.
+- Makes the stats system more robust for future sports additions.
+
+**End of v4.3 Documentation**

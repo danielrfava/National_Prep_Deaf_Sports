@@ -21,84 +21,167 @@ function buildSearchFilter(query) {
   return parts.join(",");
 }
 
+async function fetchPaginatedRows({
+  pageSize = 1000,
+  fetchPage,
+  onError,
+  onPageData
+}) {
+  const allRows = [];
+  let page = 0;
+
+  while (true) {
+    const { data, error } = await fetchPage(page, pageSize);
+
+    if (error) {
+      if (onError) {
+        const action = await onError({ error, page, allRows });
+        if (action === 'retry') {
+          continue;
+        }
+        if (action === 'stop') {
+          break;
+        }
+      }
+
+      throw new Error(error.message);
+    }
+
+    const rows = data || [];
+
+    if (onPageData) {
+      const action = await onPageData({ data: rows, page, allRows });
+      if (action === 'retry') {
+        continue;
+      }
+      if (action === 'stop') {
+        break;
+      }
+    }
+
+    if (rows.length === 0) {
+      break;
+    }
+
+    allRows.push(...rows);
+
+    if (rows.length < pageSize) {
+      break;
+    }
+
+    page++;
+  }
+
+  return allRows;
+}
+
+async function fetchUniqueColumnValues(columnName) {
+  const rows = await fetchPaginatedRows({
+    pageSize: 1000,
+    fetchPage: (page, pageSize) => (
+      supabase
+        .from("raw_stat_rows")
+        .select(columnName)
+        .range(page * pageSize, (page + 1) * pageSize - 1)
+    )
+  });
+
+  const uniqueValues = new Set();
+  rows.forEach((row) => {
+    const value = row?.[columnName];
+    if (value) {
+      uniqueValues.add(value);
+    }
+  });
+
+  return Array.from(uniqueValues).sort();
+}
+
 export async function fetchSportsRecords(query = "", filters = {}) {
   console.log('fetchSportsRecords called with:', { query, filters });
   
   // Fetch in batches to overcome 1000 record limit
-  let allData = [];
-  let page = 0;
-  const pageSize = 1000;
-  let hasMore = true;
   let footballVariantFilterMode = filters.footballVariant ? 'sport_variant' : 'none';
 
-  while (hasMore && allData.length < 50000) {
-    let request = supabase
-      .from("raw_stat_rows")
-      .select("*")
-      .range(page * pageSize, (page + 1) * pageSize - 1);
+  const allData = await fetchPaginatedRows({
+    pageSize: 1000,
+    fetchPage: (page, pageSize) => {
+      let request = supabase
+        .from("raw_stat_rows")
+        .select("*")
+        .range(page * pageSize, (page + 1) * pageSize - 1);
 
-    if (query) {
-      request = request.or(`${buildSearchFilter(query)},stat_row->>Athlete Name.ilike.%${query}%`);
-    }
-
-    if (filters.schoolId && filters.schoolId !== '' && filters.schoolId !== 'all') {
-      console.log('Applying school filter:', filters.schoolId);
-      request = request.eq("school", filters.schoolId);
-    } else {
-      console.log('Not applying school filter - showing all schools');
-    }
-
-    if (filters.sport && filters.sport !== '' && filters.sport !== 'all') {
-      console.log('Applying sport filter:', filters.sport);
-      request = request.eq("sport", filters.sport);
-    } else {
-      console.log('Not applying sport filter - showing all sports');
-    }
-
-    if (filters.footballVariant) {
-      if (footballVariantFilterMode === 'sport_variant') {
-        request = request.eq("sport_variant", filters.footballVariant);
-      } else {
-        request = request.ilike("sport", `%${filters.footballVariant}%`);
+      if (query) {
+        request = request.or(`${buildSearchFilter(query)},stat_row->>Athlete Name.ilike.%${query}%`);
       }
-    }
 
-    const { data, error } = await request;
 
-    if (error) {
+      if (filters.division && filters.division !== '') {
+        if (filters.division === 'd1') {
+          // Only Big 6 schools
+          request = request.in("school", [
+            "msd", "mssd", "csd-fremont", "csd-riverside", "isd", "tsd"
+          ]);
+        } else if (filters.division === 'd2') {
+          // Only D2 schools (exclude Big 6)
+          // If you have a division field in the DB, use it. Otherwise, filter by school list.
+          // Here, we assume all non-Big 6 are D2.
+          request = request.not("school", "in", [
+            "msd", "mssd", "csd-fremont", "csd-riverside", "isd", "tsd"
+          ]);
+        }
+      }
+
+      if (filters.schoolId && filters.schoolId !== '' && filters.schoolId !== 'all') {
+        console.log('Applying school filter:', filters.schoolId);
+        request = request.eq("school", filters.schoolId);
+      } else {
+        console.log('Not applying school filter - showing all schools');
+      }
+
+      if (filters.sport && filters.sport !== '' && filters.sport !== 'all') {
+        console.log('Applying sport filter:', filters.sport);
+        request = request.eq("sport", filters.sport);
+      } else {
+        console.log('Not applying sport filter - showing all sports');
+      }
+
+      if (filters.footballVariant) {
+        if (footballVariantFilterMode === 'sport_variant') {
+          request = request.eq("sport_variant", filters.footballVariant);
+        } else {
+          request = request.ilike("sport", `%${filters.footballVariant}%`);
+        }
+      }
+
+      return request;
+    },
+    onError: ({ error }) => {
       if (filters.footballVariant && footballVariantFilterMode === 'sport_variant' && isMissingSportVariantColumnError(error)) {
         console.warn('sport_variant column missing on raw_stat_rows, falling back to sport text matching for football variant filter.');
         footballVariantFilterMode = 'sport_text';
-        continue;
+        return 'retry';
       }
 
       console.error('Supabase error:', error);
-      throw new Error(error.message);
-    }
-
-    if (
-      filters.footballVariant &&
-      footballVariantFilterMode === 'sport_variant' &&
-      page === 0 &&
-      allData.length === 0 &&
-      (!data || data.length === 0)
-    ) {
-      console.warn('No football variant rows found via sport_variant, retrying with legacy sport text matching.');
-      footballVariantFilterMode = 'sport_text';
-      continue;
-    }
-
-    if (!data || data.length === 0) {
-      hasMore = false;
-    } else {
-      allData = allData.concat(data);
-      if (data.length < pageSize) {
-        hasMore = false;
-      } else {
-        page++;
+      return null;
+    },
+    onPageData: ({ data, page, allRows }) => {
+      if (
+        filters.footballVariant &&
+        footballVariantFilterMode === 'sport_variant' &&
+        page === 0 &&
+        allRows.length === 0 &&
+        data.length === 0
+      ) {
+        console.warn('No football variant rows found via sport_variant, retrying with legacy sport text matching.');
+        footballVariantFilterMode = 'sport_text';
+        return 'retry';
       }
+
+      return null;
     }
-  }
+  });
 
   console.log(`Fetched ${allData?.length || 0} records`);
   if (allData && allData.length > 0) {
@@ -122,80 +205,17 @@ export async function fetchSportsRecords(query = "", filters = {}) {
 }
 
 export async function fetchSchools() {
-  // Get all unique schools - use pagination
-  let allSchools = new Set();
-  let page = 0;
-  const pageSize = 1000;
-  let hasMore = true;
+  const schools = await fetchUniqueColumnValues("school");
 
-  while (hasMore && page < 50) {
-    const { data, error } = await supabase
-      .from("raw_stat_rows")
-      .select("school")
-      .range(page * pageSize, (page + 1) * pageSize - 1);
-
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    if (!data || data.length === 0) {
-      hasMore = false;
-    } else {
-      data.forEach((row) => {
-        if (row?.school) {
-          allSchools.add(row.school);
-        }
-      });
-      
-      if (data.length < pageSize) {
-        hasMore = false;
-      } else {
-        page++;
-      }
-    }
-  }
-
-  console.log('Total unique schools found:', allSchools.size);
-  return Array.from(allSchools).sort().map(school => ({
+  console.log('Total unique schools found:', schools.length);
+  return schools.map(school => ({
     id: school,
     full_name: school
   }));
 }
 
 export async function fetchSportsList() {
-  // Get all unique sports - use pagination
-  let allSports = new Set();
-  let page = 0;
-  const pageSize = 1000;
-  let hasMore = true;
-
-  while (hasMore && page < 50) {
-    const { data, error } = await supabase
-      .from("raw_stat_rows")
-      .select("sport")
-      .range(page * pageSize, (page + 1) * pageSize - 1);
-
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    if (!data || data.length === 0) {
-      hasMore = false;
-    } else {
-      data.forEach((row) => {
-        if (row?.sport) {
-          allSports.add(row.sport);
-        }
-      });
-      
-      if (data.length < pageSize) {
-        hasMore = false;
-      } else {
-        page++;
-      }
-    }
-  }
-
-  console.log('Total unique sports found:', allSports.size);
-  return Array.from(allSports).sort();
+  const sports = await fetchUniqueColumnValues("sport");
+  console.log('Total unique sports found:', sports.length);
+  return sports;
 }

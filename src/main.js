@@ -5,15 +5,19 @@ const filterInput = document.querySelector("#athleteFilter");
 const status = document.querySelector("#status");
 const recordsContainer = document.querySelector("#records");
 const schoolFilter = document.querySelector("#schoolFilter");
+const divisionFilter = document.querySelector("#divisionFilter");
 const sportFilter = document.querySelector("#sportFilter");
 const footballVariantFilter = document.querySelector("#footballVariantFilter");
 const footballVariantFilterField = document.querySelector("#footballVariantFilterField");
 const statsViewFilter = document.querySelector("#statsViewFilter");
 const sportsMenu = document.querySelector("#sportsMenu");
 const sportsMenuGrid = document.querySelector("#sportsMenuGrid");
+const modeTabs = Array.from(document.querySelectorAll(".mode-tab"));
+const modePanels = Array.from(document.querySelectorAll("[data-mode-panel]"));
 
 let activeRequest = 0;
 let debounceId = null;
+let currentMode = "individual";
 
 function updateStatus(message) {
   status.textContent = message;
@@ -133,6 +137,7 @@ function buildFilters() {
   const filters = {
     schoolId: schoolFilter.value,
     sport: sportFilter.value,
+    division: divisionFilter.value,
     footballVariant: footballVariantFilter ? footballVariantFilter.value : ''
   };
   console.log('Built filters:', filters);
@@ -164,7 +169,48 @@ function setOptions(select, options, getLabel) {
   });
 }
 
+function setMode(mode) {
+  currentMode = mode;
+
+  modeTabs.forEach((tab) => {
+    const isActive = tab.dataset.mode === mode;
+    tab.classList.toggle("active", isActive);
+    tab.setAttribute("aria-selected", String(isActive));
+  });
+
+  modePanels.forEach((panel) => {
+    panel.hidden = panel.dataset.modePanel !== mode;
+  });
+
+  if (mode === "individual") {
+    runSearch(filterInput.value.trim());
+    return;
+  }
+
+  updateStatus("");
+}
+
+function setupModeTabs() {
+  if (!modeTabs.length || !modePanels.length) {
+    return;
+  }
+
+  modeTabs.forEach((tab) => {
+    tab.addEventListener("click", () => {
+      const mode = tab.dataset.mode;
+      if (!mode || mode === currentMode) {
+        return;
+      }
+      setMode(mode);
+    });
+  });
+}
+
 async function runSearch(query) {
+  if (currentMode !== "individual") {
+    return;
+  }
+
   const requestId = ++activeRequest;
   updateStatus(query ? "Searching..." : "Loading records...");
 
@@ -201,40 +247,62 @@ function applyFilter() {
   }, 300);
 }
 
+
+let allSchools = [];
+
 async function init() {
   setupSportsMenu();
+  setupModeTabs();
+  setMode("individual");
   updateStatus("Loading filters...");
 
   try {
     const [schools, sports] = await Promise.all([fetchSchools(), fetchSportsList()]);
+    allSchools = schools;
+    updateSchoolFilter();
 
-    setOptions(
-      schoolFilter,
-      schools.map((school) => ({
-        value: school.id,
-        label: school.full_name || school.short_name || school.id
-      })),
-      (option) => option.label
-    );
+    // Populate sports dropdown
+    sportFilter.innerHTML = "<option value=''>All sports</option>";
+    sports.forEach(sport => {
+      const item = document.createElement("option");
+      item.value = sport;
+      item.textContent = sport;
+      sportFilter.appendChild(item);
+    });
 
-    setOptions(
-      sportFilter,
-      sports.map((sport) => ({ value: sport, label: sport })),
-      (option) => option.label
-    );
-    
-    console.log('After setOptions - schoolFilter options count:', schoolFilter.options.length);
-    console.log('After setOptions - schoolFilter.selectedIndex:', schoolFilter.selectedIndex);
-    console.log('After setOptions - schoolFilter.value:', schoolFilter.value);
-    console.log('After setOptions - First option value:', schoolFilter.options[0]?.value);
-    console.log('After setOptions - First option text:', schoolFilter.options[0]?.text);
-    
+    // School filter population by division
+    function updateSchoolOptions() {
+      const division = divisionFilter.value;
+      let filteredSchools = schools;
+      if (division === "d1") {
+        // Division 1 schools (Big 6)
+        filteredSchools = schools.filter(school => [
+          "msd", "mssd", "csd-fremont", "csd-riverside", "isd", "tsd"
+        ].includes(school.id));
+      } else if (division === "d2") {
+        filteredSchools = schools.filter(school => school.division === "d2");
+      }
+      // Always include 'All schools' as the first option
+      schoolFilter.innerHTML = "<option value=''>All schools</option>";
+      filteredSchools.forEach(school => {
+        const item = document.createElement("option");
+        item.value = school.id;
+        item.textContent = school.full_name || school.short_name || school.id;
+        schoolFilter.appendChild(item);
+      });
+    }
+    // Initial population
+    updateSchoolOptions();
+    // Division filter event
+    divisionFilter.addEventListener("change", () => {
+      updateSchoolOptions();
+      schoolFilter.selectedIndex = 0;
+      runSearch(filterInput.value.trim());
+    });
     // Ensure filters are reset to "All" after loading options
     setTimeout(() => {
       schoolFilter.selectedIndex = 0; // Select first option ("All schools")
       sportFilter.selectedIndex = 0; // Select first option ("All sports")
-      console.log('Reset filters - schoolFilter.selectedIndex:', schoolFilter.selectedIndex, 'value:', schoolFilter.value);
-      console.log('Reset filters - sportFilter.selectedIndex:', sportFilter.selectedIndex, 'value:', sportFilter.value);
       runSearch("");
     }, 100);
   } catch (error) {
@@ -242,15 +310,45 @@ async function init() {
   }
 }
 
+function updateSchoolFilter() {
+  // Save current selection
+  const prevValue = schoolFilter.value;
+  // Clear options
+  schoolFilter.innerHTML = '<option value="">All schools</option>';
+  let filteredSchools = allSchools;
+  if (divisionFilter && divisionFilter.value) {
+    filteredSchools = allSchools.filter(s => (s.division || '').toLowerCase() === divisionFilter.value.toLowerCase());
+  }
+  filteredSchools.forEach((school) => {
+    const option = document.createElement('option');
+    option.value = school.id;
+    option.textContent = school.full_name || school.short_name || school.id;
+    schoolFilter.appendChild(option);
+  });
+  // Try to restore previous selection if possible
+  if (prevValue) {
+    schoolFilter.value = prevValue;
+  }
+}
+
+
 filterInput.addEventListener("input", applyFilter);
 schoolFilter.addEventListener("change", () => runSearch(filterInput.value.trim()));
 sportFilter.addEventListener("change", () => {
   toggleFootballVariantFilter();
   runSearch(filterInput.value.trim());
 });
+if (divisionFilter) {
+  divisionFilter.addEventListener("change", () => {
+    updateSchoolFilter();
+    runSearch(filterInput.value.trim());
+  });
+}
 if (footballVariantFilter) {
   footballVariantFilter.addEventListener("change", () => runSearch(filterInput.value.trim()));
 }
-statsViewFilter.addEventListener("change", () => runSearch(filterInput.value.trim()));
+if (statsViewFilter) {
+  statsViewFilter.addEventListener("change", () => runSearch(filterInput.value.trim()));
+}
 
 init();

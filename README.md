@@ -23,6 +23,33 @@ This repository contains the complete static web application for Deaf Sports His
 - Ready for deployment on Netlify as a static site (see deployment guides).
 - Supabase environment variables (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY) are required for production.
 
+## ⚠️ UI Layout & Filter Row Policy (v4.3)
+
+- The statistics page (`src/stats.html`) must have **only one filter row** at the top (School, Sport, Stats View), styled as shown in the screenshots and demo videos.
+- **Do not duplicate** the filter row or add extra filter sections—this causes confusion and layout issues. If you see a duplicate login button or filter row, remove the extra section immediately.
+- All filter dropdowns are **dynamically populated** from Supabase data via JavaScript. Do not hardcode filter options in HTML.
+- Soccer stats now display only GP, Goals, Assists, and Shots on Goal for both boys and girls soccer. Irrelevant columns (Minutes, Yellow Cards, Red Cards) have been removed.
+- Sport detection logic improved: "Boys Soccer" and "Girls Soccer" now use soccer columns, not basketball columns.
+- The navigation bar, search bar, and filter row structure are critical for a consistent user experience. If you change the layout, update this documentation and test thoroughly.
+- If you see duplicate filters or login buttons, remove the extra section and keep only the main filter row and single login button at the top right.
+
+**For new contributors:**
+- Review this README and the code in `src/stats.html`, `src/main.js`, and `src/components/renderRecords.js` before making UI changes.
+- Always test the site locally after edits to ensure the layout and dynamic filters work as expected.
+
+## Critical data loading policy (all sports)
+
+- Never hard-cap pagination by row count or page count in frontend Supabase fetch loops.
+- Always paginate with `range()` in batches (currently 1000) and continue until Supabase returns fewer than `pageSize` rows.
+- This rule applies to all sports and all filter states (Basketball, Baseball, Softball, Football, Volleyball, etc.).
+- Reintroducing caps (like 50 pages or 50,000 rows) can silently hide valid records and create ranking/filter bugs.
+
+Current implementation reference:
+- `src/services/sportsService.js`
+	- `fetchSportsRecords()`
+	- `fetchSchools()`
+	- `fetchSportsList()`
+
 ## Purpose
 
 To provide a maintainable, modular, and fully documented static web application for Deaf Sports History, including all code, data, and guides needed for development, deployment, and future enhancements.

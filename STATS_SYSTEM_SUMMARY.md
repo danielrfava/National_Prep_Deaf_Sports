@@ -3,17 +3,36 @@
 
 ## 🎯 What We Built Today
 
+### 0.5 **Core vs Advanced Stats UX (All Major Sports)**
+- Added `+ Advanced Stats` toggle pattern to keep first view focused and readable.
+- **Basketball default core:** GP, PTS, PPG, REB, AST, STL, BLK.
+- **Baseball/Softball batting core:** GP, AVG, HR, RBI.
+- **Baseball/Softball pitching core:** GP, W, L, ERA, IP, H, R, BB, SO.
+- Advanced toggle reveals all previously available extra metrics.
+
+### 0. **All-Sports Pagination Policy (Anti-Truncation Guardrail)**
+- Removed hard pagination caps that could truncate records for some sports/schools.
+- Data fetch loops now continue until Supabase returns the final partial page.
+- Applies globally across all sports, filters, and views.
+- Prevents past issues where only part of the dataset appeared (for example certain schools/sports dominating first pages).
+
+**Policy for future updates:**
+- Do **not** add fixed limits like `page < 50` or `allData.length < 50000` in core fetch loops.
+- If optimization is needed, implement explicit UX patterns (load-more, caching, server-side aggregation) rather than hidden caps.
+
 ### 1. **Baseball & Softball Statistics with Batting/Pitching Tabs**
 - Added comprehensive batting statistics (AVG, AB, H, 2B, 3B, HR, RBI, R, SB, BB, SO, OBP, SLG)
 - Added comprehensive pitching statistics (W, L, ERA, IP, H, R, ER, BB, SO, SV, WHIP)
 - **Tab interface** automatically appears when viewing baseball/softball stats
 - Same user experience as professional sports sites
 
-### 2. **Football Statistics with Passing/Rushing/Defense Tabs**
-- **Passing stats:** COMP, ATT, PCT, YDS, YPG, TD, INT, QBR, Rating
-- **Rushing stats:** ATT, YDS, AVG, YPG, TD, Long, FUM, REC, Rec YDS, Rec TD
-- **Defense stats:** Tackles, Solo, AST, TFL, Sacks, INT, PD, FF, FR, TD
-- **Tab interface** switches between stat categories
+### 2. **Football Statistics with Passing/Rushing/Receiving/Defense Tabs**
+- **Tab order:** Passing → Rushing → Receiving → Defense (Defense last)
+- **Passing core:** GP, COMP, ATT, YDS, YPG, TD, INT
+- **Rushing core:** GP, ATT, YDS, YPG, TD, FUM
+- **Receiving core:** GP, REC, YDS, YPG, TD, FUM
+- **Defense core:** GP, Tackles, Solo, AST, TFL, Sacks, INT
+- Additional football metrics remain available under `+ Advanced Stats`
 
 ### 3. **Football Variant Filter (8-Man vs 11-Man)**
 - Dropdown filter appears **only when Football is selected**
