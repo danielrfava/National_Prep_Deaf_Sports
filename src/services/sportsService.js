@@ -145,34 +145,32 @@ export async function fetchSportsRecords(query = "", filters = {}) {
 
 /* ---------------- Dropdown APIs ---------------- */
 
-export async function fetchSchools() {
-  const rows = await fetchSchoolsFromMetadata();
-  return rows.map((r) => ({
-    id: r.id,
-    full_name: r.full_name,
-    short_name: r.short_name,
-    division: r.division,
-  }));
-}
-
 export async function fetchSportsList() {
-  const { data, error } = await supabase
-    .from("raw_stat_rows")
-    .select("sport");
+  // Read every page from raw_stat_rows but only the 'sport' column (lightweight)
+  const PAGE_SIZE = 10000; // ~61,603 rows -> ~7 pages today; scales as you grow
 
-  if (error) throw new Error(error.message);
+  const allRows = await fetchPaginatedRows({
+    pageSize: PAGE_SIZE,
+    fetchPage: (page, pageSize) =>
+      supabase
+        .from("raw_stat_rows")
+        .select("sport")
+        .not("sport", "is", null) // ignore nulls
+        .range(page * pageSize, (page + 1) * pageSize - 1)
+  });
 
-  const unique = [...new Set((data || []).map((r) => r.sport))];
-  return unique.sort();
-}
-
-export async function fetchSeasonsList() {
-  const { data, error } = await supabase
-    .from("raw_stat_rows")
-    .select("season");
-
-  if (error) throw new Error(error.message);
-
-  const unique = [...new Set((data || []).map((r) => r.season))];
-  return unique.sort();
+  // Normalize + de-duplicate (case-insensitive) + sort
+  const seen = new Set();
+  const out = [];
+  for (const r of allRows || []) {
+    const label = String(r?.sport || "").trim();
+    if (!label) continue;                // drop blanks
+    const key = label.toLowerCase();     // case-insensitive uniqueness
+    if (!seen.has(key)) {
+      seen.add(key);
+      out.push(label);
+    }
+  }
+  out.sort((a, b) => a.localeCompare(b));
+  return out;
 }

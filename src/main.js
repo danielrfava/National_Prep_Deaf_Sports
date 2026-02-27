@@ -1,4 +1,4 @@
-import { fetchSchools, fetchSportsList, fetchSportsRecords } from "./services/sportsService.js";
+iw ill import { fetchSchools, fetchSportsList, fetchSportsRecords } from "./services/sportsService.js";
 import { renderRecords } from "./components/renderRecords.js";
 
 const filterInput = document.querySelector("#athleteFilter");
