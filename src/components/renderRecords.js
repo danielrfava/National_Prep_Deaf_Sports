@@ -837,8 +837,9 @@ function renderTableRows(records, startIndex = 0, sportType = 'basketball', hide
   return records
     .map((record, index) => {
       const athleteName = record.stat_row?.["Athlete Name"] || "Unknown";
-      const fullSchool = record.school || "";
-      const school = getSchoolAbbrev(fullSchool);
+      const school = record.school_id
+  ? record.school_id.toUpperCase()
+  : getSchoolAbbrev(record.school);
       const sport = record.sport || "";
       const season = record.season || "";
       
