@@ -1,6 +1,6 @@
 @@ -1,32 +1,38 @@
 // sportsService.js
-import { supabase } from "../supabaseClient.js";
+import { supabase } from ".../supaClient.js";
 
 function isMissingSportVariantColumnError(error) {
   const message = `${error?.message || ''} ${error?.details || ''}`.toLowerCase();
