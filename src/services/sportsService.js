@@ -146,26 +146,43 @@ export async function fetchSportsRecords(query = "", filters = {}) {
 /* ---------------- Dropdown APIs ---------------- */
 
 export async function fetchSportsList() {
-  // Read every page from raw_stat_rows but only the 'sport' column (lightweight)
-  const PAGE_SIZE = 10000; // ~61,603 rows -> ~7 pages today; scales as you grow
+  // Pull every page from raw_stat_rows, but only the 'sport' column (small payload).
+  // With ~61,603 rows today, PAGE_SIZE=10000 → about 7 requests. Scales as you grow.
+  const PAGE_SIZE = 10000;
 
-  const allRows = await fetchPaginatedRows({
-    pageSize: PAGE_SIZE,
-    fetchPage: (page, pageSize) =>
-      supabase
-        .from("raw_stat_rows")
-        .select("sport")
-        .not("sport", "is", null) // ignore nulls
-        .range(page * pageSize, (page + 1) * pageSize - 1)
-  });
+  let page = 0;
+  const all = [];
 
-  // Normalize + de-duplicate (case-insensitive) + sort
+  for (;;) {
+    const { data, error } = await supabase
+      .from("raw_stat_rows")
+      .select("sport")
+      .not("sport", "is", null)                        // ignore nulls
+      .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+
+    if (error) {
+      console.error("[fetchSportsList] Supabase error:", error);
+      // Fail soft: return what we have so far instead of crashing the app
+      break;
+    }
+
+    if (!data || data.length === 0) break;
+
+    all.push(...data);
+
+    // If we received fewer than PAGE_SIZE, we've reached the end.
+    if (data.length < PAGE_SIZE) break;
+
+    page++;
+  }
+
+  // Normalize + de-duplicate (case-insensitive), then sort
   const seen = new Set();
   const out = [];
-  for (const r of allRows || []) {
-    const label = String(r?.sport || "").trim();
-    if (!label) continue;                // drop blanks
-    const key = label.toLowerCase();     // case-insensitive uniqueness
+  for (const row of all) {
+    const label = String(row?.sport || "").trim();
+    if (!label) continue;
+    const key = label.toLowerCase();
     if (!seen.has(key)) {
       seen.add(key);
       out.push(label);
