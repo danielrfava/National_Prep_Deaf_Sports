@@ -92,11 +92,11 @@ export async function fetchSportsRecords(query = "", filters = {}) {
       return ptsB - ptsA;
     });
   }
-const normalizedData = (allData || []).map(row => ({
-  ...row,
-  school_id: row.schools?.short_name || row.school_id
-}));
 
-return normalizedData;
-  return allData || [];
+  const normalizedData = (allData || []).map(row => ({
+    ...row,
+    school_id: row?.schools?.short_name || row?.school_id || ""
+  }));
+
+  return normalizedData;
 }
