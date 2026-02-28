@@ -148,24 +148,15 @@ export async function fetchSportsRecords(query = "", filters = {}) {
 export async function fetchSportsList() {
   const { data, error } = await supabase
     .from("raw_stat_rows")
-    .select("sport")
+    .select("sport", { distinct: true })
     .not("sport", "is", null);
 
   if (error) throw new Error(error.message);
 
-  const seen = new Set();
-  const out = [];
+  const out = (data || [])
+    .map(r => r.sport?.trim())
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b));
 
-  for (const row of data || []) {
-    const label = String(row.sport || "").trim();
-    if (!label) continue;
-    const key = label.toLowerCase();
-    if (!seen.has(key)) {
-      seen.add(key);
-      out.push(label);
-    }
-  }
-
-  out.sort((a, b) => a.localeCompare(b));
   return out;
 }
