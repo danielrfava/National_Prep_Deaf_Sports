@@ -147,16 +147,10 @@ export async function fetchSportsRecords(query = "", filters = {}) {
 
 export async function fetchSportsList() {
   const { data, error } = await supabase
-    .from("raw_stat_rows")
-    .select("sport", { distinct: true })
-    .not("sport", "is", null);
+    .from("vw_sports")
+    .select("sport");
 
   if (error) throw new Error(error.message);
 
-  const out = (data || [])
-    .map(r => r.sport?.trim())
-    .filter(Boolean)
-    .sort((a, b) => a.localeCompare(b));
-
-  return out;
+  return (data || []).map(r => r.sport);
 }
