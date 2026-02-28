@@ -55,7 +55,7 @@ async function fetchPaginatedRows({ pageSize = 1000, fetchPage }) {
 
 /* ---------------- Metadata ---------------- */
 
-async function fetchSchoolsFromMetadata() {
+export async function fetchSchools() {
   const { data, error } = await supabase
     .from("schools")
     .select("id, full_name, short_name, division, is_active")
