@@ -338,10 +338,11 @@ const schoolAbbreviations = {
   // Independent - Division 2
   'Hawaii School for the Deaf and the Blind': 'HSDB',
   'Illinois School for the Deaf': 'ISD-IL',
-  'Michigan School for the Deaf': 'MSD-MI'
+  'Michigan School for the Deaf': 'MSD-MI',
 
   // Western States Basketball Classic (WSBC) - Division 2
-  'Arizona State School for the Deaf': 'ASSD-AZ',
+  'Arizona School for the Deaf': 'ASD-AZ',
+  'Arizona State School for the Deaf': 'ASD-AZ',
   'Washington School for the Deaf': 'WSD-WA',
   'Phoenix Day School for the Deaf': 'PDSD',
   'Colorado School for the Deaf and Blind': 'CSDB',
