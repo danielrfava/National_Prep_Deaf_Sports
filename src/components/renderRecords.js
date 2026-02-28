@@ -324,8 +324,9 @@ const schoolAbbreviations = {
   'Wisconsin School for the Deaf': 'WSD',
   
   // MDSDAA Conference - Division 2
-  'Alabama Institute for the Deaf and Blind': 'AIDB',
-  'Alabama School for the Deaf': 'ASD',
+  'Alabama School for the Deaf': 'ASDB',
+  'Alabama Institute for the Deaf and Blind': 'AIDB', 
+  'Alabama School for the Deaf and Blind': 'ASDB',
   'Eastern North Carolina School for the Deaf': 'ENCSD',
   'Florida School for the Deaf and Blind': 'FSDB',
   'Georgia School for the Deaf': 'GSD',
