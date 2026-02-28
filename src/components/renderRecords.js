@@ -708,7 +708,6 @@ export function renderRecords(records, container, statsView = 'season', filters 
   }
   
   currentRecords = displayRecords;
-  currentPage = 1; // Reset to first page on new data
 
   if (!displayRecords.length) {
     container.innerHTML = "<p>No records found.</p>";
