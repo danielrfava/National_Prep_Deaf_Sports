@@ -1,3 +1,4 @@
+// commit test
 let currentSort = { column: null, ascending: true };
 let currentRecords = [];
 let currentPage = 1;
