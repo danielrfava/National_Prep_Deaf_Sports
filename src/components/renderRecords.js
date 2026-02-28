@@ -304,11 +304,16 @@ const schoolAbbreviations = {
   'New York State School for the Deaf': 'NYSSD',
   'Rochester School for the Deaf': 'RSD',
   'West Virginia Schools for the Deaf and Blind': 'WVSDB',
+  'Marie Philip School for the Deaf': 'MPSD',
+  'Rhode Island School for the Deaf': 'RISD',
+  'New York School for the Deaf': 'NYSD',
+  'Pennsylvania School for the Deaf': 'PSD',
+  'Scranton School for the Deaf': 'SSD',
   
   // GPSD Conference - Division 2
   'Arkansas School for the Deaf': 'ASD-AR',
   'Iowa School for the Deaf': 'ISD-IA',
-  'Kansas State School for the Deaf': 'KSSD',
+  'Kansas School for the Deaf': 'KSD',
   'Minnesota State Academy for the Deaf': 'MSAD',
   'Missouri School for the Deaf': 'MSD-MO',
   'New Mexico School for the Deaf': 'NMSD',
@@ -318,6 +323,7 @@ const schoolAbbreviations = {
   
   // MDSDAA Conference - Division 2
   'Alabama Institute for the Deaf and Blind': 'AIDB',
+  'Alabama School for the Deaf': 'ASD',
   'Eastern North Carolina School for the Deaf': 'ENCSD',
   'Florida School for the Deaf and Blind': 'FSDB',
   'Georgia School for the Deaf': 'GSD',
@@ -330,10 +336,17 @@ const schoolAbbreviations = {
   'Virginia School for the Deaf and the Blind': 'VSDB',
   
   // Independent - Division 2
-  'Colorado School for the Deaf and Blind': 'CSDB',
   'Hawaii School for the Deaf and the Blind': 'HSDB',
   'Illinois School for the Deaf': 'ISD-IL',
   'Michigan School for the Deaf': 'MSD-MI'
+
+  // Western States Basketball Classic (WSBC) - Division 2
+  'Arizona State School for the Deaf': 'ASSD-AZ',
+  'Washington School for the Deaf': 'WSD-WA',
+  'Phoenix Day School for the Deaf': 'PDSD',
+  'Colorado School for the Deaf and Blind': 'CSDB',
+  'Oregon School for the Deaf': 'OSD-OR',
+  'Utah School for the Deaf and Blind': 'USDB',
 };
 
 function getSchoolAbbrev(fullSchool) {
