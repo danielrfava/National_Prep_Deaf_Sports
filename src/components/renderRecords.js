@@ -300,6 +300,8 @@ const schoolAbbreviations = {
   'Marie H. Katzenbach School for the Deaf': 'KSD',
   'The Learning Center for the Deaf': 'TLC',
   'Western Pennsylvania School for the Deaf': 'WPSD',
+  'West Pennyslvania School for the Deaf': 'WPSD', // typo in DB
+  'West Pennsylvania School for the Deaf': 'WPSD',  // partial variation safety 
   'Governor Baxter School for the Deaf': 'GBSD',
   'New York State School for the Deaf': 'NYSSD',
   'Rochester School for the Deaf': 'RSD',
