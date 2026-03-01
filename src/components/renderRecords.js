@@ -649,7 +649,42 @@ function aggregateCareerStats(records, maxSeasons = Infinity) {
     if (maxSeasons !== Infinity) {
     seasonArray = seasonArray.slice(-maxSeasons);
     }
+    // 👇 PASTE NEW BLOCK RIGHT HERE
+    // Recalculate totals if limited to 4-year standard
+    let effectiveSeasons = seasonArray;
 
+    let filteredTotals = {};
+    let filteredGP = 0;
+
+    if (maxSeasons !== Infinity) {
+     columns.forEach(col => {
+     filteredTotals[col.field] = 0;
+     });
+
+     effectiveSeasons.forEach(season => {
+      const seasonRecord = player.seasonData.get(season);
+      if (!seasonRecord) return;
+
+     const gp = parseFloat(seasonRecord.gp) || 0;
+      filteredGP += gp;
+
+     columns.forEach(col => {
+      if (col.key === 'gp') return;
+
+      let value = getNumericStatValue(
+        seasonRecord.stat_row,
+        col.field,
+        getStatAliases(col.field)
+      );
+
+      if (col.label.endsWith('/G') || col.label.endsWith('PG')) {
+        filteredTotals[col.field] += value * gp;
+      } else {
+        filteredTotals[col.field] += value;
+      }
+    });
+  });
+}
     // Format season range
     let seasonDisplay = '';
     
@@ -673,14 +708,16 @@ function aggregateCareerStats(records, maxSeasons = Infinity) {
        maxSeasons === Infinity && player.seasons.size > 4
        ? `${player.name}*`
        : player.name,
-        "GP": player.totalGP.toFixed(0)
+        "GP": (maxSeasons !== Infinity ? filteredGP : player.totalGP).toFixed(0)
         };
     
     // Calculate career averages or totals for each stat
     columns.forEach(col => {
       if (col.key === 'gp') return; // Already handled
       
-      const total = player.statTotals[col.field];
+      const total = maxSeasons !== Infinity
+       ? filteredTotals[col.field]
+       : player.statTotals[col.field];
       
       // For per-game stats, calculate career average
       if (col.label.endsWith('/G') || col.label.endsWith('PG')) {
