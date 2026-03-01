@@ -729,10 +729,11 @@ export function getStatCategory() {
   return currentStatCategory;
 }
 
-export function renderRecords(container, statsView = 'season', filters = {}) {
+export function renderRecords(container, statsView = 'season', filters = {}, records = null) {
   currentStatsView = statsView;
   currentFilters = filters;
 
+ rawRecords = container.__records || [];
  let displayRecords = [...rawRecords];
 
   // 🔥 Consolidate multiple stat rows per season first
