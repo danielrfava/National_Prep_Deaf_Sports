@@ -222,10 +222,12 @@ async function runSearch(query) {
       return;
     }
 
-    const statsView = statsViewFilter ? statsViewFilter.value : 'season';
-    renderRecords(records, recordsContainer, statsView, filters);
-    updateStatus(query ? `${records.length} record(s) match.` : "");
-  } catch (error) {
+     const statsView = statsViewFilter ? statsViewFilter.value : 'season';
+      rawRecords = records;   // 🔥 store original raw data
+      renderRecords(recordsContainer, statsView, filters);
+
+      updateStatus(query ? `${records.length} record(s) match.` : "");
+      } catch (error) {
     if (requestId !== activeRequest) {
       return;
     }
