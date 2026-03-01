@@ -644,10 +644,11 @@ function aggregateCareerStats(records, maxSeasons = Infinity) {
   
   return Array.from(playerMap.values()).map(player => {
     // Enforce season limit properly AFTER collecting all seasons
-    let seasonArray = Array.from(player.seasons).sort();
+    let seasonArray = Array.from(player.seasons)
+    .sort((a, b) => b.localeCompare(a));
 
     if (maxSeasons !== Infinity) {
-    seasonArray = seasonArray.slice(-maxSeasons);
+    seasonArray = seasonArray.slice(0, maxSeasons);
     }
     // 👇 PASTE NEW BLOCK RIGHT HERE
     // Recalculate totals if limited to 4-year standard
@@ -711,37 +712,48 @@ function aggregateCareerStats(records, maxSeasons = Infinity) {
         "GP": (maxSeasons !== Infinity ? filteredGP : player.totalGP).toFixed(0)
         };
     
-    // Calculate career averages or totals for each stat
-    columns.forEach(col => {
-      if (col.key === 'gp') return; // Already handled
-      
-      const total = maxSeasons !== Infinity
-       ? filteredTotals[col.field]
-       : player.statTotals[col.field];
-      
-      // For per-game stats, calculate career average
-      if (col.label.endsWith('/G') || col.label.endsWith('PG')) {
-        careerStats[col.field] = player.totalGP > 0 
-          ? (total / player.totalGP).toFixed(1) 
-          : '0.0';
-      } else if (col.label === 'AVG') {
-        // Compute batting average from H/AB whenever AB data exists
-        const hits = player.statTotals['H'] || 0;
-        const atBats = player.statTotals['AB'] || 0;
-        if (atBats > 0) {
-          careerStats[col.field] = formatBattingAverage(hits, atBats);
-        } else {
-          // For other AVG fields, keep existing averaging behavior
-          const count = player.seasons.size;
-          careerStats[col.field] = count > 0 
-            ? (total / count).toFixed(3)
-            : '0.000';
-        }
-      } else {
-        // For counting stats (K, DIG, ACE, H, HR, etc), show career totals
-        careerStats[col.field] = total.toFixed(0);
-      }
-    });
+// Calculate career averages or totals for each stat
+columns.forEach(col => {
+  if (col.key === 'gp') return;
+
+  const total = maxSeasons !== Infinity
+    ? filteredTotals[col.field]
+    : player.statTotals[col.field];
+
+  const gpBase = maxSeasons !== Infinity ? filteredGP : player.totalGP;
+
+  // ✅ Per-game stats (PPG, RPG, YPG, K/G, etc.)
+  if (col.label.endsWith('/G') || col.label.endsWith('PG')) {
+
+    careerStats[col.field] = gpBase > 0
+      ? (total / gpBase).toFixed(1)
+      : '0.0';
+
+  }
+
+  // ✅ Batting average (recompute from H / AB)
+  else if (col.label === 'AVG') {
+
+    const hits = maxSeasons !== Infinity
+      ? filteredTotals['H'] || 0
+      : player.statTotals['H'] || 0;
+
+    const atBats = maxSeasons !== Infinity
+      ? filteredTotals['AB'] || 0
+      : player.statTotals['AB'] || 0;
+
+    careerStats[col.field] =
+      atBats > 0 ? formatBattingAverage(hits, atBats) : '0.000';
+
+  }
+
+  // ✅ Counting stats (PTS, HR, RBI, Tackles, etc.)
+  else {
+
+    careerStats[col.field] = total.toFixed(0);
+
+  }
+});
     
     return {
       stat_row: careerStats,
