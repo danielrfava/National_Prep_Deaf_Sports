@@ -1,5 +1,6 @@
 let currentSort = { column: null, ascending: true };
 let currentRecords = [];
+let rawRecords = [];
 let currentPage = 1;
 let recordsPerPage = 25;
 let currentStatsView = 'season';
@@ -537,7 +538,8 @@ function getColumnNumericValue(record, col, sportType) {
   return value;
 }
 
-function aggregateCareerStats(records) {
+   // season limit update
+function aggregateCareerStats(records, maxSeasons = Infinity) {
   const playerMap = new Map();
   
   // Detect sport type from records
@@ -573,9 +575,11 @@ function aggregateCareerStats(records) {
     const player = playerMap.get(key);
     const season = record.season || 'unknown';
     
-    // Only process each season once (avoid duplicates)
-    if (!player.seasonData.has(season)) {
-      player.seasons.add(season);
+      // Enforce season limit if needed
+
+      // Only process each season once (avoid duplicates)
+       if (!player.seasonData.has(season)) {
+       player.seasons.add(season);
       
       const gp = parseFloat(record.stat_row?.["GP"]) || 0;
       player.totalGP += gp;
@@ -610,8 +614,14 @@ function aggregateCareerStats(records) {
   });
   
   return Array.from(playerMap.values()).map(player => {
+    // Enforce season limit properly AFTER collecting all seasons
+    let seasonArray = Array.from(player.seasons).sort();
+
+    if (maxSeasons !== Infinity) {
+    seasonArray = seasonArray.slice(0, maxSeasons);
+    }
+
     // Format season range
-    const seasonArray = Array.from(player.seasons).sort();
     let seasonDisplay = '';
     
     if (seasonArray.length === 0) {
@@ -628,11 +638,14 @@ function aggregateCareerStats(records) {
       seasonDisplay = `${firstYear}-${lastYear}`;
     }
     
-    // Build career stat_row
-    const careerStats = {
-      "Athlete Name": player.name,
-      "GP": player.totalGP.toFixed(0)
-    };
+      // Build career stat_row
+       const careerStats = {
+       "Athlete Name":
+       maxSeasons === Infinity && player.seasons.size > 4
+       ? `${player.name}*`
+       : player.name,
+        "GP": player.totalGP.toFixed(0)
+        };
     
     // Calculate career averages or totals for each stat
     columns.forEach(col => {
@@ -673,6 +686,37 @@ function aggregateCareerStats(records) {
   });
 }
 
+function consolidateSeasonRows(records) {
+  const seasonMap = new Map();
+
+records.forEach(record => {
+  const rawName = record.stat_row?.["Athlete Name"] || "";
+  const name = rawName.replace(/\((Fr|So|Jr|Sr)\)/i, '').trim();
+  const school = (record.school || "").trim();
+  const sport = (record.sport || "").trim();
+  const season = (record.season || "").trim();
+
+  const key = `${name}|${school}|${sport}|${season}`;
+
+  if (!seasonMap.has(key)) {
+    seasonMap.set(key, {
+      ...record,
+      stat_row: { ...record.stat_row }
+    });
+  } else {
+    const existing = seasonMap.get(key);
+
+    Object.entries(record.stat_row || {}).forEach(([k, v]) => {
+      if (v !== null && v !== undefined && v !== "") {
+        existing.stat_row[k] = v;
+      }
+    });
+  }
+});
+
+  return Array.from(seasonMap.values());
+}
+
 export function setStatsView(view) {
   currentStatsView = view;
 }
@@ -685,12 +729,20 @@ export function getStatCategory() {
   return currentStatCategory;
 }
 
-export function renderRecords(records, container, statsView = 'season', filters = {}) {
+export function renderRecords(container, statsView = 'season', filters = {}) {
   currentStatsView = statsView;
-  currentFilters = filters; // Store filters for re-rendering
-  
-  // Aggregate career stats if needed
-  const displayRecords = statsView === 'career' ? aggregateCareerStats(records) : records;
+  currentFilters = filters;
+
+ let displayRecords = [...rawRecords];
+
+  // 🔥 Consolidate multiple stat rows per season first
+    displayRecords = consolidateSeasonRows(displayRecords);
+
+    if (statsView === 'career-standard') {
+     displayRecords = aggregateCareerStats(displayRecords, 4);
+      } else if (statsView === 'career-extended') {
+     displayRecords = aggregateCareerStats(displayRecords, Infinity);
+     }
   
   // Determine which columns to hide based on filters
   const hideSchool = filters.schoolId && filters.schoolId !== '';
@@ -751,7 +803,7 @@ export function renderRecords(records, container, statsView = 'season', filters 
     ${categoryTabsHTML}
     <div class="pagination-controls">
       <div class="pagination-info">
-        Showing ${start + 1}-${Math.min(end, displayRecords.length)} of ${displayRecords.length} ${statsView === 'career' ? 'players' : 'records'}
+      Showing ${start + 1}-${Math.min(end, displayRecords.length)} of ${displayRecords.length} ${(statsView === 'career-standard' || statsView === 'career-extended') ? 'players' : 'records'}
       </div>
       <div class="pagination-actions">
         ${advancedToggleHTML}
@@ -797,52 +849,55 @@ export function renderRecords(records, container, statsView = 'season', filters 
     });
   });
 
-  // Add click handlers to stat category tabs
+  // Stat category tabs
   container.querySelectorAll(".stat-tab").forEach((tab) => {
     tab.addEventListener("click", () => {
       const category = tab.dataset.category;
       if (category !== currentStatCategory) {
         currentStatCategory = category;
-        renderRecords(currentRecords, container, currentStatsView, currentFilters);
+        renderRecords(container, currentStatsView, currentFilters);
       }
     });
   });
 
+  // Advanced toggle
   const advancedToggle = container.querySelector('.advanced-toggle');
   if (advancedToggle) {
     advancedToggle.addEventListener('click', () => {
       showAdvancedStats = !showAdvancedStats;
-      renderRecords(currentRecords, container, currentStatsView, currentFilters);
+      renderRecords(container, currentStatsView, currentFilters);
     });
   }
 
-  // Pagination controls
+  // Per page selector
   const perPageSelector = container.querySelector("#perPage");
   if (perPageSelector) {
     perPageSelector.addEventListener("change", (e) => {
       recordsPerPage = parseInt(e.target.value);
       currentPage = 1;
-      renderRecords(currentRecords, container, currentStatsView, currentFilters);
+      renderRecords(container, currentStatsView, currentFilters);
     });
   }
 
+  // Prev button
   const prevButton = container.querySelector(".prev-page");
   if (prevButton) {
     prevButton.addEventListener("click", () => {
       if (currentPage > 1) {
         currentPage--;
-        renderRecords(currentRecords, container, currentStatsView, currentFilters);
+        renderRecords(container, currentStatsView, currentFilters);
       }
     });
   }
 
+  // Next button
   const nextButton = container.querySelector(".next-page");
   if (nextButton) {
     nextButton.addEventListener("click", () => {
       const totalPages = Math.ceil(currentRecords.length / recordsPerPage);
       if (currentPage < totalPages) {
         currentPage++;
-        renderRecords(currentRecords, container, currentStatsView, currentFilters);
+        renderRecords(container, currentStatsView, currentFilters);
       }
     });
   }
@@ -873,12 +928,16 @@ function renderTableRows(records, startIndex = 0, sportType = 'basketball', hide
           value = gp > 0 && ppg > 0 ? (gp * ppg).toFixed(0) : "";
         }
 
-        // Display-only data quality hint for unusually high basketball career GP totals
-        if (col.key === 'gp' && currentStatsView === 'career' && sportType === 'basketball') {
-          const gpValue = parseFloat(value) || 0;
-          if (gpValue > 120) {
-            value = `${value} ⚠`;
-          }
+         // Display-only data quality hint for unusually high basketball career GP totals
+          if (
+          col.key === 'gp' &&
+          (currentStatsView === 'career-standard' || currentStatsView === 'career-extended') &&
+          sportType === 'basketball'
+        ) {
+         const gpValue = parseFloat(value) || 0;
+         if (gpValue > 140) {
+         value = `${value} ⚠`;
+         }
         }
 
         // Derive AVG from H/AB whenever AB is available in row data
@@ -969,6 +1028,6 @@ function sortTable(column, container) {
   });
 
   currentRecords = sorted;
-  currentPage = 1; // Reset to first page after sorting
-  renderRecords(sorted, container, currentStatsView, currentFilters);
+  currentPage = 1;
+  renderRecords(container, currentStatsView, currentFilters);
 }
