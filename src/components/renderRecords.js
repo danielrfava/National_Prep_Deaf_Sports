@@ -1084,7 +1084,14 @@ function renderTableRows(records, startIndex = 0, sportType = 'basketball', hide
   
   return records
     .map((record, index) => {
-      const athleteName = record.stat_row?.["Athlete Name"] || "Unknown";
+      let athleteName = record.stat_row?.["Athlete Name"] || "Unknown";
+
+if (
+  currentStatsView === 'career-extended' &&
+  athleteName.endsWith('*')
+) {
+  athleteName = `<strong>${athleteName}</strong>`;
+}
       const school = getSchoolAbbrev(record.school);
       const sport = record.sport || "";
       const season = record.season || "";
