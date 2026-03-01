@@ -223,7 +223,7 @@ async function runSearch(query) {
     }
 
      const statsView = statsViewFilter ? statsViewFilter.value : 'season';
-      rawRecords = records;   // 🔥 store original raw data
+    // 🔥 store original raw data
       renderRecords(recordsContainer, statsView, filters);
 
       updateStatus(query ? `${records.length} record(s) match.` : "");
