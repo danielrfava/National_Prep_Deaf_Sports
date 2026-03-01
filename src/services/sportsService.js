@@ -109,10 +109,11 @@ export async function fetchSportsRecords(query = "", filters = {}) {
   const allData = await fetchPaginatedRows({
     pageSize: 1000,
     fetchPage: (page, pageSize) => {
-      let request = supabase
-        .from("raw_stat_rows")
-        .select("*")
-        .range(page * pageSize, (page + 1) * pageSize - 1);
+  let request = supabase
+   .from("raw_stat_rows")
+   .select("*")
+   .order("season", { ascending: true })   // REQUIRED
+   .range(page * pageSize, (page + 1) * pageSize - 1);
 
       if (query) {
         request = request.or(
