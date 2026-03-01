@@ -733,8 +733,11 @@ export function renderRecords(container, statsView = 'season', filters = {}, rec
   currentStatsView = statsView;
   currentFilters = filters;
 
- rawRecords = container.__records || [];
- let displayRecords = [...rawRecords];
+  if (records) {
+    rawRecords = records;
+  }
+
+  let displayRecords = [...rawRecords];
 
   // 🔥 Consolidate multiple stat rows per season first
     displayRecords = consolidateSeasonRows(displayRecords);
