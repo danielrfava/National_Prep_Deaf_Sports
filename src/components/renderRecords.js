@@ -770,11 +770,22 @@ export function renderRecords(container, statsView = 'season', filters = {}, rec
     return;
   }
 
-  // Detect sport type from first record
-  const sportType = displayRecords.length > 0 ? detectSportType(displayRecords[0].sport) : 'basketball';
-  const columns = getDisplayColumns(displayRecords[0]?.sport || 'basketball', currentStatCategory);
-  const needsCategories = displayRecords.length > 0 ? sportNeedsCategories(displayRecords[0].sport) : false;
-  const canShowAdvancedToggle = ['basketball', 'baseball', 'softball', 'football'].includes(sportType);
+// Determine sport type safely based on filter
+let sportType = 'mixed';
+
+if (filters.sport && filters.sport !== '') {
+  sportType = detectSportType(filters.sport);
+}
+
+const columns = sportType === 'mixed'
+  ? basketballCoreColumns   // safe neutral columns
+  : getDisplayColumns(filters.sport, currentStatCategory);
+
+const needsCategories = sportType !== 'mixed' && sportNeedsCategories(filters.sport);
+
+const canShowAdvancedToggle =
+  sportType !== 'mixed' &&
+  ['basketball', 'baseball', 'softball', 'football'].includes(sportType);
 
   const totalPages = Math.ceil(displayRecords.length / recordsPerPage);
   const start = (currentPage - 1) * recordsPerPage;
