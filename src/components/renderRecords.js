@@ -1104,7 +1104,8 @@ function renderTableRows(records, startIndex = 0, sportType = 'basketball', hide
 }
 
 function sortTable(column, container) {
-  if (currentSort.column === column) {
+    if (!currentRecords || currentRecords.length === 0) return;
+    if (currentSort.column === column) {
     currentSort.ascending = !currentSort.ascending;
   } else {
     currentSort.column = column;
