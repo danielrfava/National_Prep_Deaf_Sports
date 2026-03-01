@@ -686,22 +686,30 @@ function aggregateCareerStats(records, maxSeasons = Infinity) {
     });
   });
 }
-    // Format season range
-    let seasonDisplay = '';
-    
-    if (seasonArray.length === 0) {
-      seasonDisplay = '';
-    } else if (seasonArray.length === 1) {
-      seasonDisplay = seasonArray[0];
-    } else {
-      const firstSeason = seasonArray[0];
-      const lastSeason = seasonArray[seasonArray.length - 1];
-      const firstParts = firstSeason.split('-');
-      const lastParts = lastSeason.split('-');
-      const firstYear = firstParts[0] || firstSeason;
-      const lastYear = lastParts[1] || lastParts[0] || lastSeason;
-      seasonDisplay = `${firstYear}-${lastYear}`;
-    }
+// Format season range
+let seasonDisplay = '';
+
+if (seasonArray.length === 0) {
+  seasonDisplay = '';
+} 
+else if (seasonArray.length === 1) {
+  seasonDisplay = seasonArray[0];
+}
+else {
+  // Always display chronologically (oldest → newest)
+  const displaySeasons = [...seasonArray].sort();
+
+  const firstSeason = displaySeasons[0];
+  const lastSeason = displaySeasons[displaySeasons.length - 1];
+
+  const firstParts = firstSeason.split('-');
+  const lastParts = lastSeason.split('-');
+
+  const firstYear = firstParts[0] || firstSeason;
+  const lastYear = lastParts[1] || lastParts[0] || lastSeason;
+
+  seasonDisplay = `${firstYear}-${lastYear}`;
+}
     
       // Build career stat_row
        const careerStats = {
