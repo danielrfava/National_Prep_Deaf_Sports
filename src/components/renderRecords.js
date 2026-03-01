@@ -534,9 +534,16 @@ function getDerivedBasketballTotal(record, totalField, rateField) {
 }
 
 function getColumnNumericValue(record, col, sportType) {
-  if (sportType === 'basketball' && col.derivedRateField) {
-    return getDerivedBasketballTotal(record, col.field, col.derivedRateField);
+ if (sportType === 'basketball' && col.derivedRateField) {
+
+  // In career views, totals already exist — don't re-derive
+  if (currentStatsView !== 'season') {
+    return getNumericStatValue(record.stat_row, col.field);
   }
+
+  // Season view still needs derived calculation
+  return getDerivedBasketballTotal(record, col.field, col.derivedRateField);
+}
 
   let value = getNumericStatValue(record.stat_row, col.field, getStatAliases(col.field));
 
