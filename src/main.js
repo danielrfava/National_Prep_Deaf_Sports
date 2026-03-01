@@ -224,7 +224,7 @@ async function runSearch(query) {
 
      const statsView = statsViewFilter ? statsViewFilter.value : 'season';
     // 🔥 store original raw data
-      renderRecords(recordsContainer, statsView, filters);
+      renderRecords(recordsContainer, statsView, filters, records);
 
       updateStatus(query ? `${records.length} record(s) match.` : "");
       } catch (error) {
