@@ -37,18 +37,25 @@ async function fetchPaginatedRows({ pageSize = 1000, fetchPage }) {
   let page = 0;
 
   while (true) {
+    console.log("Fetching page:", page);
+
     const { data, error } = await fetchPage(page, pageSize);
 
     if (error) throw new Error(error.message);
 
     const rows = data || [];
+    console.log("Rows returned:", rows.length);
+
     if (rows.length === 0) break;
 
     allRows.push(...rows);
+
     if (rows.length < pageSize) break;
 
     page++;
   }
+
+  console.log("FINAL TOTAL:", allRows.length);
 
   return allRows;
 }
