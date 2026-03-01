@@ -840,29 +840,6 @@ export function renderRecords(container, statsView = 'season', filters = {}, rec
       } else if (statsView === 'career-extended') {
      displayRecords = aggregateCareerStats(displayRecords, Infinity);
      }
-  // 🔥 FORCE default PTS sort for basketball (fresh render only)
-if (displayRecords.length > 0) {
-  const sportType = detectSportType(displayRecords[0].sport);
-
-  if (sportType === 'basketball') {
-    const columnsForSort = getDisplayColumns(
-      filters.sport || displayRecords[0].sport,
-      currentStatCategory
-    );
-
-    const ptsColumn = columnsForSort.find(c => c.key === 'pts');
-
-    if (ptsColumn) {
-      displayRecords.sort((a, b) => {
-        const aVal = getColumnNumericValue(a, ptsColumn, sportType);
-        const bVal = getColumnNumericValue(b, ptsColumn, sportType);
-        return bVal - aVal;
-      });
-
-      currentSort.column = 'pts';
-      currentSort.ascending = false;
-    }
-  }
 }
   // Determine which columns to hide based on filters
   const hideSchool = filters.schoolId && filters.schoolId !== '';
@@ -1143,7 +1120,9 @@ const isExtended =
       return `
         <tr>
           <td>${startIndex + index + 1}</td>
-          <td class="athlete-name">${athleteName}</td>
+          <td class="athlete-name ${isExtended ? 'extended-player' : ''}">
+  ${athleteName}
+</td>
           ${hideSchool ? '' : `<td>${school}</td>`}
           ${hideSport ? '' : `<td>${sport}</td>`}
           <td>${season}</td>
