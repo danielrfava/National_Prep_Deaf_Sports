@@ -831,8 +831,29 @@ export function renderRecords(container, statsView = 'season', filters = {}, rec
   
   if (!records) {
   currentRecords = displayRecords;
-  }
+      // Auto default sort for basketball (PTS high → low)
+  if (currentRecords.length > 0) {
+  const sportType = detectSportType(currentRecords[0].sport);
 
+  if (sportType === 'basketball') {
+    const ptsColumn = getDisplayColumns(
+      currentFilters.sport || currentRecords[0].sport,
+      currentStatCategory
+    ).find(c => c.key === 'pts');
+
+    if (ptsColumn) {
+      currentRecords.sort((a, b) => {
+        const aVal = getColumnNumericValue(a, ptsColumn, sportType);
+        const bVal = getColumnNumericValue(b, ptsColumn, sportType);
+        return bVal - aVal;
+      });
+
+      currentSort.column = 'pts';
+      currentSort.ascending = false;
+      }
+    }
+  }
+}
   if (!displayRecords.length) {
     container.innerHTML = "<p>No records found.</p>";
     return;
