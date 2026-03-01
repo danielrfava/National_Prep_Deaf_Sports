@@ -873,8 +873,8 @@ if (displayRecords.length > 0) {
   }
     currentRecords = [...displayRecords];
 
-// 🔥 Apply intelligent default sort (only on fresh render)
-if (currentRecords.length > 0) {
+// Only apply default sort if no column has been chosen yet
+if (!currentSort.column && currentRecords.length > 0) {
   const defaultKey = getDefaultSortKey(
     filters.sport || currentRecords[0]?.sport,
     currentStatCategory
@@ -1070,14 +1070,6 @@ const pageRecords = currentRecords.slice(start, end);
   filters.sport || displayRecords[0]?.sport,
   currentStatCategory
   );
-
-  // Reset sort if sport or category changed
-  if (currentSort.column !== defaultKey) {
-  currentSort.column = defaultKey;
-
-  // ERA should be ascending (lower is better)
-  currentSort.ascending = defaultKey === 'era';
- }
 }
 
 function renderTableRows(records, startIndex = 0, sportType = 'basketball', hideSchool = false, hideSport = false, columns = []) {
