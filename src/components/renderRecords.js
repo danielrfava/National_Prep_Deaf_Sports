@@ -813,7 +813,30 @@ export function renderRecords(container, statsView = 'season', filters = {}, rec
       } else if (statsView === 'career-extended') {
      displayRecords = aggregateCareerStats(displayRecords, Infinity);
      }
-  
+  // 🔥 FORCE default PTS sort for basketball (fresh render only)
+if (!records && displayRecords.length > 0) {
+  const sportType = detectSportType(displayRecords[0].sport);
+
+  if (sportType === 'basketball') {
+    const columnsForSort = getDisplayColumns(
+      filters.sport || displayRecords[0].sport,
+      currentStatCategory
+    );
+
+    const ptsColumn = columnsForSort.find(c => c.key === 'pts');
+
+    if (ptsColumn) {
+      displayRecords.sort((a, b) => {
+        const aVal = getColumnNumericValue(a, ptsColumn, sportType);
+        const bVal = getColumnNumericValue(b, ptsColumn, sportType);
+        return bVal - aVal;
+      });
+
+      currentSort.column = 'pts';
+      currentSort.ascending = false;
+    }
+  }
+}
   // Determine which columns to hide based on filters
   const hideSchool = filters.schoolId && filters.schoolId !== '';
   const hideSport = filters.sport && filters.sport !== '';
@@ -881,10 +904,10 @@ const canShowAdvancedToggle =
   sportType !== 'mixed' &&
   ['basketball', 'baseball', 'softball', 'football'].includes(sportType);
 
- const totalPages = Math.ceil(currentRecords.length / recordsPerPage);
- const start = (currentPage - 1) * recordsPerPage;
- const end = start + recordsPerPage;
- const pageRecords = currentRecords.slice(start, end);
+const totalPages = Math.ceil(displayRecords.length / recordsPerPage);
+const start = (currentPage - 1) * recordsPerPage;
+const end = start + recordsPerPage;
+const pageRecords = displayRecords.slice(start, end);
 
   // Generate dynamic table headers
   const statHeaders = columns.map(col => 
