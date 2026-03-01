@@ -818,7 +818,13 @@ const canShowAdvancedToggle =
     ${categoryTabsHTML}
     <div class="pagination-controls">
       <div class="pagination-info">
-      Showing ${start + 1}-${Math.min(end, displayRecords.length)} of ${displayRecords.length} ${(statsView === 'career-standard' || statsView === 'career-extended') ? 'players' : 'records'}
+      Showing ${start + 1}-${Math.min(end, displayRecords.length)} of ${displayRecords.length} ${
+       statsView === 'career-standard'
+        ? 'players (4-year standard)'
+        : statsView === 'career-extended'
+        ? 'players (full participation)'
+        : 'season records'
+}
       </div>
       <div class="pagination-actions">
         ${advancedToggleHTML}
@@ -850,8 +856,14 @@ const canShowAdvancedToggle =
         <tbody>
           ${renderTableRows(pageRecords, start, sportType, hideSchool, hideSport, columns)}
         </tbody>
-      </table>
-    </div>
+        </table>
+         </div>
+    ${statsView === 'career-extended' ? `
+      <div class="eligibility-legend">
+        * Indicates participation beyond the standard 4-year eligibility window.
+      </div>
+    ` : ''}
+
   `;
 
   container.innerHTML = tableHTML;
