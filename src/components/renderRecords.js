@@ -647,7 +647,7 @@ function aggregateCareerStats(records, maxSeasons = Infinity) {
     let seasonArray = Array.from(player.seasons).sort();
 
     if (maxSeasons !== Infinity) {
-    seasonArray = seasonArray.slice(0, maxSeasons);
+    seasonArray = seasonArray.slice(-maxSeasons);
     }
 
     // Format season range
