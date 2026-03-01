@@ -279,7 +279,36 @@ function getCategoriesForSport(sport) {
     ];
   }
   
-  return [];
+   return [];
+}
+
+function getDefaultSortKey(sport, statCategory = 'batting') {
+  const sportType = detectSportType(sport);
+
+  if (sportType === 'basketball') return 'pts';
+  if (sportType === 'soccer') return 'g';
+  if (sportType === 'volleyball') return 'k';
+
+  if (sportType === 'baseball' || sportType === 'softball') {
+    return statCategory === 'pitching' ? 'era' : 'avg';
+  }
+
+  if (sportType === 'football') {
+    switch (statCategory) {
+      case 'passing':
+        return 'yds';
+      case 'rushing':
+        return 'yds';
+      case 'receiving':
+        return 'recyds';
+      case 'defense':
+        return 'tackles';
+      default:
+        return 'yds';
+    }
+  }
+
+  return 'pts';
 }
 
 const schoolAbbreviations = {
@@ -928,6 +957,21 @@ const canShowAdvancedToggle =
       }
     });
   }
+  // Apply intelligent default sort
+  const defaultKey = getDefaultSortKey(
+  filters.sport || displayRecords[0]?.sport,
+  currentStatCategory
+  );
+
+  // Reset sort if sport or category changed
+  if (currentSort.column !== defaultKey) {
+  currentSort.column = defaultKey;
+
+  // ERA should be ascending (lower is better)
+  currentSort.ascending = defaultKey === 'era';
+
+  sortTable(defaultKey, container);
+ }
 }
 
 function renderTableRows(records, startIndex = 0, sportType = 'basketball', hideSchool = false, hideSport = false, columns = []) {
@@ -1054,7 +1098,9 @@ function sortTable(column, container) {
     }
   });
 
-  currentRecords = sorted;
-  currentPage = 1;
-  renderRecords(container, currentStatsView, currentFilters);
+   currentRecords = sorted;
+   currentPage = 1;
+
+   // Re-render using already sorted records
+   renderRecords(container, currentStatsView, currentFilters, currentRecords);
 }
