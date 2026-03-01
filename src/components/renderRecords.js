@@ -829,7 +829,9 @@ export function renderRecords(container, statsView = 'season', filters = {}, rec
     }
   }
   
+  if (!records) {
   currentRecords = displayRecords;
+  }
 
   if (!displayRecords.length) {
     container.innerHTML = "<p>No records found.</p>";
@@ -1006,8 +1008,6 @@ const canShowAdvancedToggle =
 
   // ERA should be ascending (lower is better)
   currentSort.ascending = defaultKey === 'era';
-
-  sortTable(defaultKey, container);
  }
 }
 
