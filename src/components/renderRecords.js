@@ -828,30 +828,35 @@ export function renderRecords(container, statsView = 'season', filters = {}, rec
       currentStatCategory = 'batting'; // Default for baseball/softball
     }
   }
-  
-  if (!records) {
-  currentRecords = displayRecords;
-      // Auto default sort for basketball (PTS high → low)
-  if (currentRecords.length > 0) {
-  const sportType = detectSportType(currentRecords[0].sport);
+    currentRecords = [...displayRecords];
 
-  if (sportType === 'basketball') {
-    const ptsColumn = getDisplayColumns(
-      currentFilters.sport || currentRecords[0].sport,
-      currentStatCategory
-    ).find(c => c.key === 'pts');
+// 🔥 Apply intelligent default sort (only on fresh render)
+if (!records && currentRecords.length > 0) {
+  const defaultKey = getDefaultSortKey(
+    filters.sport || currentRecords[0]?.sport,
+    currentStatCategory
+  );
 
-    if (ptsColumn) {
-      currentRecords.sort((a, b) => {
-        const aVal = getColumnNumericValue(a, ptsColumn, sportType);
-        const bVal = getColumnNumericValue(b, ptsColumn, sportType);
-        return bVal - aVal;
-      });
+  const sportType = detectSportType(currentRecords[0]?.sport);
+  const columnsForSort = getDisplayColumns(
+    filters.sport || currentRecords[0]?.sport,
+    currentStatCategory
+  );
 
-      currentSort.column = 'pts';
-      currentSort.ascending = false;
-      }
-    }
+  const colConfig = columnsForSort.find(c => c.key === defaultKey);
+
+  if (colConfig) {
+    currentRecords.sort((a, b) => {
+      const aVal = getColumnNumericValue(a, colConfig, sportType);
+      const bVal = getColumnNumericValue(b, colConfig, sportType);
+
+      return defaultKey === 'era'
+        ? aVal - bVal   // ERA ascending
+        : bVal - aVal;  // everything else descending
+    });
+
+    currentSort.column = defaultKey;
+    currentSort.ascending = defaultKey === 'era';
   }
 }
   if (!displayRecords.length) {
@@ -876,10 +881,10 @@ const canShowAdvancedToggle =
   sportType !== 'mixed' &&
   ['basketball', 'baseball', 'softball', 'football'].includes(sportType);
 
-  const totalPages = Math.ceil(displayRecords.length / recordsPerPage);
-  const start = (currentPage - 1) * recordsPerPage;
-  const end = start + recordsPerPage;
-  const pageRecords = displayRecords.slice(start, end);
+ const totalPages = Math.ceil(currentRecords.length / recordsPerPage);
+ const start = (currentPage - 1) * recordsPerPage;
+ const end = start + recordsPerPage;
+ const pageRecords = currentRecords.slice(start, end);
 
   // Generate dynamic table headers
   const statHeaders = columns.map(col => 
