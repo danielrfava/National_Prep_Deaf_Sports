@@ -904,10 +904,10 @@ const canShowAdvancedToggle =
   sportType !== 'mixed' &&
   ['basketball', 'baseball', 'softball', 'football'].includes(sportType);
 
-const totalPages = Math.ceil(displayRecords.length / recordsPerPage);
+const totalPages = Math.ceil(currentRecords.length / recordsPerPage);
 const start = (currentPage - 1) * recordsPerPage;
 const end = start + recordsPerPage;
-const pageRecords = displayRecords.slice(start, end);
+const pageRecords = currentRecords.slice(start, end);
 
   // Generate dynamic table headers
   const statHeaders = columns.map(col => 
