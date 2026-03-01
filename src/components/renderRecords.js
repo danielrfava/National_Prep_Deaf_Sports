@@ -814,7 +814,7 @@ export function renderRecords(container, statsView = 'season', filters = {}, rec
      displayRecords = aggregateCareerStats(displayRecords, Infinity);
      }
   // 🔥 FORCE default PTS sort for basketball (fresh render only)
-if (!records && displayRecords.length > 0) {
+if (displayRecords.length > 0) {
   const sportType = detectSportType(displayRecords[0].sport);
 
   if (sportType === 'basketball') {
@@ -854,7 +854,7 @@ if (!records && displayRecords.length > 0) {
     currentRecords = [...displayRecords];
 
 // 🔥 Apply intelligent default sort (only on fresh render)
-if (!records && currentRecords.length > 0) {
+if (currentRecords.length > 0) {
   const defaultKey = getDefaultSortKey(
     filters.sport || currentRecords[0]?.sport,
     currentStatCategory
