@@ -614,9 +614,9 @@ function aggregateCareerStats(records, maxSeasons = Infinity) {
       player.totalGP += gp;
       
       // Store season data
-      player.seasonData.set(season, {
-        gp: gp,
-        processed: true
+       player.seasonData.set(season, {
+          gp: gp,
+          stat_row: record.stat_row
       });
       
       // Aggregate all stat fields dynamically
