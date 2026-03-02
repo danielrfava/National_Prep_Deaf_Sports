@@ -7,6 +7,7 @@ let currentStatsView = 'season';
 let currentStatCategory = 'batting'; // For baseball/softball: 'batting' or 'pitching'; For football: 'passing', 'rushing', or 'defense'
 let currentFilters = {}; // Store current filters for re-rendering
 let showAdvancedStats = false; // Basketball advanced stats toggle
+let lastSortContext = '';
 
 // Sport-specific column configurations
 const sportColumns = {
@@ -157,9 +158,9 @@ const basketballCoreColumns = [
   { key: 'pts', label: 'PTS', type: 'number', field: 'PTS' },
   { key: 'ppg', label: 'PPG', type: 'number', field: 'PPG' },
   { key: 'reb', label: 'REB', type: 'number', field: 'REB', derivedRateField: 'RPG' },
-  { key: 'ast_total', label: 'AST', type: 'number', field: 'AST', derivedRateField: 'APG' },
-  { key: 'stl_total', label: 'STL', type: 'number', field: 'STL', derivedRateField: 'SPG' },
-  { key: 'blk_total', label: 'BLK', type: 'number', field: 'BLK', derivedRateField: 'BPG' }
+  { key: 'ast', label: 'AST', type: 'number', field: 'AST', derivedRateField: 'APG' },
+  { key: 'stl', label: 'STL', type: 'number', field: 'STL', derivedRateField: 'SPG' },
+  { key: 'blk', label: 'BLK', type: 'number', field: 'BLK', derivedRateField: 'BPG' }
 ];
 
 const basketballAdvancedColumns = [
@@ -181,6 +182,8 @@ const footballCoreKeysByCategory = {
   receiving: ['gp', 'rec', 'recyds', 'recypg', 'rectd', 'fum'],
   defense: ['gp', 'tackles', 'solo', 'ast', 'tfl', 'sacks', 'int']
 };
+// 🔥 ADD THIS RIGHT HERE
+const volleyballCoreKeys = ['gp', 'k', 'dig', 'ast', 'blk', 'ace'];
 
 function splitColumnsByCoreKeys(allColumns, coreKeys) {
   const columnByKey = new Map(allColumns.map(col => [col.key, col]));
@@ -229,6 +232,17 @@ function getDisplayColumns(sport, statCategory = 'batting') {
       ? [...basketballCoreColumns, ...basketballAdvancedColumns]
       : basketballCoreColumns;
   }
+  
+  // 🔥 Volleyball Advanced/Core Split
+if (sportType === 'volleyball') {
+  const allColumns = getSportColumns(sport);
+  const { coreColumns, advancedColumns } =
+    splitColumnsByCoreKeys(allColumns, volleyballCoreKeys);
+
+  return showAdvancedStats
+    ? [...coreColumns, ...advancedColumns]
+    : coreColumns;
+}
 
   if (sportType === 'baseball' || sportType === 'softball') {
     const allColumns = getSportColumns(sport, statCategory);
@@ -580,7 +594,7 @@ function aggregateCareerStats(records, maxSeasons = Infinity) {
   
   // Detect sport type from records
   const sportType = records.length > 0 ? detectSportType(records[0].sport) : 'basketball';
-  const columns = getSportColumns(records[0]?.sport || 'basketball', currentStatCategory);
+  const columns = getDisplayColumns(records[0]?.sport || 'basketball', currentStatCategory);
   
   records.forEach(record => {
     const rawName = record.stat_row?.["Athlete Name"];
@@ -822,16 +836,28 @@ export function getStatCategory() {
   return currentStatCategory;
 }
 
+function getSortContext(statsView, filters) {
+  const sport = filters.sport || '';
+  const category = currentStatCategory || '';
+  return `${sport}__${statsView}__${category}`;
+}
+
 export function renderRecords(container, statsView = 'season', filters = {}, records = null) {
   currentStatsView = statsView;
   currentFilters = filters;
 
-  if (records) {
-    rawRecords = records;
+    const newContext = getSortContext(statsView, filters);
+
+  if (newContext !== lastSortContext) {
+    currentSort.column = null;
+    currentSort.ascending = false;
+    lastSortContext = newContext;
   }
-if (records !== null) {
-  currentSort.column = null;
+
+if (records && statsView === 'season') {
+  rawRecords = records;
 }
+
   let displayRecords = [...rawRecords];
 
   // 🔥 Consolidate multiple stat rows per season first
@@ -857,7 +883,53 @@ if (records !== null) {
     }
   }
     currentRecords = [...displayRecords];
+// Apply user-selected sort (after default sort logic)
+if (currentSort.column && currentRecords.length > 0) {
+  const sportTypeForSort = detectSportType(
+    currentFilters.sport || currentRecords[0]?.sport
+  );
 
+  const columnsForSort = getDisplayColumns(
+    currentFilters.sport || currentRecords[0]?.sport,
+    currentStatCategory
+  );
+
+  const colConfig = columnsForSort.find(c => c.key === currentSort.column);
+
+  currentRecords.sort((a, b) => {
+    let aVal, bVal;
+
+    if (currentSort.column === "name") {
+      aVal = a.stat_row?.["Athlete Name"] || "";
+      bVal = b.stat_row?.["Athlete Name"] || "";
+    } else if (currentSort.column === "school") {
+      aVal = a.school || "";
+      bVal = b.school || "";
+    } else if (currentSort.column === "sport") {
+      aVal = a.sport || "";
+      bVal = b.sport || "";
+    } else if (currentSort.column === "season") {
+      aVal = a.season || "";
+      bVal = b.season || "";
+    } else if (colConfig) {
+      aVal = getColumnNumericValue(a, colConfig, sportTypeForSort);
+      bVal = getColumnNumericValue(b, colConfig, sportTypeForSort);
+    } else {
+      return 0;
+    }
+
+    const aNum = parseFloat(aVal);
+    const bNum = parseFloat(bVal);
+
+    if (!isNaN(aNum) && !isNaN(bNum)) {
+      return currentSort.ascending ? aNum - bNum : bNum - aNum;
+    }
+
+    return currentSort.ascending
+      ? String(aVal).localeCompare(String(bVal))
+      : String(bVal).localeCompare(String(aVal));
+  });
+}
 // Always apply intelligent default sort on fresh render
 if (currentRecords.length > 0 && !currentSort.column) {
   const defaultKey = getDefaultSortKey(
@@ -1135,71 +1207,14 @@ const isExtended =
 }
 
 function sortTable(column, container) {
-    if (!currentRecords || currentRecords.length === 0) return;
-    if (currentSort.column === column) {
+  if (currentSort.column === column) {
     currentSort.ascending = !currentSort.ascending;
   } else {
     currentSort.column = column;
     currentSort.ascending = false;
   }
 
-// Rebuild clean dataset before sorting (prevents stacked sorts)
-let workingRecords = consolidateSeasonRows([...rawRecords]);
+  currentPage = 1;
 
-if (currentStatsView === 'career-standard') {
-  workingRecords = aggregateCareerStats(workingRecords, 4);
-} else if (currentStatsView === 'career-extended') {
-  workingRecords = aggregateCareerStats(workingRecords, Infinity);
-}
-
-const sorted = [...workingRecords].sort((a, b) => {
-    let aVal, bVal;
-
-    switch (column) {
-      case "rank":
-        return 0;
-      case "name":
-        aVal = a.stat_row?.["Athlete Name"] || "";
-        bVal = b.stat_row?.["Athlete Name"] || "";
-        break;
-      case "school":
-        aVal = a.school || "";
-        bVal = b.school || "";
-        break;
-      case "sport":
-        aVal = a.sport || "";
-        bVal = b.sport || "";
-        break;
-      case "season":
-        aVal = a.season || "";
-        bVal = b.season || "";
-        break;
-      default:
-        // Dynamic column lookup - find the field mapping from sport columns
-        const sportType = a.sport ? detectSportType(a.sport) : 'basketball';
-        const columns = getDisplayColumns(a.sport || 'basketball', currentStatCategory);
-        const colConfig = columns.find(c => c.key === column);
-        
-        if (colConfig) {
-          aVal = getColumnNumericValue(a, colConfig, sportType);
-          bVal = getColumnNumericValue(b, colConfig, sportType);
-        } else {
-          return 0;
-        }
-    }
-
-    if (typeof aVal === "string") {
-      return currentSort.ascending
-        ? aVal.localeCompare(bVal)
-        : bVal.localeCompare(aVal);
-    } else {
-      return currentSort.ascending ? aVal - bVal : bVal - aVal;
-    }
-  });
-
-   currentRecords = sorted;
-   currentPage = 1;
-
-   // Re-render using already sorted records
-   renderRecords(container, currentStatsView, currentFilters, currentRecords);
+  renderRecords(container, currentStatsView, currentFilters);
 }
