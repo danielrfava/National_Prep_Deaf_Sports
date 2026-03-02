@@ -857,7 +857,7 @@ export function renderRecords(container, statsView = 'season', filters = {}, rec
     currentRecords = [...displayRecords];
 
 // Always apply intelligent default sort on fresh render
-if (currentRecords.length > 0) {
+if (currentRecords.length > 0 && !currentSort.column) {
   const defaultKey = getDefaultSortKey(
     filters.sport || currentRecords[0]?.sport,
     currentStatCategory
