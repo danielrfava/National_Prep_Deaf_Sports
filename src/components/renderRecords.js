@@ -829,7 +829,9 @@ export function renderRecords(container, statsView = 'season', filters = {}, rec
   if (records) {
     rawRecords = records;
   }
-
+if (records !== null) {
+  currentSort.column = null;
+}
   let displayRecords = [...rawRecords];
 
   // 🔥 Consolidate multiple stat rows per season first
