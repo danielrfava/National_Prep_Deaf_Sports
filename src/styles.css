@@ -1129,6 +1129,6 @@ body.landing-page {
 }
 /* Extended eligibility players (career-extended view) */
 .stats-table td.athlete-name.extended-player {
-  font-weight: 900 !important;
-  color: var(--accent) !important;
+  color: #000 !important;
 }
+
