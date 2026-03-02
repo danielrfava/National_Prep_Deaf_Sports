@@ -840,7 +840,6 @@ export function renderRecords(container, statsView = 'season', filters = {}, rec
       } else if (statsView === 'career-extended') {
      displayRecords = aggregateCareerStats(displayRecords, Infinity);
      }
-}
   // Determine which columns to hide based on filters
   const hideSchool = filters.schoolId && filters.schoolId !== '';
   const hideSport = filters.sport && filters.sport !== '';
