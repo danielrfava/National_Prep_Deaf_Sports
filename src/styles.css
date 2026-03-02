@@ -1127,4 +1127,7 @@ body.landing-page {
     font-size: 13px;
   }
 }
-
+/* Extended eligibility players (career-extended view) */
+.stats-table td.extended-player {
+  font-weight: 800 !important;
+}
