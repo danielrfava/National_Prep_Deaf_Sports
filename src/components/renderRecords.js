@@ -1143,7 +1143,16 @@ function sortTable(column, container) {
     currentSort.ascending = false;
   }
 
-  const sorted = [...currentRecords].sort((a, b) => {
+// Rebuild clean dataset before sorting (prevents stacked sorts)
+let workingRecords = consolidateSeasonRows([...rawRecords]);
+
+if (currentStatsView === 'career-standard') {
+  workingRecords = aggregateCareerStats(workingRecords, 4);
+} else if (currentStatsView === 'career-extended') {
+  workingRecords = aggregateCareerStats(workingRecords, Infinity);
+}
+
+const sorted = [...workingRecords].sort((a, b) => {
     let aVal, bVal;
 
     switch (column) {
