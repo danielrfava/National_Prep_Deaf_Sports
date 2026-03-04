@@ -264,12 +264,16 @@ function displayPreview(data, method, originalData = null) {
 
       <div class="stat-row">
         <strong>Score:</strong>
-        <span>${game.homeTeam} ${game.homeScore} - ${game.awayScore} ${game.awayTeam}</span>
-      </div>
+        <span>
+    ${game.homeTeam && game.awayTeam
+      ? `${game.homeTeam} ${game.homeScore || 0} - ${game.awayScore || 0} ${game.awayTeam}`
+      : 'Not specified'}
+        </span>
+       </div>
 
       <div class="stat-row">
         <strong>Location:</strong>
-        <span>${game.location || 'Not specified'}</span>
+        <span>${game.date ? game.date : 'Not specified'}</span>
       </div>
 
       <h4 style="margin-top: 24px; margin-bottom: 12px;">
@@ -336,7 +340,7 @@ function setupPreview() {
       const metadata = {
         userId: currentUser.id,
         schoolId: currentUser.school_id,
-        submissionMethod: method + '_paste',
+        submissionMethod: method,   // 'text' | 'csv' | 'manual'
         originalData: originalData,
         source: 'athletic_director_portal'
       };

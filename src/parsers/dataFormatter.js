@@ -68,11 +68,11 @@ export async function formatForSupabase(parsedData, metadata) {
       players: formatPlayers(parsedData.players, homeSchoolId, awaySchoolId)
     },
     
-    // Metadata
-    submission_method: metadata.submissionMethod || 'text_paste',
-    original_data: metadata.originalData || null,
-    submitted_by: metadata.userId,
-    submitter_school_id: metadata.schoolId
+// Metadata
+submission_method: metadata.submissionMethod || 'text',
+original_data: metadata.originalData || null,
+submitted_by: metadata.userId,
+submitter_school_id: metadata.schoolId
   };
 
   console.log('✅ JSON formatted for Supabase:', supabaseJSON);
