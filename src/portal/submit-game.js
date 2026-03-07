@@ -1,393 +1,635 @@
-/**
- * SUBMIT GAME - Athletic Director Interface
- * Handles all three submission methods and connects to parsers
- */
+import { supabase } from "../supabaseClient.js";
+import { inspectSpreadsheet, finalizeSpreadsheetParse } from "../parsers/spreadsheetParser.js";
+import { formatForSupabase, submitToSupabase } from "../parsers/dataFormatter.js";
+import { parseBoxScoreText } from "../parsers/boxScoreParser.js";
 
-import { supabase } from '../supabaseClient.js';
-import { parseTextBoxScore } from '../parsers/textParser.js';
-import { parseCSV } from '../parsers/csvParser.js';
-import { processAndSubmit, previewSubmission } from '../parsers/dataFormatter.js';
-
-// State
-let currentMethod = 'text';
-let parsedData = null;
 let currentUser = null;
-let csvFileContent = null;
+let selectedFile = null;
+let inspectionResult = null;
+let finalizedData = null;
+let mode2ParsedData = null;
 
-// Initialize
-window.addEventListener('DOMContentLoaded', async () => {
-  // Check authentication
+const sportSelection = document.getElementById("sportSelection");
+const seasonHint = document.getElementById("seasonHint");
+const fileDropzone = document.getElementById("fileDropzone");
+const spreadsheetInput = document.getElementById("spreadsheetInput");
+const selectedFileBox = document.getElementById("selectedFile");
+const inspectBtn = document.getElementById("inspectBtn");
+const resetBtn = document.getElementById("resetBtn");
+const leftStatus = document.getElementById("leftStatus");
+
+const reviewCard = document.getElementById("reviewCard");
+const reviewMetaGrid = document.getElementById("reviewMetaGrid");
+const confidenceLabel = document.getElementById("confidenceLabel");
+const confidenceBarFill = document.getElementById("confidenceBarFill");
+const warningsList = document.getElementById("warningsList");
+const mappingTableBody = document.getElementById("mappingTableBody");
+const sheetPreviewHead = document.getElementById("sheetPreviewHead");
+const sheetPreviewBody = document.getElementById("sheetPreviewBody");
+const buildPreviewBtn = document.getElementById("buildPreviewBtn");
+
+const finalPreviewCard = document.getElementById("finalPreviewCard");
+const finalSummary = document.getElementById("finalSummary");
+const playerPreviewList = document.getElementById("playerPreviewList");
+const submitBtn = document.getElementById("submitBtn");
+const backToReviewBtn = document.getElementById("backToReviewBtn");
+
+const mode1Btn = document.getElementById("mode1Btn");
+const mode2Btn = document.getElementById("mode2Btn");
+const mode1Panel = document.getElementById("mode1Panel");
+const mode2Panel = document.getElementById("mode2Panel");
+
+const boxSportSelection = document.getElementById("boxSportSelection");
+const boxScoreInput = document.getElementById("boxScoreInput");
+const parseBoxScoreBtn = document.getElementById("parseBoxScoreBtn");
+const boxStatus = document.getElementById("boxStatus");
+const mode2PreviewCard = document.getElementById("mode2PreviewCard");
+const mode2Summary = document.getElementById("mode2Summary");
+const mode2Warnings = document.getElementById("mode2Warnings");
+const mode2Players = document.getElementById("mode2Players");
+const submitMode2Btn = document.getElementById("submitMode2Btn");
+
+window.addEventListener("DOMContentLoaded", async () => {
+  await requireAuth();
+  setupFileUI();
+  setupActions();
+  switchSubmitMode("mode1");
+});
+
+async function requireAuth() {
   const { data: { session } } = await supabase.auth.getSession();
+
   if (!session) {
-    window.location.href = 'login.html';
+    window.location.href = "login.html";
     return;
   }
 
-  // Get user profile
-  const { data: profile } = await supabase
-    .from('user_profiles')
-    .select('*')
-    .eq('id', session.user.id)
+  const { data: profile, error } = await supabase
+    .from("user_profiles")
+    .select("*")
+    .eq("id", session.user.id)
     .single();
 
+  if (error || !profile) {
+    alert("Could not load your profile. Please sign in again.");
+    await supabase.auth.signOut();
+    window.location.href = "login.html";
+    return;
+  }
+
   currentUser = profile;
-  console.log('Logged in as:', currentUser.full_name);
-
-  // Setup event listeners
-  setupMethodSelector();
-  setupTextParsing();
-  setupCSVUpload();
-  setupManualForm();
-  setupPreview();
-});
-
-/**
- * Method selector setup
- */
-function setupMethodSelector() {
-  const cards = document.querySelectorAll('.method-card');
-  const areas = document.querySelectorAll('.upload-area');
-
-  cards.forEach(card => {
-    card.addEventListener('click', () => {
-      const method = card.dataset.method;
-      
-      // Update active states
-      cards.forEach(c => c.classList.remove('active'));
-      card.classList.add('active');
-      
-      areas.forEach(a => a.classList.remove('active'));
-      document.getElementById(`${method}Area`).classList.add('active');
-      
-      currentMethod = method;
-      hidePreview();
-    });
-  });
+  setStatus(`Signed in as ${profile.full_name} • ${profile.school_name || "School not set"}`);
 }
 
-/**
- * Text parsing setup
- */
-function setupTextParsing() {
-  const parseBtn = document.getElementById('parseTextBtn');
-  const textInput = document.getElementById('textInput');
+function setupFileUI() {
+  sportSelection.addEventListener("change", updateInspectState);
+  spreadsheetInput.addEventListener("change", onFilePicked);
 
-  parseBtn.addEventListener('click', async () => {
-    const text = textInput.value.trim();
-    
-    if (!text) {
-      alert('Please paste box score text first');
+  fileDropzone.addEventListener("click", () => spreadsheetInput.click());
+
+  fileDropzone.addEventListener("dragover", (event) => {
+    event.preventDefault();
+    fileDropzone.classList.add("dragover");
+  });
+
+  fileDropzone.addEventListener("dragleave", () => {
+    fileDropzone.classList.remove("dragover");
+  });
+
+  fileDropzone.addEventListener("drop", (event) => {
+    event.preventDefault();
+    fileDropzone.classList.remove("dragover");
+
+    const file = event.dataTransfer.files?.[0];
+    if (!file) return;
+
+    const lower = file.name.toLowerCase();
+    if (!lower.endsWith(".xlsx") && !lower.endsWith(".xls") && !lower.endsWith(".csv")) {
+      alert("Please upload an Excel or CSV file.");
       return;
     }
 
-    parseBtn.textContent = '🤖 Parsing...';
-    parseBtn.disabled = true;
-
-    try {
-      // Parse the text
-      parsedData = parseTextBoxScore(text);
-      
-      // Show preview
-      displayPreview(parsedData, 'text', text);
-      
-    } catch (error) {
-      alert('Error parsing text: ' + error.message);
-      console.error(error);
-    } finally {
-      parseBtn.textContent = 'Parse & Preview';
-      parseBtn.disabled = false;
-    }
+    selectedFile = file;
+    renderSelectedFile();
+    updateInspectState();
   });
 }
 
-/**
- * CSV upload setup
- */
-function setupCSVUpload() {
-  const dropZone = document.getElementById('csvDropZone');
-  const fileInput = document.getElementById('csvInput');
-  const fileNameDiv = document.getElementById('csvFileName');
-  const parseBtn = document.getElementById('parseCSVBtn');
-
-  // Click to browse
-  dropZone.addEventListener('click', () => {
-    fileInput.click();
+function setupActions() {
+  inspectBtn.addEventListener("click", handleInspect);
+  resetBtn.addEventListener("click", hardReset);
+  buildPreviewBtn.addEventListener("click", buildFinalPreview);
+  backToReviewBtn.addEventListener("click", () => {
+    finalPreviewCard.classList.add("hidden");
+    reviewCard.classList.remove("hidden");
   });
+  submitBtn.addEventListener("click", submitSpreadsheet);
 
-  // File selected
-  fileInput.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      handleCSVFile(file);
-    }
-  });
-
-  // Drag and drop
-  dropZone.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    dropZone.classList.add('dragover');
-  });
-
-  dropZone.addEventListener('dragleave', () => {
-    dropZone.classList.remove('dragover');
-  });
-
-  dropZone.addEventListener('drop', (e) => {
-    e.preventDefault();
-    dropZone.classList.remove('dragover');
-    
-    const file = e.dataTransfer.files[0];
-    if (file && file.name.endsWith('.csv')) {
-      handleCSVFile(file);
-    } else {
-      alert('Please upload a CSV file');
-    }
-  });
-
-  // Parse button
-  parseBtn.addEventListener('click', async () => {
-    if (!csvFileContent) {
-      alert('No CSV file loaded');
-      return;
-    }
-
-    parseBtn.textContent = '🤖 Parsing CSV...';
-    parseBtn.disabled = true;
-
-    try {
-      parsedData = parseCSV(csvFileContent);
-      displayPreview(parsedData, 'csv', csvFileContent);
-    } catch (error) {
-      alert('Error parsing CSV: ' + error.message);
-      console.error(error);
-    } finally {
-      parseBtn.textContent = 'Parse & Preview';
-      parseBtn.disabled = false;
-    }
-  });
+  mode1Btn.addEventListener("click", () => switchSubmitMode("mode1"));
+  mode2Btn.addEventListener("click", () => switchSubmitMode("mode2"));
+  parseBoxScoreBtn.addEventListener("click", handleMode2Parse);
+  submitMode2Btn.addEventListener("click", submitMode2BoxScore);
 }
 
-/**
- * Handle CSV file upload
- */
-function handleCSVFile(file) {
-  const reader = new FileReader();
-  
-  reader.onload = (e) => {
-    csvFileContent = e.target.result;
-    
-    // Show file name
-    const fileNameDiv = document.getElementById('csvFileName');
-    fileNameDiv.innerHTML = `
-      <div style="padding: 12px; background: #f7fafc; border-radius: 6px; display: flex; align-items: center; gap: 8px;">
-        <span style="font-size: 24px;">📄</span>
-        <div>
-          <strong>${file.name}</strong>
-          <div style="font-size: 12px; color: #718096;">${(file.size / 1024).toFixed(2)} KB</div>
-        </div>
-      </div>
-    `;
-    fileNameDiv.style.display = 'block';
-    
-    // Show parse button
-    document.getElementById('parseCSVBtn').style.display = 'block';
-  };
-  
-  reader.readAsText(file);
+function onFilePicked(event) {
+  const file = event.target.files?.[0];
+  selectedFile = file || null;
+  renderSelectedFile();
+  updateInspectState();
 }
 
-/**
- * Manual form setup
- */
-function setupManualForm() {
-  const form = document.getElementById('manualForm');
-  
-  form.addEventListener('submit', (e) => {
-    e.preventDefault();
-    
-    // Collect form data
-    const formData = {
-      game: {
-        date: document.getElementById('gameDate').value,
-        sport: document.getElementById('sport').value,
-        gender: document.getElementById('gender').value,
-        location: document.getElementById('location').value,
-        homeTeam: document.getElementById('homeTeam').value,
-        homeScore: parseInt(document.getElementById('homeScore').value),
-        awayTeam: document.getElementById('awayTeam').value,
-        awayScore: parseInt(document.getElementById('awayScore').value)
-      },
-      players: [], // Manual form doesn't include player stats yet
-      confidence: 100 // Manual entry is 100% confident
-    };
-    
-    parsedData = formData;
-    displayPreview(parsedData, 'manual');
-  });
+function renderSelectedFile() {
+  if (!selectedFile) {
+    selectedFileBox.style.display = "none";
+    selectedFileBox.innerHTML = "";
+    return;
+  }
+
+  selectedFileBox.style.display = "block";
+  selectedFileBox.innerHTML = `
+    <strong>${selectedFile.name}</strong>
+    <span>${(selectedFile.size / 1024).toFixed(1)} KB • Ready for inspection</span>
+  `;
 }
 
-/**
- * Display preview of parsed data
- */
-function displayPreview(data, method, originalData = null) {
-  const previewSection = document.getElementById('previewSection');
-  const previewContent = document.getElementById('previewContent');
-  
-  const game = data.game || {};
-  const players = data.players || [];
-  const confidence = data.confidence || 0;
+function updateInspectState() {
+  inspectBtn.disabled = !(sportSelection.value && selectedFile);
+}
 
-  // Determine confidence class
-  let confidenceClass = 'confidence-low';
-  if (confidence >= 80) confidenceClass = 'confidence-high';
-  else if (confidence >= 50) confidenceClass = 'confidence-medium';
+function setStatus(message) {
+  leftStatus.textContent = message;
+}
 
-  // Generate preview HTML
-  previewContent.innerHTML = `
-    <div class="preview-card">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-        <h3>Game Summary</h3>
-        <span class="confidence-badge ${confidenceClass}">
-          ${confidence}% Confidence
-        </span>
-      </div>
+function resolveSportSelection(value) {
+  switch (value) {
+    case "boys_basketball":
+      return { sport: "basketball", gender: "boys", label: "Boys Basketball" };
+    case "girls_basketball":
+      return { sport: "basketball", gender: "girls", label: "Girls Basketball" };
+    case "girls_volleyball":
+      return { sport: "volleyball", gender: "girls", label: "Girls Volleyball" };
+    case "boys_soccer":
+      return { sport: "soccer", gender: "boys", label: "Boys Soccer" };
+    case "girls_soccer":
+      return { sport: "soccer", gender: "girls", label: "Girls Soccer" };
+    case "football":
+      return { sport: "football", gender: null, label: "Football" };
+    case "baseball":
+      return { sport: "baseball", gender: null, label: "Baseball" };
+    case "softball":
+      return { sport: "softball", gender: null, label: "Softball" };
+    default:
+      return { sport: null, gender: null, label: "" };
+  }
+}
 
-      <div class="stat-row">
-        <strong>Date:</strong>
-        <span>${game.date || 'Not specified'}</span>
-      </div>
+async function handleInspect() {
+  if (!selectedFile || !sportSelection.value) {
+    alert("Choose a sport and file first.");
+    return;
+  }
 
-      <div class="stat-row">
-        <strong>Sport:</strong>
-        <span>${game.sport || 'Not specified'} (${game.gender || 'Not specified'})</span>
-      </div>
+  inspectBtn.disabled = true;
+  inspectBtn.textContent = "Inspecting...";
+  setStatus("Inspecting spreadsheet...");
 
-      <div class="stat-row">
-        <strong>Score:</strong>
-        <span>
-    ${game.homeTeam && game.awayTeam
-      ? `${game.homeTeam} ${game.homeScore || 0} - ${game.awayScore || 0} ${game.awayTeam}`
-      : 'Not specified'}
-        </span>
-       </div>
+  try {
+    inspectionResult = await inspectSpreadsheet(selectedFile, sportSelection.value);
+    finalizedData = null;
+    renderReview(inspectionResult);
+    reviewCard.classList.remove("hidden");
+    finalPreviewCard.classList.add("hidden");
+    setStatus("Inspection complete. Review the column mapping.");
+  } catch (error) {
+    console.error(error);
+    alert(error.message || "Could not inspect spreadsheet.");
+    setStatus("Inspection failed");
+  } finally {
+    inspectBtn.disabled = false;
+    inspectBtn.textContent = "Inspect Spreadsheet";
+  }
+}
 
-      <div class="stat-row">
-        <strong>Location:</strong>
-        <span>${game.date ? game.date : 'Not specified'}</span>
-      </div>
+function renderReview(inspection) {
+  const sportMeta = resolveSportSelection(sportSelection.value);
 
-      <h4 style="margin-top: 24px; margin-bottom: 12px;">
-        Player Statistics (${players.length} players)
-      </h4>
-
-      ${players.length > 0 ? `
-        <div style="max-height: 300px; overflow-y: auto;">
-          ${players.map(p => `
-            <div class="stat-row">
-              <strong>${p.name}</strong>
-              <span style="font-family: monospace;">
-                ${Object.entries(p.stats || {}).map(([key, val]) => `${key}: ${val}`).join(', ')}
-              </span>
-            </div>
-          `).join('')}
-        </div>
-      ` : `
-        <p style="color: #718096; font-style: italic;">No player stats included</p>
-      `}
-
-      ${confidence < 70 ? `
-        <div style="margin-top: 20px; padding: 12px; background: #fef5e7; border-left: 4px solid #f39c12; border-radius: 4px;">
-          <strong>⚠️ Low Confidence</strong>
-          <p style="margin: 4px 0 0 0; font-size: 14px;">
-            Some data may not have been parsed correctly. Please review carefully before submitting.
-          </p>
-        </div>
-      ` : ''}
+  reviewMetaGrid.innerHTML = `
+    <div class="meta-chip">
+      <span class="label">School</span>
+      <span class="value">${currentUser.school_name || currentUser.school_id || "Unknown"}</span>
+    </div>
+    <div class="meta-chip">
+      <span class="label">Sport</span>
+      <span class="value">${sportMeta.label}</span>
+    </div>
+    <div class="meta-chip">
+      <span class="label">File</span>
+      <span class="value">${inspection.fileName}</span>
+    </div>
+    <div class="meta-chip">
+      <span class="label">Rows found</span>
+      <span class="value">${inspection.dataRows.length}</span>
     </div>
   `;
 
-  // Store original data for submission
-  previewSection.dataset.method = method;
-  previewSection.dataset.originalData = originalData || '';
+  confidenceLabel.textContent = `${inspection.confidence}%`;
+  confidenceBarFill.style.width = `${inspection.confidence}%`;
 
-  // Show preview section
-  previewSection.style.display = 'block';
-  previewSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  warningsList.innerHTML = "";
+  if (inspection.warnings.length) {
+    inspection.warnings.forEach((warning) => {
+      const li = document.createElement("li");
+      li.textContent = warning;
+      warningsList.appendChild(li);
+    });
+  } else {
+    const li = document.createElement("li");
+    li.textContent = "No major warnings found during inspection.";
+    warningsList.appendChild(li);
+  }
+
+  mappingTableBody.innerHTML = inspection.mappings.map((mapping) => {
+    const statusClass =
+      mapping.status === "exact"
+        ? "tag-exact"
+        : mapping.status === "likely"
+        ? "tag-likely"
+        : "tag-unknown";
+
+    const statusLabel =
+      mapping.status === "exact"
+        ? "Recognized"
+        : mapping.status === "likely"
+        ? "Needs quick check"
+        : "Needs confirmation";
+
+    const options = buildOptionsForMapping(mapping, inspection.options);
+
+    const mappedValue = mapping.mappedTo || mapping.suggested || "";
+
+    return `
+      <tr>
+        <td><strong>${escapeHtml(mapping.originalHeader)}</strong></td>
+        <td><span class="tag ${statusClass}">${statusLabel}</span></td>
+        <td>
+          <select class="mapping-select" data-header="${escapeHtmlAttr(mapping.originalHeader)}">
+            ${options.map((option) => `
+              <option value="${escapeHtmlAttr(option.value)}" ${option.value === mappedValue ? "selected" : ""}>
+                ${escapeHtml(option.label)}
+              </option>
+            `).join("")}
+          </select>
+        </td>
+        <td class="sample-values">${escapeHtml(mapping.sampleValues.join(" • ") || "No sample values")}</td>
+      </tr>
+    `;
+  }).join("");
+
+  renderSheetPreview(inspection);
 }
 
-/**
- * Setup preview actions (Submit & Edit buttons)
- */
-function setupPreview() {
-  const submitBtn = document.getElementById('submitBtn');
-  const editBtn = document.getElementById('editBtn');
+function buildOptionsForMapping(mapping, defaultOptions) {
+  const all = [...defaultOptions];
+  const currentValues = new Set(all.map((o) => o.value));
 
-  submitBtn.addEventListener('click', async () => {
-    if (!parsedData) {
-      alert('No data to submit');
-      return;
-    }
-
-    submitBtn.textContent = '📤 Submitting...';
-    submitBtn.disabled = true;
-
-    try {
-      const previewSection = document.getElementById('previewSection');
-      const method = previewSection.dataset.method;
-      const originalData = previewSection.dataset.originalData;
-
-      // Prepare metadata
-const methodMap = {
-  text: 'text_paste',
-  csv: 'csv_upload',
-  manual: 'manual_form'
-};
-
-const metadata = {
-  userId: currentUser.id,
-  schoolId: currentUser.school_id,
-  submissionMethod: methodMap[method],
-  originalData: originalData,
-  source: 'athletic_director_portal'
-};
-
-      // Get the input data based on method
-      let inputData;
-      if (method === 'text') {
-        inputData = originalData;
-      } else if (method === 'csv') {
-        inputData = originalData;
-      } else {
-        inputData = parsedData;
-      }
-
-      // Submit to Supabase (goes through parser -> formatter -> supabase)
-      const result = await processAndSubmit(inputData, method, metadata);
-
-      if (result.success) {
-        alert('✅ Game submitted successfully! It will appear after admin approval.');
-        window.location.href = 'dashboard.html';
-      } else {
-        throw new Error(result.error || 'Submission failed');
-      }
-
-    } catch (error) {
-      alert('❌ Error submitting game: ' + error.message);
-      console.error('Submission error:', error);
-      submitBtn.textContent = '✓ Submit for Review';
-      submitBtn.disabled = false;
+  (mapping.options || []).forEach((value) => {
+    if (!currentValues.has(value)) {
+      all.push({ value, label: value });
+      currentValues.add(value);
     }
   });
 
-  editBtn.addEventListener('click', () => {
-    hidePreview();
-  });
+  return all;
 }
 
-/**
- * Hide preview section
- */
-function hidePreview() {
-  document.getElementById('previewSection').style.display = 'none';
-  parsedData = null;
+function renderSheetPreview(inspection) {
+  sheetPreviewHead.innerHTML = `
+    <tr>
+      ${inspection.rawHeaders.map((header) => `<th>${escapeHtml(header)}</th>`).join("")}
+    </tr>
+  `;
+
+  sheetPreviewBody.innerHTML = inspection.previewRows.map((row) => `
+    <tr>
+      ${inspection.rawHeaders.map((header) => `<td>${escapeHtml(String(row[header] ?? ""))}</td>`).join("")}
+    </tr>
+  `).join("");
+}
+
+function collectMappingSelections() {
+  const selections = {};
+  document.querySelectorAll(".mapping-select").forEach((select) => {
+    selections[select.dataset.header] = select.value;
+  });
+  return selections;
+}
+
+function buildFinalPreview() {
+  if (!inspectionResult) {
+    alert("Inspect a spreadsheet first.");
+    return;
+  }
+
+  const sportMeta = resolveSportSelection(sportSelection.value);
+
+  try {
+    finalizedData = finalizeSpreadsheetParse(inspectionResult, collectMappingSelections(), {
+      sport: sportMeta.sport,
+      gender: sportMeta.gender,
+      seasonHint: seasonHint.value.trim(),
+      defaultSchoolId: currentUser.school_id || null,
+      defaultSchoolName: currentUser.school_name || null,
+    });
+
+    renderFinalPreview(finalizedData, sportMeta.label);
+    reviewCard.classList.add("hidden");
+    finalPreviewCard.classList.remove("hidden");
+    setStatus("Preview ready. Submit when satisfied.");
+  } catch (error) {
+    console.error(error);
+    alert(error.message || "Could not build final preview.");
+  }
+}
+
+function renderFinalPreview(data, sportLabel) {
+  finalSummary.innerHTML = `
+    <div class="summary-row">
+      <strong>Submission type</strong>
+      <span>Spreadsheet upload (${data.submission_scope})</span>
+    </div>
+    <div class="summary-row">
+      <strong>School</strong>
+      <span>${currentUser.school_name || currentUser.school_id || "Unknown"}</span>
+    </div>
+    <div class="summary-row">
+      <strong>Sport</strong>
+      <span>${sportLabel}</span>
+    </div>
+    <div class="summary-row">
+      <strong>Players parsed</strong>
+      <span>${data.players.length}</span>
+    </div>
+    <div class="summary-row">
+      <strong>Confidence</strong>
+      <span>${data.confidence}%</span>
+    </div>
+    <div class="summary-row">
+      <strong>Detected seasons</strong>
+      <span>${(data.parse_review?.detected_seasons || []).join(", ") || seasonHint.value.trim() || "Not detected"}</span>
+    </div>
+  `;
+
+  playerPreviewList.innerHTML = data.players.slice(0, 30).map((player) => `
+    <div class="player-preview-item">
+      <strong>${escapeHtml(player.name)}</strong>
+      <span>${escapeHtml(
+        Object.entries(player.stats || {})
+          .map(([key, value]) => `${key}: ${value}`)
+          .join(", ") || "No parsed stats"
+      )}</span>
+    </div>
+  `).join("");
+}
+
+async function submitSpreadsheet() {
+  if (!finalizedData) {
+    alert("Build the final preview first.");
+    return;
+  }
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = "Submitting...";
+  setStatus("Submitting to Supabase...");
+
+  try {
+    const metadata = {
+      userId: currentUser.id,
+      schoolId: currentUser.school_id,
+      defaultSchoolId: currentUser.school_id,
+      defaultSchoolName: currentUser.school_name,
+      submissionMethod: "csv_upload",
+      originalData: selectedFile ? selectedFile.name : null,
+      source: "athletic_director_portal",
+      selectedSportValue: sportSelection.value,
+      seasonHint: seasonHint.value.trim() || null,
+    };
+
+    const formatted = await formatForSupabase(finalizedData, metadata);
+    const result = await submitToSupabase(formatted);
+
+    if (!result.success) {
+      throw new Error(result.error || "Submission failed.");
+    }
+
+    alert("✅ Spreadsheet submitted successfully. It is now pending admin review.");
+    window.location.href = "dashboard.html";
+  } catch (error) {
+    console.error(error);
+    alert(`❌ ${error.message || "Could not submit spreadsheet."}`);
+    submitBtn.disabled = false;
+    submitBtn.textContent = "Submit for Admin Review";
+    setStatus("Submission failed");
+  }
+}
+
+function hardReset() {
+  selectedFile = null;
+  inspectionResult = null;
+  finalizedData = null;
+  spreadsheetInput.value = "";
+  sportSelection.value = "";
+  seasonHint.value = "";
+  renderSelectedFile();
+  updateInspectState();
+  reviewCard.classList.add("hidden");
+  finalPreviewCard.classList.add("hidden");
+  setStatus("Waiting for file");
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function escapeHtmlAttr(value) {
+  return escapeHtml(value);
+}
+
+function switchSubmitMode(mode) {
+  const isMode1 = mode === "mode1";
+
+  mode1Panel.classList.toggle("hidden", !isMode1);
+  mode2Panel.classList.toggle("hidden", isMode1);
+
+  mode1Btn.classList.toggle("portal-btn-primary", isMode1);
+  mode1Btn.classList.toggle("portal-btn-secondary", !isMode1);
+
+  mode2Btn.classList.toggle("portal-btn-primary", !isMode1);
+  mode2Btn.classList.toggle("portal-btn-secondary", isMode1);
+}
+
+function handleMode2Parse() {
+  const sportValue = boxSportSelection.value;
+  const text = boxScoreInput.value.trim();
+
+  if (!sportValue) {
+    alert("Select a sport first.");
+    return;
+  }
+
+  if (!text) {
+    alert("Paste a box score or game summary first.");
+    return;
+  }
+
+  parseBoxScoreBtn.disabled = true;
+  parseBoxScoreBtn.textContent = "Parsing...";
+  boxStatus.textContent = "Parsing box score...";
+
+  try {
+    mode2ParsedData = parseBoxScoreText(text, sportValue);
+    renderMode2Preview(mode2ParsedData);
+    mode2PreviewCard.classList.remove("hidden");
+    boxStatus.textContent = "Box score parsed. Review before submit.";
+  } catch (error) {
+    console.error(error);
+    alert(error.message || "Could not parse box score.");
+    boxStatus.textContent = "Box score parsing failed.";
+  } finally {
+    parseBoxScoreBtn.disabled = false;
+    parseBoxScoreBtn.textContent = "Parse Box Score";
+  }
+}
+
+function renderMode2Preview(data) {
+  const game = data.game || {};
+  const players = data.players || [];
+
+  mode2Summary.innerHTML = `
+    <div class="summary-row">
+      <strong>Date</strong>
+      <span>${game.date || "Not detected"}</span>
+    </div>
+    <div class="summary-row">
+      <strong>Sport</strong>
+      <span>${game.sport || "Not detected"} ${game.gender ? `(${game.gender})` : ""}</span>
+    </div>
+    <div class="summary-row">
+      <strong>Game</strong>
+      <span>${game.homeTeam || "Home"} ${game.homeScore ?? "?"} - ${game.awayScore ?? "?"} ${game.awayTeam || "Away"}</span>
+    </div>
+    <div class="summary-row">
+      <strong>Location</strong>
+      <span>${game.location || "Not detected"}</span>
+    </div>
+    <div class="summary-row">
+      <strong>Players parsed</strong>
+      <span>${players.length}</span>
+    </div>
+    <div class="summary-row">
+      <strong>Confidence</strong>
+      <span>${data.confidence || 0}%</span>
+    </div>
+  `;
+
+  mode2Warnings.innerHTML = "";
+  const warnings = data.warnings || [];
+  if (warnings.length) {
+    warnings.forEach((warning) => {
+      const li = document.createElement("li");
+      li.textContent = warning;
+      mode2Warnings.appendChild(li);
+    });
+  } else {
+    const li = document.createElement("li");
+    li.textContent = "No major warnings found.";
+    mode2Warnings.appendChild(li);
+  }
+
+  mode2Players.innerHTML = players.length
+    ? players.map((player) => `
+        <div class="player-preview-item">
+          <strong>${escapeHtml(player.name)}</strong>
+          <span>${escapeHtml(
+            Object.entries(player.stats || {})
+              .map(([key, value]) => `${key}: ${value}`)
+              .join(", ") || "No parsed stats"
+          )}</span>
+        </div>
+      `).join("")
+    : `<div class="player-preview-item"><strong>No players detected</strong><span>Try pasting cleaner game summary text.</span></div>`;
+}
+
+async function submitMode2BoxScore() {
+  if (!mode2ParsedData) {
+    alert("Parse a box score first.");
+    return;
+  }
+
+  submitMode2Btn.disabled = true;
+  submitMode2Btn.textContent = "Submitting...";
+  boxStatus.textContent = "Submitting box score...";
+
+  try {
+    const sportMeta = resolveMode2Sport(boxSportSelection.value);
+
+    const metadata = {
+      userId: currentUser.id,
+      schoolId: currentUser.school_id,
+      defaultSchoolId: currentUser.school_id,
+      defaultSchoolName: currentUser.school_name,
+      submissionMethod: "text_paste",
+      originalData: boxScoreInput.value.trim(),
+      source: "athletic_director_portal",
+      sport: sportMeta.sport,
+      gender: sportMeta.gender,
+    };
+
+    const formatted = await formatForSupabase(mode2ParsedData, metadata);
+    const result = await submitToSupabase(formatted);
+
+    if (!result.success) {
+      throw new Error(result.error || "Submission failed.");
+    }
+
+    boxStatus.textContent = "✅ Box score submitted successfully and is now pending admin review.";
+    mode2PreviewCard.classList.add("hidden");
+    boxScoreInput.value = "";
+    boxSportSelection.value = "";
+    mode2ParsedData = null;
+  } catch (error) {
+    console.error(error);
+    alert(`❌ ${error.message || "Could not submit box score."}`);
+    boxStatus.textContent = "Box score submission failed.";
+  } finally {
+    submitMode2Btn.disabled = false;
+    submitMode2Btn.textContent = "Submit Box Score";
+  }
+}
+
+function resolveMode2Sport(value) {
+  switch (value) {
+    case "boys_basketball":
+      return { sport: "basketball", gender: "boys" };
+    case "girls_basketball":
+      return { sport: "basketball", gender: "girls" };
+    case "girls_volleyball":
+      return { sport: "volleyball", gender: "girls" };
+    case "boys_soccer":
+      return { sport: "soccer", gender: "boys" };
+    case "girls_soccer":
+      return { sport: "soccer", gender: "girls" };
+    case "football":
+      return { sport: "football", gender: null };
+    case "baseball":
+      return { sport: "baseball", gender: null };
+    case "softball":
+      return { sport: "softball", gender: null };
+    default:
+      return { sport: null, gender: null };
+  }
 }

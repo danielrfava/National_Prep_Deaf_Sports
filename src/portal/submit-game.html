@@ -1,240 +1,545 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Submit Game - NPDS Portal</title>
-  <link rel="stylesheet" href="../styles.css">
-  <style>
-    .portal-container {
-      max-width: 900px;
-      margin: 40px auto;
-      padding: 20px;
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Upload Spreadsheet - NPDS Portal</title>
+  <link rel="stylesheet" href="../styles.css" />
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+  .portal-shell {
+    max-width: 1180px;
+    margin: 32px auto 48px;
+    padding: 0 20px;
+  }
+
+  #mode1Panel,
+  #mode2Panel {
+    display: block;
+  }
+
+  textarea:focus {
+    outline: 2px solid rgba(15, 110, 110, 0.18);
+    border-color: #0f6e6e;
+  }
+
+  .portal-page-header {
+    margin-bottom: 20px;
+  }
+    .portal-page-header h1 {
+      margin: 0 0 8px;
+      font-size: 2rem;
+      color: #18212b;
     }
 
-    .submit-card {
-      background: white;
-      border-radius: 12px;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-      padding: 32px;
-      margin-bottom: 24px;
+    .portal-page-header p {
+      margin: 0;
+      color: #5d6b79;
+      font-size: 1rem;
+      line-height: 1.55;
     }
 
-    .method-selector {
+    .portal-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-      gap: 16px;
-      margin-bottom: 32px;
+      grid-template-columns: 360px 1fr;
+      gap: 20px;
+      align-items: start;
     }
 
-    .method-card {
-      border: 2px solid #e2e8f0;
-      border-radius: 8px;
-      padding: 24px;
+    .portal-card {
+      background: #fff;
+      border: 1px solid #dde5ec;
+      border-radius: 20px;
+      box-shadow: 0 12px 36px rgba(15, 23, 42, 0.06);
+      overflow: hidden;
+    }
+
+    .portal-card-header {
+      padding: 22px 24px 14px;
+      border-bottom: 1px solid #eef2f6;
+    }
+
+    .portal-card-header h2 {
+      margin: 0 0 6px;
+      font-size: 1.15rem;
+      color: #18212b;
+    }
+
+    .portal-card-header p {
+      margin: 0;
+      color: #657484;
+      font-size: 0.95rem;
+      line-height: 1.45;
+    }
+
+    .portal-card-body {
+      padding: 22px 24px 24px;
+    }
+
+    .step-list {
+      display: grid;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .step-item {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      padding: 12px 14px;
+      border: 1px solid #e7edf3;
+      border-radius: 14px;
+      background: #fbfdff;
+    }
+
+    .step-number {
+      width: 30px;
+      height: 30px;
+      border-radius: 999px;
+      background: #0f6e6e;
+      color: #fff;
+      display: grid;
+      place-items: center;
+      font-weight: 700;
+      font-size: 0.9rem;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .step-item strong {
+      display: block;
+      margin-bottom: 2px;
+      color: #16202a;
+    }
+
+    .step-item span {
+      color: #607080;
+      font-size: 0.92rem;
+      line-height: 1.45;
+    }
+
+    .form-stack {
+      display: grid;
+      gap: 16px;
+    }
+
+    .field-group {
+      display: grid;
+      gap: 8px;
+    }
+
+    .field-group label {
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: #4d5a68;
+    }
+
+    .field-group select,
+    .field-group input[type="text"] {
+      width: 100%;
+      border: 1px solid #d7e0e8;
+      border-radius: 14px;
+      padding: 0.9rem 1rem;
+      font-size: 1rem;
+      background: #fff;
+      color: #17222d;
+    }
+
+    .field-group select:focus,
+    .field-group input[type="text"]:focus {
+      outline: 2px solid rgba(15, 110, 110, 0.18);
+      border-color: #0f6e6e;
+    }
+
+    .file-dropzone {
+      border: 2px dashed #c8d4df;
+      border-radius: 18px;
+      background: linear-gradient(180deg, #fbfdff 0%, #f5f9fc 100%);
+      padding: 26px 20px;
       text-align: center;
       cursor: pointer;
-      transition: all 0.2s;
+      transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
     }
 
-    .method-card:hover {
-      border-color: #4299e1;
-      background: #ebf8ff;
+    .file-dropzone:hover,
+    .file-dropzone.dragover {
+      border-color: #0f6e6e;
+      background: #f3fbfb;
+      transform: translateY(-1px);
     }
 
-    .method-card.active {
-      border-color: #4299e1;
-      background: #ebf8ff;
+    .dropzone-icon {
+      font-size: 2.5rem;
+      margin-bottom: 10px;
     }
 
-    .method-icon {
-      font-size: 48px;
-      margin-bottom: 12px;
+    .dropzone-title {
+      font-weight: 800;
+      color: #16202a;
+      margin-bottom: 4px;
     }
 
-    .method-card h3 {
-      font-size: 18px;
+    .dropzone-subtitle {
+      color: #657484;
+      font-size: 0.92rem;
+      line-height: 1.45;
+    }
+
+    .selected-file {
+      display: none;
+      border: 1px solid #d7e7df;
+      background: #f4fbf7;
+      border-radius: 14px;
+      padding: 14px 16px;
+      color: #1f3a2d;
+      font-size: 0.95rem;
+    }
+
+    .selected-file strong {
+      display: block;
+      margin-bottom: 3px;
+    }
+
+    .help-note {
+      font-size: 0.88rem;
+      line-height: 1.5;
+      color: #6a7784;
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+    }
+
+    .portal-btn {
+      appearance: none;
+      border: 0;
+      border-radius: 14px;
+      padding: 0.95rem 1.2rem;
+      font-size: 0.98rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+    }
+
+    .portal-btn:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 10px 22px rgba(15, 23, 42, 0.08);
+    }
+
+    .portal-btn:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .portal-btn-primary {
+      background: #0f6e6e;
+      color: #fff;
+    }
+
+    .portal-btn-secondary {
+      background: #edf2f7;
+      color: #22303c;
+    }
+
+    .portal-btn-success {
+      background: #15803d;
+      color: #fff;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: #f4f8fb;
+      color: #4e5f6f;
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+
+    .review-layout {
+      display: grid;
+      gap: 20px;
+    }
+
+    .review-meta-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .meta-chip {
+      border: 1px solid #e5ecf2;
+      background: #f8fbfd;
+      border-radius: 14px;
+      padding: 12px 14px;
+    }
+
+    .meta-chip .label {
+      display: block;
+      color: #607080;
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 4px;
+    }
+
+    .meta-chip .value {
+      color: #16202a;
+      font-weight: 700;
+    }
+
+    .confidence-bar-wrap {
+      border: 1px solid #e3ebf2;
+      border-radius: 16px;
+      padding: 14px;
+      background: #fbfdff;
+    }
+
+    .confidence-bar-label {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      font-weight: 700;
+      color: #22303c;
+      margin-bottom: 10px;
+    }
+
+    .confidence-bar {
+      width: 100%;
+      height: 10px;
+      border-radius: 999px;
+      background: #e7edf3;
+      overflow: hidden;
+    }
+
+    .confidence-bar-fill {
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #f59e0b 0%, #10b981 100%);
+      width: 0%;
+    }
+
+    .warnings-box,
+    .mapping-box,
+    .preview-box {
+      border: 1px solid #e4ebf1;
+      border-radius: 18px;
+      background: #fff;
+      overflow: hidden;
+    }
+
+    .section-head {
+      padding: 16px 18px;
+      border-bottom: 1px solid #edf2f6;
+      background: #fbfdff;
+    }
+
+    .section-head h3 {
+      margin: 0 0 4px;
+      font-size: 1rem;
+      color: #19232d;
+    }
+
+    .section-head p {
+      margin: 0;
+      color: #647382;
+      font-size: 0.9rem;
+      line-height: 1.45;
+    }
+
+    .warnings-list {
+      margin: 0;
+      padding: 14px 18px 18px 34px;
+      color: #6b4d00;
+      background: #fffaf0;
+    }
+
+    .warnings-list li {
       margin-bottom: 8px;
-      color: #2d3748;
+      line-height: 1.45;
     }
 
-    .method-card p {
-      font-size: 14px;
-      color: #718096;
-    }
-
-    .upload-area {
+    .warnings-list:empty {
       display: none;
     }
 
-    .upload-area.active {
-      display: block;
+    .mapping-table-wrap,
+    .sheet-table-wrap {
+      overflow-x: auto;
     }
 
-    .textarea-large {
+    .mapping-table,
+    .sheet-preview-table {
       width: 100%;
-      min-height: 300px;
-      padding: 16px;
-      border: 2px dashed #cbd5e0;
-      border-radius: 8px;
-      font-family: 'Courier New', monospace;
-      font-size: 14px;
-      resize: vertical;
+      border-collapse: collapse;
+      font-size: 0.93rem;
     }
 
-    .textarea-large:focus {
-      outline: none;
-      border-color: #4299e1;
+    .mapping-table th,
+    .mapping-table td,
+    .sheet-preview-table th,
+    .sheet-preview-table td {
+      border-bottom: 1px solid #edf2f6;
+      padding: 12px 14px;
+      text-align: left;
+      vertical-align: top;
     }
 
-    .file-upload {
-      border: 2px dashed #cbd5e0;
-      border-radius: 8px;
-      padding: 60px 20px;
-      text-align: center;
-      cursor: pointer;
-      transition: all 0.2s;
+    .mapping-table th,
+    .sheet-preview-table th {
+      background: #f8fbfd;
+      color: #51606e;
+      font-size: 0.83rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      font-weight: 800;
+      white-space: nowrap;
     }
 
-    .file-upload:hover {
-      border-color: #4299e1;
-      background: #f7fafc;
+    .mapping-table select {
+      width: 100%;
+      min-width: 210px;
+      border: 1px solid #d7e0e8;
+      border-radius: 12px;
+      padding: 0.72rem 0.82rem;
+      background: #fff;
+      font-size: 0.95rem;
     }
 
-    .file-upload.dragover {
-      border-color: #48bb78;
-      background: #f0fff4;
+    .sample-values {
+      color: #667585;
+      font-size: 0.9rem;
+      line-height: 1.45;
     }
 
-    .upload-icon {
-      font-size: 64px;
-      color: #a0aec0;
-      margin-bottom: 16px;
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      white-space: nowrap;
     }
 
-    .btn {
-      padding: 12px 24px;
-      border-radius: 6px;
-      font-size: 16px;
-      font-weight: 600;
-      cursor: pointer;
-      border: none;
-      transition: all 0.2s;
+    .tag-exact {
+      background: #ecfdf3;
+      color: #166534;
     }
 
-    .btn-primary {
-      background: #4299e1;
-      color: white;
+    .tag-likely {
+      background: #fff7ed;
+      color: #9a3412;
     }
 
-    .btn-primary:hover {
-      background: #3182ce;
+    .tag-unknown {
+      background: #fef2f2;
+      color: #b91c1c;
     }
 
-    .btn-success { 
-      background: #48bb78;
-      color: white;
-    }
-
-    .btn-success:hover {
-      background: #38a169;
-    }
-
-    .btn-secondary {
-      background: #e2e8f0;
-      color: #2d3748;
-    }
-
-    .btn-secondary:hover {
-      background: #cbd5e0;
-    }
-
-    .preview-card {
-      background: #f7fafc;
-      border: 1px solid #e2e8f0;
-      border-radius: 8px;
-      padding: 24px;
-      margin: 24px 0;
-    }
-
-    .preview-card h3 {
-      color: #2d3748;
-      margin-bottom: 16px;
-    }
-
-    .stat-row {
-      display: flex;
-      justify-content: space-between;
-      padding: 8px 0;
-      border-bottom: 1px solid #e2e8f0;
-    }
-
-    .button-group {
+    .preview-actions {
       display: flex;
       gap: 12px;
-      margin-top: 24px;
+      flex-wrap: wrap;
+      margin-top: 18px;
     }
 
-    .confidence-badge {
-      display: inline-block;
-      padding: 4px 12px;
-      border-radius: 12px;
-      font-size: 12px;
-      font-weight: 600;
-    }
-
-    .confidence-high {
-      background: #c6f6d5;
-      color: #22543d;
-    }
-
-    .confidence-medium {
-      background: #feebc8;
-      color: #7c2d12;
-    }
-
-    .confidence-low {
-      background: #fed7d7;
-      color: #9b2c2c;
-    }
-
-    .form-group {
-      margin-bottom: 20px;
-    }
-
-    .form-group label {
-      display: block;
-      font-weight: 600;
-      margin-bottom: 8px;
-    }
-
-    .form-group input, .form-group select {
-      width: 100%;
-      padding: 12px;
-      border: 1px solid #cbd5e0;
-      border-radius: 6px;
-    }
-
-    .form-grid {
+    .preview-summary {
       display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 16px;
+      gap: 12px;
+      margin-bottom: 16px;
     }
 
-    @media (max-width: 768px) {
-      .form-grid {
-        grid-template-columns: 1fr;
-      }
-      
-      .method-selector {
+    .summary-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 10px 0;
+      border-bottom: 1px solid #eef2f6;
+    }
+
+    .summary-row strong {
+      color: #22303c;
+    }
+
+    .summary-row span {
+      color: #5f6f7f;
+      text-align: right;
+    }
+
+    .player-preview-list {
+      display: grid;
+      gap: 10px;
+      max-height: 360px;
+      overflow-y: auto;
+      padding-right: 2px;
+    }
+
+    .player-preview-item {
+      border: 1px solid #e8eef4;
+      border-radius: 14px;
+      padding: 12px 14px;
+      background: #fbfdff;
+    }
+
+    .player-preview-item strong {
+      display: block;
+      margin-bottom: 5px;
+      color: #16202a;
+    }
+
+    .player-preview-item span {
+      color: #5e6e7f;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.88rem;
+      line-height: 1.5;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    @media (max-width: 980px) {
+      .portal-grid {
         grid-template-columns: 1fr;
       }
 
-      .button-group {
+      .review-meta-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 640px) {
+      .portal-shell {
+        padding: 0 14px;
+      }
+
+      .portal-card-header,
+      .portal-card-body {
+        padding-left: 16px;
+        padding-right: 16px;
+      }
+
+      .review-meta-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .summary-row {
         flex-direction: column;
+        gap: 4px;
       }
 
-      .btn {
-        width: 100%;
+      .summary-row span {
+        text-align: left;
       }
     }
   </style>
@@ -245,175 +550,303 @@
       <div class="brand">
         <div class="logo">NP</div>
         <div class="brand-text">
-          <div class="brand-title">Submit Game Results</div>
+          <div class="brand-title">National Prep Deaf Sports</div>
+          <div class="brand-tag">Athletic Director Portal</div>
         </div>
       </div>
       <nav class="nav">
-        <a href="dashboard.html">← Back to Dashboard</a>
+        <a class="nav-link" href="dashboard.html">← Back to Dashboard</a>
       </nav>
     </div>
   </header>
 
-  <main class="portal-container">
-    <div class="submit-card">
-      <h2>Choose Submission Method</h2>
-      <p style="color: #718096; margin-bottom: 24px;">Select how you'd like to submit your game data</p>
-
-      <!-- Method Selection -->
-      <div class="method-selector">
-        <div class="method-card active" data-method="text">
-          <div class="method-icon">📋</div>
-          <h3>Paste Box Score</h3>
-          <p>Copy from MaxPreps/Hudl and paste</p>
-        </div>
-
-        <div class="method-card" data-method="csv">
-          <div class="method-icon">📁</div>
-          <h3>Upload CSV</h3>
-          <p>Upload CSV file from your system</p>
-        </div>
-
-        <div class="method-card" data-method="manual">
-          <div class="method-icon">✍️</div>
-          <h3>Manual Entry</h3>
-          <p>Fill out form manually</p>
-        </div>
-      </div>
-
-      <!-- TEXT PASTE AREA -->
-      <div id="textArea" class="upload-area active">
-        <h3>Paste Box Score</h3>
-        <p style="color: #718096; margin-bottom: 16px;">
-          Copy the box score from MaxPreps, Hudl, or your stats system and paste below:
-        </p>
-        <textarea 
-          id="textInput" 
-          class="textarea-large" 
-          placeholder="Example:
-MSD 78, ISD 65
-February 16, 2026 - Boys Basketball
-
-Maryland Scoring:
-John Smith: 24 points, 8 rebounds, 3 assists
-Mike Jones: 18 points, 5 rebounds
-
-Indiana Scoring:
-Tom Wilson: 20 points, 7 rebounds"
-        ></textarea>
-
-        <div class="button-group">
-          <button id="parseTextBtn" class="btn btn-primary">Parse & Preview</button>
-        </div>
-      </div>
-
-      <!-- CSV UPLOAD AREA -->
-      <div id="csvArea" class="upload-area">
-        <h3>Upload CSV File</h3>
-        <p style="color: #718096; margin-bottom: 16px;">
-          Upload a CSV file exported from MaxPreps, Hudl, or Excel
-        </p>
-
-        <div class="file-upload" id="csvDropZone">
-          <div class="upload-icon">☁️</div>
-          <h3>Drop CSV file here</h3>
-          <p>or click to browse</p>
-          <input type="file" id="csvInput" accept=".csv" style="display: none;">
-        </div>
-
-        <div id="csvFileName" style="margin-top: 16px; display: none;"></div>
-
-        <div class="button-group">
-          <button id="parseCSVBtn" class="btn btn-primary" style="display: none;">Parse & Preview</button>
-        </div>
-      </div>
-
-      <!-- MANUAL FORM AREA -->
-      <div id="manualArea" class="upload-area">
-        <h3>Manual Entry</h3>
-        
-        <form id="manualForm">
-          <h4>Game Information</h4>
-          <div class="form-grid">
-            <div class="form-group">
-              <label for="gameDate">Game Date*</label>
-              <input type="date" id="gameDate" required>
-            </div>
-            
-            <div class="form-group">
-              <label for="sport">Sport*</label>
-              <select id="sport" required>
-                <option value="basketball">Basketball</option>
-                <option value="volleyball">Volleyball</option>
-                <option value="football">Football</option>
-                <option value="soccer">Soccer</option>
-                <option value="baseball">Baseball</option>
-                <option value="softball">Softball</option>
-                <option value="track">Track & Field</option>
-                <option value="cross country">Cross Country</option>
-                <option value="wrestling">Wrestling</option>
-                <option value="swimming">Swimming</option>
-              </select>
-            </div>
-
-            <div class="form-group">
-              <label for="gender">Gender*</label>
-              <select id="gender" required>
-                <option value="boys">Boys</option>
-                <option value="girls">Girls</option>
-              </select>
-            </div>
-
-            <div class="form-group">
-              <label for="location">Location</label>
-              <input type="text" id="location" placeholder="City, State">
-            </div>
-          </div>
-
-          <h4 style="margin-top: 24px;">Teams & Score</h4>
-          <div class="form-grid">
-            <div class="form-group">
-              <label for="homeTeam">Home Team*</label>
-              <input type="text" id="homeTeam" required>
-            </div>
-
-            <div class="form-group">
-              <label for="homeScore">Home Score*</label>
-              <input type="number" id="homeScore" required min="0">
-            </div>
-
-            <div class="form-group">
-              <label for="awayTeam">Away Team*</label>
-              <input type="text" id="awayTeam" required>
-            </div>
-
-            <div class="form-group">
-              <label for="awayScore">Away Score*</label>
-              <input type="number" id="awayScore" required min="0">
-            </div>
-          </div>
-
-          <div class="button-group">
-            <button type="submit" class="btn btn-primary">Preview Submission</button>
-          </div>
-        </form>
-      </div>
+  <main class="portal-shell">
+    <div class="portal-page-header">
+      <h1>Upload Spreadsheet</h1>
+      <p>
+        Drop in your team spreadsheet and NPDS will inspect the columns, flag anything unclear,
+        and let you confirm the correct stat matches before submission.
+      </p>
     </div>
 
-    <!-- PREVIEW SECTION (Hidden until data is parsed) -->
-    <div id="previewSection" style="display: none;">
-      <div class="submit-card">
-        <h2>Preview Your Submission</h2>
-        <div id="previewContent"></div>
+    <div class="portal-grid">
+      <aside class="portal-card">
+        <div class="portal-card-header">
+          <h2>Mode 1 Workflow</h2>
+          <p>This version is built for spreadsheet uploads first. Box scores and historical entry can plug into the same review pipeline later.</p>
+        </div>
+        <div class="portal-card-body">
+          <div class="step-list">
+            <div class="step-item">
+              <div class="step-number">1</div>
+              <div>
+                <strong>Choose sport</strong>
+                <span>Select the sport label once so the parser knows what stat dictionary to use.</span>
+              </div>
+            </div>
+            <div class="step-item">
+              <div class="step-number">2</div>
+              <div>
+                <strong>Upload spreadsheet</strong>
+                <span>Supports Excel and CSV. AD never has to think about file format.</span>
+              </div>
+            </div>
+            <div class="step-item">
+              <div class="step-number">3</div>
+              <div>
+                <strong>Confirm unclear columns</strong>
+                <span>If the parser is unsure, dropdowns appear with suggestions and sample values.</span>
+              </div>
+            </div>
+            <div class="step-item">
+              <div class="step-number">4</div>
+              <div>
+                <strong>Preview and submit</strong>
+                <span>Submission goes in as pending with review metadata saved for admin confirmation.</span>
+              </div>
+            </div>
+          </div>
 
-        <div class="button-group">
-          <button id="submitBtn" class="btn btn-success">✓ Submit for Review</button>
-          <button id="editBtn" class="btn btn-secondary">← Edit</button>
+          <div class="form-stack">
+            <div class="field-group">
+              <label for="sportSelection">Sport</label>
+              <select id="sportSelection">
+                <option value="">Select sport</option>
+                <option value="boys_basketball">Boys Basketball</option>
+                <option value="girls_basketball">Girls Basketball</option>
+                <option value="football">Football</option>
+                <option value="girls_volleyball">Girls Volleyball</option>
+                <option value="boys_soccer">Boys Soccer</option>
+                <option value="girls_soccer">Girls Soccer</option>
+                <option value="baseball">Baseball</option>
+                <option value="softball">Softball</option>
+              </select>
+            </div>
+
+            <div class="field-group">
+              <label for="seasonHint">Optional season note</label>
+              <input id="seasonHint" type="text" placeholder="Example: 2025-2026 or 25-26" />
+            </div>
+
+            <div class="field-group">
+              <label>Spreadsheet file</label>
+              <div id="fileDropzone" class="file-dropzone">
+                <div class="dropzone-icon">📄</div>
+                <div class="dropzone-title">Drop Excel or CSV here</div>
+                <div class="dropzone-subtitle">Accepted: .xlsx, .xls, .csv</div>
+                <input id="spreadsheetInput" type="file" accept=".xlsx,.xls,.csv" class="hidden" />
+              </div>
+            </div>
+
+            <div id="selectedFile" class="selected-file"></div>
+
+            <div class="help-note">
+              This upload mode is strongest for season-style spreadsheets with one player per row.
+              We will use the same review engine later for box score and historical modes too.
+            </div>
+
+            <div class="btn-row">
+              <button id="inspectBtn" class="portal-btn portal-btn-primary" disabled>Inspect Spreadsheet</button>
+              <button id="resetBtn" class="portal-btn portal-btn-secondary" type="button">Reset</button>
+            </div>
+
+            <div id="leftStatus" class="status-pill">Waiting for file</div>
+          </div>
+        </div>
+      </aside>
+<div class="portal-card" style="margin-bottom: 20px;">
+  <div class="portal-card-header">
+    <h2>Submission Lanes</h2>
+    <p>Mode 1 handles season spreadsheets. Mode 2 handles single-game box scores.</p>
+  </div>
+  <div class="portal-card-body">
+    <div class="btn-row" style="margin-top: 0;">
+      <button id="mode1Btn" class="portal-btn portal-btn-primary" type="button">Mode 1 — Spreadsheet Upload</button>
+      <button id="mode2Btn" class="portal-btn portal-btn-secondary" type="button">Mode 2 — Game Box Score</button>
+    </div>
+  </div>
+</div>
+
+<div id="mode1Panel">
+      <section class="review-layout">
+        <div id="reviewCard" class="portal-card hidden">
+          <div class="portal-card-header">
+            <h2>Review & Column Mapping</h2>
+            <p>Check what the parser recognized, resolve anything unclear, and build the final preview.</p>
+          </div>
+          <div class="portal-card-body">
+            <div class="review-meta-grid" id="reviewMetaGrid"></div>
+
+            <div class="confidence-bar-wrap" style="margin: 18px 0 20px;">
+              <div class="confidence-bar-label">
+                <span>Parse confidence</span>
+                <span id="confidenceLabel">0%</span>
+              </div>
+              <div class="confidence-bar">
+                <div id="confidenceBarFill" class="confidence-bar-fill"></div>
+              </div>
+            </div>
+
+            <div class="warnings-box" style="margin-bottom: 18px;">
+              <div class="section-head">
+                <h3>Warnings</h3>
+                <p>These do not always block submission, but they help catch bad data before it reaches admin review.</p>
+              </div>
+              <ul id="warningsList" class="warnings-list"></ul>
+            </div>
+
+            <div class="mapping-box" style="margin-bottom: 18px;">
+              <div class="section-head">
+                <h3>Column review</h3>
+                <p>Recognized columns are shown here too, so the AD and admin can see exactly how the file was interpreted.</p>
+              </div>
+              <div class="mapping-table-wrap">
+                <table class="mapping-table">
+                  <thead>
+                    <tr>
+                      <th>Uploaded column</th>
+                      <th>Status</th>
+                      <th>Suggested / mapped as</th>
+                      <th>Sample values</th>
+                    </tr>
+                  </thead>
+                  <tbody id="mappingTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="preview-box">
+              <div class="section-head">
+                <h3>Spreadsheet preview</h3>
+                <p>Showing the top rows so the AD can compare the dropdown mappings without leaving the page.</p>
+              </div>
+              <div class="sheet-table-wrap">
+                <table class="sheet-preview-table">
+                  <thead id="sheetPreviewHead"></thead>
+                  <tbody id="sheetPreviewBody"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="preview-actions">
+              <button id="buildPreviewBtn" class="portal-btn portal-btn-primary">Build Submission Preview</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="finalPreviewCard" class="portal-card hidden">
+          <div class="portal-card-header">
+            <h2>Final Submission Preview</h2>
+            <p>This is what will be sent to <code>game_submissions</code> as a pending upload.</p>
+          </div>
+          <div class="portal-card-body">
+            <div class="preview-summary" id="finalSummary"></div>
+
+            <div class="preview-box">
+              <div class="section-head">
+                <h3>Parsed player rows</h3>
+                <p>Quick check of the normalized player output.</p>
+              </div>
+              <div class="portal-card-body" style="padding-top: 18px;">
+                <div id="playerPreviewList" class="player-preview-list"></div>
+              </div>
+            </div>
+
+            <div class="preview-actions">
+              <button id="submitBtn" class="portal-btn portal-btn-success">Submit for Admin Review</button>
+              <button id="backToReviewBtn" class="portal-btn portal-btn-secondary" type="button">Back to review</button>
+            </div>
+          </div>
+        </div>
+</section>
+</div>
+
+<div id="mode2Panel" class="hidden">
+  <section class="portal-card">
+    <div class="portal-card-header">
+      <h2>Mode 2 — Single-Game Box Score</h2>
+      <p>Paste one game summary or box score below. This is built for same-night or next-day game submission.</p>
+    </div>
+    <div class="portal-card-body">
+      <div class="form-stack">
+        <div class="field-group">
+          <label for="boxSportSelection">Sport</label>
+          <select id="boxSportSelection">
+            <option value="">Select sport</option>
+            <option value="boys_basketball">Boys Basketball</option>
+            <option value="girls_basketball">Girls Basketball</option>
+            <option value="football">Football</option>
+            <option value="girls_volleyball">Girls Volleyball</option>
+            <option value="boys_soccer">Boys Soccer</option>
+            <option value="girls_soccer">Girls Soccer</option>
+            <option value="baseball">Baseball</option>
+            <option value="softball">Softball</option>
+          </select>
+        </div>
+
+        <div class="field-group">
+          <label for="boxScoreInput">Paste box score / game summary</label>
+          <textarea
+            id="boxScoreInput"
+            rows="14"
+            style="width: 100%; border: 1px solid #d7e0e8; border-radius: 14px; padding: 1rem; font-size: 0.98rem; line-height: 1.45; resize: vertical;"
+            placeholder="Example:
+
+Indiana School for the Deaf 58 - 52 Maryland School for the Deaf
+February 14, 2026
+at Indianapolis, IN
+
+Marcus Hill: 24 points, 8 rebounds, 5 assists, 2 steals
+Daniel Ortiz: 18 points, 6 rebounds, 3 assists
+Tyler Brooks: 11 points, 4 rebounds, 7 assists"
+          ></textarea>
+        </div>
+
+        <div class="btn-row">
+          <button id="parseBoxScoreBtn" class="portal-btn portal-btn-primary" type="button">Parse Box Score</button>
+        </div>
+
+        <div id="boxStatus" class="status-pill">Waiting for pasted box score</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="mode2PreviewCard" class="portal-card hidden" style="margin-top: 20px;">
+    <div class="portal-card-header">
+      <h2>Mode 2 Preview</h2>
+      <p>Review the detected game summary and player lines before sending it for admin review.</p>
+    </div>
+    <div class="portal-card-body">
+      <div id="mode2Summary" class="preview-summary"></div>
+
+      <div class="warnings-box" style="margin: 18px 0;">
+        <div class="section-head">
+          <h3>Warnings</h3>
+          <p>Anything unclear from the pasted text will show here.</p>
+        </div>
+        <ul id="mode2Warnings" class="warnings-list"></ul>
+      </div>
+
+      <div class="preview-box">
+        <div class="section-head">
+          <h3>Detected player lines</h3>
+          <p>Quick preview of parsed game stats.</p>
+        </div>
+        <div class="portal-card-body" style="padding-top: 18px;">
+          <div id="mode2Players" class="player-preview-list"></div>
         </div>
       </div>
+
+      <div class="preview-actions">
+        <button id="submitMode2Btn" class="portal-btn portal-btn-success" type="button">Submit Box Score</button>
+      </div>
+    </div>
+  </section>
+</div>
     </div>
   </main>
 
   <script src="../env.js"></script>
-  <script type="module" src="submit-game.js"></script>
+  <script type="module" src="./submit-game.js"></script>
 </body>
 </html>
