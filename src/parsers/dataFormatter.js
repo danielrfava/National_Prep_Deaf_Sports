@@ -277,9 +277,19 @@ export async function processAndSubmit(input, inputType, metadata) {
     console.warn('⚠️ Low confidence parse. Please review carefully.');
   }
 
-  // Step 2: Format for Supabase (Convert to JSON)
-  metadata.submissionMethod = inputType;
-  metadata.originalData = typeof input === 'string' ? input : JSON.stringify(input);
+// Step 2: Format for Supabase (Convert to JSON)
+
+// Do NOT overwrite submission method if already mapped
+if (!metadata.submissionMethod) {
+  const methodMap = {
+    text: 'text_paste',
+    csv: 'csv_upload',
+    manual: 'manual_form'
+  };
+  metadata.submissionMethod = methodMap[inputType];
+}
+
+metadata.originalData = typeof input === 'string' ? input : JSON.stringify(input);
   
   const formattedJSON = await formatForSupabase(parsedData, metadata);
 

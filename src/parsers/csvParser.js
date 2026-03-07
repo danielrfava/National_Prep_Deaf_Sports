@@ -23,7 +23,7 @@ export function parseCSV(csvContent) {
 
   try {
     // Parse CSV into rows
-    const rows = csvContent.trim().split('\n').map(row => {
+    const rows = csvContent.trim().split(/\r?\n/).map(row => {
       // Handle quoted fields with commas
       return parseCSVRow(row);
     });
@@ -155,35 +155,43 @@ function parsePlayerStatsCSV(rows, headers) {
 
     const player = {
       name: row[columnMap.name]?.trim(),
-      team: row[columnMap.team]?.trim(),
+      team: columnMap.team !== undefined ? row[columnMap.team]?.trim() : null,
       stats: {}
     };
 
-    // Extract all available stats
-    if (columnMap.points !== undefined) {
-      player.stats.points = parseInt(row[columnMap.points]) || 0;
-    }
-    if (columnMap.rebounds !== undefined) {
-      player.stats.rebounds = parseInt(row[columnMap.rebounds]) || 0;
-    }
-    if (columnMap.assists !== undefined) {
-      player.stats.assists = parseInt(row[columnMap.assists]) || 0;
-    }
-    if (columnMap.steals !== undefined) {
-      player.stats.steals = parseInt(row[columnMap.steals]) || 0;
-    }
-    if (columnMap.blocks !== undefined) {
-      player.stats.blocks = parseInt(row[columnMap.blocks]) || 0;
-    }
-    if (columnMap.three_pointers !== undefined) {
-      player.stats.three_pointers = parseInt(row[columnMap.three_pointers]) || 0;
-    }
-    if (columnMap.free_throws !== undefined) {
-      player.stats.free_throws = parseInt(row[columnMap.free_throws]) || 0;
-    }
-    if (columnMap.fg_pct !== undefined) {
-      player.stats.fg_percentage = parseFloat(row[columnMap.fg_pct]) || 0;
-    }
+// Extract all available stats (standardized stat codes)
+
+if (columnMap.points !== undefined) {
+  player.stats.PTS = parseInt(row[columnMap.points]) || 0;
+}
+
+if (columnMap.rebounds !== undefined) {
+  player.stats.REB = parseInt(row[columnMap.rebounds]) || 0;
+}
+
+if (columnMap.assists !== undefined) {
+  player.stats.AST = parseInt(row[columnMap.assists]) || 0;
+}
+
+if (columnMap.steals !== undefined) {
+  player.stats.STL = parseInt(row[columnMap.steals]) || 0;
+}
+
+if (columnMap.blocks !== undefined) {
+  player.stats.BLK = parseInt(row[columnMap.blocks]) || 0;
+}
+
+if (columnMap.three_pointers !== undefined) {
+  player.stats["3PT"] = parseInt(row[columnMap.three_pointers]) || 0;
+}
+
+if (columnMap.free_throws !== undefined) {
+  player.stats.FT = parseInt(row[columnMap.free_throws]) || 0;
+}
+
+if (columnMap.fg_pct !== undefined) {
+  player.stats["FG%"] = parseFloat(row[columnMap.fg_pct]) || 0;
+}
 
     if (player.name) {
       players.push(player);
@@ -267,14 +275,21 @@ export function validateCSVData(data) {
     errors.push('No player data found in CSV');
   }
 
-  data.players.forEach((player, index) => {
-    if (!player.name) {
-      errors.push(`Row ${index + 2}: Missing player name`);
-    }
-    if (!player.stats || Object.keys(player.stats).length === 0) {
-      errors.push(`Row ${index + 2}: No stats found for ${player.name}`);
-    }
-  });
+data.players.forEach((player, index) => {
+
+  if (!player.name) {
+    errors.push(`Row ${index + 2}: Missing player name`);
+  }
+
+  if (!player.team) {
+    errors.push(`Row ${index + 2}: Missing team`);
+  }
+
+  if (!player.stats || Object.keys(player.stats).length === 0) {
+    errors.push(`Row ${index + 2}: No stats found for ${player.name}`);
+  }
+
+});
 
   return {
     isValid: errors.length === 0,

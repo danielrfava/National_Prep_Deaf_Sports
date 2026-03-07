@@ -337,13 +337,19 @@ function setupPreview() {
       const originalData = previewSection.dataset.originalData;
 
       // Prepare metadata
-      const metadata = {
-        userId: currentUser.id,
-        schoolId: currentUser.school_id,
-        submissionMethod: method,   // 'text' | 'csv' | 'manual'
-        originalData: originalData,
-        source: 'athletic_director_portal'
-      };
+const methodMap = {
+  text: 'text_paste',
+  csv: 'csv_upload',
+  manual: 'manual_form'
+};
+
+const metadata = {
+  userId: currentUser.id,
+  schoolId: currentUser.school_id,
+  submissionMethod: methodMap[method],
+  originalData: originalData,
+  source: 'athletic_director_portal'
+};
 
       // Get the input data based on method
       let inputData;

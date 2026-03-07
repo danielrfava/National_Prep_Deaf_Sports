@@ -858,16 +858,23 @@ if (records && statsView === 'season') {
   rawRecords = records;
 }
 
-  let displayRecords = [...rawRecords];
+let displayRecords = [...rawRecords];
 
-  // 🔥 Consolidate multiple stat rows per season first
-    displayRecords = consolidateSeasonRows(displayRecords);
+// 🔥 Consolidate multiple stat rows per season first
+displayRecords = consolidateSeasonRows(displayRecords);
 
-    if (statsView === 'career-standard') {
-     displayRecords = aggregateCareerStats(displayRecords, 4);
-      } else if (statsView === 'career-extended') {
-     displayRecords = aggregateCareerStats(displayRecords, Infinity);
-     }
+// 🔥 Detect latest season in dataset (works for all views)
+const latestSeason = displayRecords
+  .map(r => r.season || "00-00")
+  .sort()
+  .pop();
+
+if (statsView === 'career-standard') {
+  displayRecords = aggregateCareerStats(displayRecords, 4);
+
+} else if (statsView === 'career-extended') {
+  displayRecords = aggregateCareerStats(displayRecords, Infinity);
+}
   // Determine which columns to hide based on filters
   const hideSchool = filters.schoolId && filters.schoolId !== '';
   const hideSport = filters.sport && filters.sport !== '';
@@ -1048,7 +1055,7 @@ const pageRecords = currentRecords.slice(start, end);
           </tr>
         </thead>
         <tbody>
-          ${renderTableRows(pageRecords, start, sportType, hideSchool, hideSport, columns)}
+          ${renderTableRows(pageRecords, start, sportType, hideSchool, hideSport, columns, latestSeason)}
         </tbody>
         </table>
          </div>
@@ -1129,11 +1136,12 @@ const pageRecords = currentRecords.slice(start, end);
   );
 }
 
-function renderTableRows(records, startIndex = 0, sportType = 'basketball', hideSchool = false, hideSport = false, columns = []) {
+function renderTableRows(records, startIndex = 0, sportType = 'basketball', hideSchool = false, hideSport = false, columns = [], latestSeason = "") {
   
   return records
     .map((record, index) => {
 let athleteName = record.stat_row?.["Athlete Name"] || "Unknown";
+const isActive = record.season === latestSeason;
 
 const isExtended =
   currentStatsView === 'career-extended' &&
@@ -1191,7 +1199,7 @@ const isExtended =
       }).join('');
 
       return `
-        <tr>
+        <tr class="${isActive ? 'active-player' : ''}">
           <td>${startIndex + index + 1}</td>
           <td class="athlete-name ${isExtended ? 'extended-player' : ''}">
   ${athleteName}

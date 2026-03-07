@@ -663,6 +663,10 @@ body {
   font-weight: 600;
   color: var(--accent);
 }
+/* Active players (latest season) */
+.stats-table tr.active-player td {
+  font-weight: 700;
+}
 
 .stats-table td:first-child {
   color: var(--muted);
