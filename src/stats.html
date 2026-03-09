@@ -3,48 +3,32 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>National Prep Deaf Sports - Statistics</title>
-    <link rel="stylesheet" href="styles.css" />
+    <title>National Prep Deaf Sports - Research</title>
+    <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
     <header class="topbar">
       <div class="topbar-container">
-        <div class="brand">
-          <div class="logo" aria-label="Logo">NP</div>
+        <a class="brand" href="index.html" aria-label="National Prep Deaf Sports home">
+          <div class="logo">NP</div>
           <div class="brand-text">
             <div class="brand-title">National Prep Deaf Sports</div>
             <div class="brand-tag">Deaf High School Athletics</div>
           </div>
-        </div>
+        </a>
+
         <nav class="nav" aria-label="Primary">
-          <a class="nav-link" href="index.html">Home</a>
-          <div class="sports-wrap">
-            <details id="sportsMenu" class="sports-details">
-              <summary class="nav-link summary">Sports <span class="caret">&#9662;</span></summary>
-              <div class="mega-menu" role="menu" aria-label="Sports menu">
-                <div id="sportsMenuGrid" class="grid"></div>
-                <div class="menu-footnote">Phase labels shown where applicable.</div>
-              </div>
-            </details>
-          </div>
-          <a class="nav-link" href="deaflympics.html">Deaflympics</a>
-          <a class="nav-link" href="tournaments.html">Tournaments</a>
+          <a class="nav-link" href="index.html">Search</a>
           <a class="nav-link" href="schools.html">Schools</a>
+          <a class="nav-link nav-link-active" href="stats.html">Research</a>
           <a class="nav-link" href="about.html">About</a>
         </nav>
+
         <div class="search-auth-group">
-          <div class="search">
-            <label class="sr-only" for="athleteFilter">Search players, teams, or sports</label>
-            <input id="athleteFilter" type="search" placeholder="Search players, teams, or sports" autocomplete="off" />
-          </div>
           <a href="portal/login.html" class="login-btn" title="Athletic Director / Admin Login">
             <span class="login-icon">👤</span>
-            <span class="login-text">Login</span>
+            <span class="login-text">Log In</span>
           </a>
-        </div>
-      </div>
-    </header>
-          </div>
         </div>
       </div>
     </header>
@@ -62,6 +46,11 @@
         <section class="filters" aria-label="Filters">
           <div class="filter-grid">
             <div class="filter-field">
+              <label for="athleteFilter">Search</label>
+              <input id="athleteFilter" type="search" placeholder="Search athlete name" autocomplete="off" />
+            </div>
+
+            <div class="filter-field">
               <label for="divisionFilter">Division</label>
               <select id="divisionFilter">
                 <option value="">All</option>
@@ -69,18 +58,21 @@
                 <option value="d2">Division 2</option>
               </select>
             </div>
+
             <div class="filter-field">
               <label for="schoolFilter">School</label>
               <select id="schoolFilter">
                 <option value="">All schools</option>
               </select>
             </div>
+
             <div class="filter-field">
               <label for="sportFilter">Sport</label>
               <select id="sportFilter">
                 <option value="">All sports</option>
               </select>
             </div>
+
             <div class="filter-field" id="footballVariantFilterField" style="display: none;">
               <label for="footballVariantFilter">Football Type</label>
               <select id="footballVariantFilter">
@@ -89,6 +81,7 @@
                 <option value="11-man">11-Man</option>
               </select>
             </div>
+
             <div class="filter-field">
               <label for="statsViewFilter">Stats View</label>
               <select id="statsViewFilter">
@@ -98,8 +91,7 @@
               </select>
             </div>
           </div>
-            </div>
-          </div>
+
           <p id="status" class="status" aria-live="polite"></p>
         </section>
 
@@ -123,8 +115,6 @@
         </section>
       </section>
     </main>
-
-    <!-- Footer intentionally left blank -->
 
     <script src="./env.js"></script>
     <script type="module" src="./supabaseClient.js"></script>
