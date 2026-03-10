@@ -850,3 +850,299 @@ Tyler Brooks: 11 points, 4 rebounds, 7 assists"
   <script type="module" src="./submit-game.js"></script>
 </body>
 </html>
+
+ (cd "$(git rev-parse --show-toplevel)" && git apply --3way <<'EOF' 
+diff --git a/src/portal/submit-game.html b/src/portal/submit-game.html
+index 0362034f8b1cf9a303111606adab3c9bdaca969a..61fc7d40ba0413f8a1a6cf34b6ce64e288574fd0 100644
+--- a/src/portal/submit-game.html
++++ b/src/portal/submit-game.html
+@@ -550,52 +550,52 @@
+       <div class="brand">
+         <div class="logo">NP</div>
+         <div class="brand-text">
+           <div class="brand-title">National Prep Deaf Sports</div>
+           <div class="brand-tag">Athletic Director Portal</div>
+         </div>
+       </div>
+       <nav class="nav">
+         <a class="nav-link" href="dashboard.html">← Back to Dashboard</a>
+       </nav>
+     </div>
+   </header>
+ 
+   <main class="portal-shell">
+     <div class="portal-page-header">
+       <h1>Upload Spreadsheet</h1>
+       <p>
+         Drop in your team spreadsheet and NPDS will inspect the columns, flag anything unclear,
+         and let you confirm the correct stat matches before submission.
+       </p>
+     </div>
+ 
+     <div class="portal-grid">
+       <aside class="portal-card">
+         <div class="portal-card-header">
+-          <h2>Mode 1 Workflow</h2>
+-          <p>This version is built for spreadsheet uploads first. Box scores and historical entry can plug into the same review pipeline later.</p>
++          <h2>Mode 1 Workflow (Primary Lane)</h2>
++          <p>Locked as the cleanest path for historical and season uploads: spreadsheet in, mapping confirmation, preview, submit.</p>
+         </div>
+         <div class="portal-card-body">
+           <div class="step-list">
+             <div class="step-item">
+               <div class="step-number">1</div>
+               <div>
+                 <strong>Choose sport</strong>
+                 <span>Select the sport label once so the parser knows what stat dictionary to use.</span>
+               </div>
+             </div>
+             <div class="step-item">
+               <div class="step-number">2</div>
+               <div>
+                 <strong>Upload spreadsheet</strong>
+                 <span>Supports Excel and CSV. AD never has to think about file format.</span>
+               </div>
+             </div>
+             <div class="step-item">
+               <div class="step-number">3</div>
+               <div>
+                 <strong>Confirm unclear columns</strong>
+                 <span>If the parser is unsure, dropdowns appear with suggestions and sample values.</span>
+               </div>
+             </div>
+             <div class="step-item">
+@@ -635,56 +635,56 @@
+                 <div class="dropzone-title">Drop Excel or CSV here</div>
+                 <div class="dropzone-subtitle">Accepted: .xlsx, .xls, .csv</div>
+                 <input id="spreadsheetInput" type="file" accept=".xlsx,.xls,.csv" class="hidden" />
+               </div>
+             </div>
+ 
+             <div id="selectedFile" class="selected-file"></div>
+ 
+             <div class="help-note">
+               This upload mode is strongest for season-style spreadsheets with one player per row.
+               We will use the same review engine later for box score and historical modes too.
+             </div>
+ 
+             <div class="btn-row">
+               <button id="inspectBtn" class="portal-btn portal-btn-primary" disabled>Inspect Spreadsheet</button>
+               <button id="resetBtn" class="portal-btn portal-btn-secondary" type="button">Reset</button>
+             </div>
+ 
+             <div id="leftStatus" class="status-pill">Waiting for file</div>
+           </div>
+         </div>
+       </aside>
+ <div class="portal-card" style="margin-bottom: 20px;">
+   <div class="portal-card-header">
+     <h2>Submission Lanes</h2>
+-    <p>Mode 1 handles season spreadsheets. Mode 2 handles single-game box scores.</p>
++    <p>Mode 1 handles historical/season spreadsheets. Mode 2 supports both box score text and export files (MaxPreps/GameChanger/Hudl).</p>
+   </div>
+   <div class="portal-card-body">
+     <div class="btn-row" style="margin-top: 0;">
+       <button id="mode1Btn" class="portal-btn portal-btn-primary" type="button">Mode 1 — Spreadsheet Upload</button>
+-      <button id="mode2Btn" class="portal-btn portal-btn-secondary" type="button">Mode 2 — Game Box Score</button>
++      <button id="mode2Btn" class="portal-btn portal-btn-secondary" type="button">Mode 2 — Flexible Upload</button>
+     </div>
+   </div>
+ </div>
+ 
+ <div id="mode1Panel">
+       <section class="review-layout">
+         <div id="reviewCard" class="portal-card hidden">
+           <div class="portal-card-header">
+             <h2>Review & Column Mapping</h2>
+             <p>Check what the parser recognized, resolve anything unclear, and build the final preview.</p>
+           </div>
+           <div class="portal-card-body">
+             <div class="review-meta-grid" id="reviewMetaGrid"></div>
+ 
+             <div class="confidence-bar-wrap" style="margin: 18px 0 20px;">
+               <div class="confidence-bar-label">
+                 <span>Parse confidence</span>
+                 <span id="confidenceLabel">0%</span>
+               </div>
+               <div class="confidence-bar">
+                 <div id="confidenceBarFill" class="confidence-bar-fill"></div>
+               </div>
+             </div>
+ 
+             <div class="warnings-box" style="margin-bottom: 18px;">
+@@ -742,111 +742,153 @@
+           <div class="portal-card-body">
+             <div class="preview-summary" id="finalSummary"></div>
+ 
+             <div class="preview-box">
+               <div class="section-head">
+                 <h3>Parsed player rows</h3>
+                 <p>Quick check of the normalized player output.</p>
+               </div>
+               <div class="portal-card-body" style="padding-top: 18px;">
+                 <div id="playerPreviewList" class="player-preview-list"></div>
+               </div>
+             </div>
+ 
+             <div class="preview-actions">
+               <button id="submitBtn" class="portal-btn portal-btn-success">Submit for Admin Review</button>
+               <button id="backToReviewBtn" class="portal-btn portal-btn-secondary" type="button">Back to review</button>
+             </div>
+           </div>
+         </div>
+ </section>
+ </div>
+ 
+ <div id="mode2Panel" class="hidden">
+   <section class="portal-card">
+     <div class="portal-card-header">
+-      <h2>Mode 2 — Single-Game Box Score</h2>
+-      <p>Paste one game summary or box score below. This is built for same-night or next-day game submission.</p>
++      <h2>Mode 2 — Flexible Upload</h2>
++      <p>Use this lane for either a single-game box score or end-of-year export files from MaxPreps, GameChanger, or Hudl.</p>
+     </div>
+     <div class="portal-card-body">
+       <div class="form-stack">
+         <div class="field-group">
+           <label for="boxSportSelection">Sport</label>
+           <select id="boxSportSelection">
+             <option value="">Select sport</option>
+             <option value="boys_basketball">Boys Basketball</option>
+             <option value="girls_basketball">Girls Basketball</option>
+             <option value="football">Football</option>
+             <option value="girls_volleyball">Girls Volleyball</option>
+             <option value="boys_soccer">Boys Soccer</option>
+             <option value="girls_soccer">Girls Soccer</option>
+             <option value="baseball">Baseball</option>
+             <option value="softball">Softball</option>
+           </select>
+         </div>
+ 
+         <div class="field-group">
+-          <label for="boxScoreInput">Paste box score / game summary</label>
+-          <textarea
+-            id="boxScoreInput"
+-            rows="14"
+-            style="width: 100%; border: 1px solid #d7e0e8; border-radius: 14px; padding: 1rem; font-size: 0.98rem; line-height: 1.45; resize: vertical;"
+-            placeholder="Example:
++          <label for="mode2SourceSelection">Source</label>
++          <select id="mode2SourceSelection">
++            <option value="maxpreps">MaxPreps Export</option>
++            <option value="gamechanger">GameChanger Export</option>
++            <option value="hudl">Hudl Export</option>
++            <option value="other">Other</option>
++          </select>
++        </div>
++
++        <div class="field-group">
++          <label for="mode2LaneSelection">Mode 2 upload type</label>
++          <select id="mode2LaneSelection">
++            <option value="boxscore_text">Single-Game Box Score (paste text)</option>
++            <option value="season_export">End-of-Year / Season Export (file upload)</option>
++          </select>
++        </div>
++
++        <div id="mode2TextLane" class="form-stack">
++          <div class="field-group">
++            <label for="boxScoreInput">Paste box score / game summary</label>
++            <textarea
++              id="boxScoreInput"
++              rows="12"
++              style="width: 100%; border: 1px solid #d7e0e8; border-radius: 14px; padding: 1rem; font-size: 0.98rem; line-height: 1.45; resize: vertical;"
++              placeholder="Example:
+ 
+ Indiana School for the Deaf 58 - 52 Maryland School for the Deaf
+ February 14, 2026
+ at Indianapolis, IN
+ 
+ Marcus Hill: 24 points, 8 rebounds, 5 assists, 2 steals
+-Daniel Ortiz: 18 points, 6 rebounds, 3 assists
+-Tyler Brooks: 11 points, 4 rebounds, 7 assists"
+-          ></textarea>
++Daniel Ortiz: 18 points, 6 rebounds, 3 assists"
++            ></textarea>
++          </div>
++
++          <div class="btn-row">
++            <button id="parseBoxScoreBtn" class="portal-btn portal-btn-primary" type="button">Parse Box Score</button>
++          </div>
+         </div>
+ 
+-        <div class="btn-row">
+-          <button id="parseBoxScoreBtn" class="portal-btn portal-btn-primary" type="button">Parse Box Score</button>
++        <div id="mode2FileLane" class="form-stack hidden">
++          <div class="field-group">
++            <label for="mode2SeasonHint">Optional season note</label>
++            <input id="mode2SeasonHint" type="text" placeholder="Example: 2025-2026" />
++          </div>
++
++          <div class="field-group">
++            <label>Export file</label>
++            <div id="mode2FileDropzone" class="file-dropzone">
++              <div class="dropzone-icon">📥</div>
++              <div class="dropzone-title">Drop export file here</div>
++              <div class="dropzone-subtitle">Accepted: .xlsx, .xls, .csv</div>
++              <input id="mode2FileInput" type="file" accept=".xlsx,.xls,.csv" class="hidden" />
++            </div>
++          </div>
++
++          <div id="mode2SelectedFile" class="selected-file"></div>
++
++          <div class="btn-row">
++            <button id="processMode2FileBtn" class="portal-btn portal-btn-primary" type="button">Process Export File</button>
++          </div>
+         </div>
+ 
+-        <div id="boxStatus" class="status-pill">Waiting for pasted box score</div>
++        <div id="boxStatus" class="status-pill">Waiting for Mode 2 input</div>
+       </div>
+     </div>
+   </section>
+ 
+   <section id="mode2PreviewCard" class="portal-card hidden" style="margin-top: 20px;">
+     <div class="portal-card-header">
+       <h2>Mode 2 Preview</h2>
+-      <p>Review the detected game summary and player lines before sending it for admin review.</p>
++      <p>Review parsed output before sending for admin review.</p>
+     </div>
+     <div class="portal-card-body">
+       <div id="mode2Summary" class="preview-summary"></div>
+ 
+       <div class="warnings-box" style="margin: 18px 0;">
+         <div class="section-head">
+           <h3>Warnings</h3>
+-          <p>Anything unclear from the pasted text will show here.</p>
++          <p>Anything unclear from parsing will show here.</p>
+         </div>
+         <ul id="mode2Warnings" class="warnings-list"></ul>
+       </div>
+ 
+       <div class="preview-box">
+         <div class="section-head">
+           <h3>Detected player lines</h3>
+-          <p>Quick preview of parsed game stats.</p>
++          <p>Quick preview of parsed stats.</p>
+         </div>
+         <div class="portal-card-body" style="padding-top: 18px;">
+           <div id="mode2Players" class="player-preview-list"></div>
+         </div>
+       </div>
+ 
+       <div class="preview-actions">
+-        <button id="submitMode2Btn" class="portal-btn portal-btn-success" type="button">Submit Box Score</button>
++        <button id="submitMode2Btn" class="portal-btn portal-btn-success" type="button">Submit Mode 2 Upload</button>
+       </div>
+     </div>
+   </section>
+ </div>
+     </div>
+   </main>
+ 
+   <script src="../env.js"></script>
+   <script type="module" src="./submit-game.js"></script>
+ </body>
+ </html>
+\ No newline at end of file
+ 
+EOF
+)

@@ -391,3 +391,68 @@ const { data, error } = await supabaseClient
 ```
 
 All three parsers output the same JSON format, making it easy to maintain and extend!
+diff --git a/GAME_SUBMISSION_SETUP.md b/GAME_SUBMISSION_SETUP.md
+index f9b48a23654ebd525aaf9fc9ce598e8be5ac0331..f703e77594d6bfc434ec89f7971eb02d8a56442e 100644
+--- a/GAME_SUBMISSION_SETUP.md
++++ b/GAME_SUBMISSION_SETUP.md
+@@ -329,50 +329,60 @@ ORDER BY created_at DESC;
+ ```
+ 
+ ### Check Recent Approvals
+ ```sql
+ SELECT * FROM games
+ WHERE created_at >= CURRENT_DATE
+ ORDER BY created_at DESC;
+ ```
+ 
+ ### User Activity
+ ```sql
+ SELECT 
+   u.full_name,
+   u.school_name,
+   COUNT(*) as submissions
+ FROM game_submissions s
+ JOIN user_profiles u ON s.submitted_by = u.id
+ GROUP BY u.id, u.full_name, u.school_name
+ ORDER BY submissions DESC;
+ ```
+ 
+ ---
+ 
+ ## 🚀 Next Steps
+ 
++## 🔧 Approval Pipeline Upgrade (Required)
++
++To ensure approved submissions power the public Research experience, run:
++
++`submission-approval-raw-stat-rows-migration.sql`
++
++This updates `approve_game_submission(...)` so approval writes parsed player rows into
++`raw_stat_rows` while still updating `game_submissions` status, and only inserts into
++`games` when game-level scores are present (avoids NOT NULL errors for season-sheet submissions). It is also compatible with projects that do not yet have a `sport_variant` column.
++
+ ### Phase 1 (Now)
+ ✅ Database schema created
+ ✅ Parsers built (text, CSV, manual)
+ ✅ AD portal created
+ ✅ Admin panel created
+ ✅ Login button added
+ ✅ Mobile responsive
+ 
+ ### Phase 2 (Optional)
+ - [ ] Email notifications
+ - [ ] Bulk operations (approve multiple)
+ - [ ] Edit submitted games
+ - [ ] School statistics dashboard
+ - [ ] Export reports (PDF/Excel)
+ 
+ ### Phase 3 (Future)
+ - [ ] Camera + OCR for paper scorebooks
+ - [ ] Real-time game updates
+ - [ ] Mobile app
+ - [ ] API for external systems
+ 
+ ---
+ 
+ ## 📞 Need Help?
+ 

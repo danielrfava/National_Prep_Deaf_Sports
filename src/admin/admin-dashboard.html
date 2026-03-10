@@ -631,3 +631,369 @@
   </script>
 </body>
 </html>
+
+diff --git a/src/admin/admin-dashboard.html b/src/admin/admin-dashboard.html
+index 0c87b9b77b04f16ac4df98b721508d76bcfcb4e3..8640960ff1a89d559743bcdc68be8c0e88de6140 100644
+--- a/src/admin/admin-dashboard.html
++++ b/src/admin/admin-dashboard.html
+@@ -60,81 +60,115 @@
+ 
+     .review-header {
+       display: flex;
+       justify-content: space-between;
+       align-items: start;
+       margin-bottom: 20px;
+       padding-bottom: 16px;
+       border-bottom: 2px solid #f7fafc;
+     }
+ 
+     .review-title {
+       font-size: 20px;
+       font-weight: 600;
+       color: #2d3748;
+       margin-bottom: 8px;
+     }
+ 
+     .review-meta {
+       display: flex;
+       gap: 16px;
+       font-size: 14px;
+       color: #718096;
+       flex-wrap: wrap;
+     }
+ 
++    .scope-badge {
++      display: inline-flex;
++      align-items: center;
++      padding: 4px 10px;
++      border-radius: 999px;
++      font-size: 12px;
++      font-weight: 700;
++      background: #ebf8ff;
++      color: #2b6cb0;
++      margin-top: 8px;
++      text-transform: uppercase;
++      letter-spacing: 0.03em;
++    }
++
+     .game-details {
+       background: #f7fafc;
+       border-radius: 8px;
+       padding: 20px;
+       margin-bottom: 20px;
+     }
+ 
+     .detail-row {
+       display: flex;
+       justify-content: space-between;
+       padding: 8px 0;
+       border-bottom: 1px solid #e2e8f0;
+     }
+ 
+     .detail-row:last-child {
+       border-bottom: none;
+     }
+ 
+     .detail-label {
+       font-weight: 600;
+       color: #4a5568;
+     }
+ 
+     .detail-value {
+       color: #2d3748;
+     }
+ 
+     .players-section {
+       margin-top: 20px;
+     }
+ 
++    .parse-review {
++      margin-top: 16px;
++      background: #edf2f7;
++      border-radius: 8px;
++      padding: 16px;
++    }
++
++    .parse-review h4 {
++      margin: 0 0 10px;
++      color: #2d3748;
++      font-size: 15px;
++    }
++
++    .warning-list {
++      margin-top: 8px;
++      padding-left: 18px;
++      color: #975a16;
++      font-size: 13px;
++    }
++
+     .players-section h4 {
+       font-size: 16px;
+       color: #2d3748;
+       margin-bottom: 12px;
+     }
+ 
+     .player-list {
+       max-height: 200px;
+       overflow-y: auto;
+       background: #f7fafc;
+       border-radius: 6px;
+       padding: 12px;
+     }
+ 
+     .player-row {
+       display: flex;
+       justify-content: space-between;
+       padding: 8px;
+       border-bottom: 1px solid #e2e8f0;
+       font-size: 14px;
+     }
+ 
+     .player-row:last-child {
+       border-bottom: none;
+     }
+@@ -451,120 +485,204 @@
+ 
+         container.innerHTML = submissions.map(sub => renderReviewCard(sub)).join('');
+ 
+         // Add event listeners to buttons
+         submissions.forEach(sub => {
+           document.getElementById(`approve-${sub.id}`)?.addEventListener('click', () => handleApprove(sub.id));
+           document.getElementById(`reject-${sub.id}`)?.addEventListener('click', () => openRejectModal(sub.id));
+         });
+ 
+       } catch (error) {
+         console.error('Error loading submissions:', error);
+         container.innerHTML = `
+           <div class="empty-state">
+             <div class="empty-icon">⚠️</div>
+             <p>Error loading submissions. Please refresh the page.</p>
+           </div>
+         `;
+       }
+     }
+ 
+     function renderReviewCard(submission) {
+       const submitter = submission.user_profiles || {};
+       const gameData = submission.game_data || {};
+       const game = gameData.game || {};
+       const players = gameData.players || [];
++      const parseReview = gameData.parse_review || {};
++      const submissionScope = gameData.submission_scope || 'game_submission';
++      const confidence = parseReview.confidence ?? 'N/A';
++      const warnings = parseReview.warnings || [];
+       
+       const submittedDate = new Date(submission.created_at).toLocaleString();
+       const gameDate = submission.game_date ? new Date(submission.game_date).toLocaleDateString() : 'N/A';
++      const reviewTitle = buildSubmissionTitle(submissionScope, submission, game, parseReview);
++      const detailRows = buildDetailRows(submissionScope, submission, game, parseReview, players);
++      const parseReviewBlock = renderParseReview(submissionScope, parseReview, confidence, warnings);
++      const playerSection = renderPlayersSection(submissionScope, players);
+ 
+       return `
+         <div class="review-card">
+           <div class="review-header">
+             <div>
+-              <div class="review-title">
+-                ${submission.sport || 'Game'} - ${game.home_team?.name || 'Home'} vs ${game.away_team?.name || 'Away'}
+-              </div>
++              <div class="review-title">${reviewTitle}</div>
++              <div class="scope-badge">${formatScopeLabel(submissionScope)}</div>
+               <div class="review-meta">
+                 <span>👤 ${submitter.full_name || 'Unknown'} (${submitter.school_name || 'Unknown School'})</span>
++                <span>🏫 Submitter School ID: ${submission.submitter_school_id || 'N/A'}</span>
+                 <span>📅 Game: ${gameDate}</span>
+                 <span>⏰ Submitted: ${submittedDate}</span>
+               </div>
+             </div>
+           </div>
+ 
+-          <div class="game-details">
+-            <div class="detail-row">
+-              <span class="detail-label">Sport:</span>
+-              <span class="detail-value">${submission.sport || 'N/A'} (${submission.gender || 'N/A'})</span>
+-            </div>
+-            <div class="detail-row">
+-              <span class="detail-label">Teams:</span>
+-              <span class="detail-value">${game.home_team?.name || submission.home_team_id || 'Home'} vs ${game.away_team?.name || submission.away_team_id || 'Away'}</span>
+-            </div>
+-            <div class="detail-row">
+-              <span class="detail-label">Final Score:</span>
+-              <span class="detail-value">${game.home_team?.score || submission.home_score || '?'} - ${game.away_team?.score || submission.away_score || '?'}</span>
+-            </div>
+-            <div class="detail-row">
+-              <span class="detail-label">Location:</span>
+-              <span class="detail-value">${submission.location || 'N/A'}</span>
+-            </div>
+-            <div class="detail-row">
+-              <span class="detail-label">Submission Method:</span>
+-              <span class="detail-value">${submission.submission_method?.replace('_', ' ') || 'Manual'}</span>
+-            </div>
+-          </div>
++          <div class="game-details">${detailRows}</div>
+ 
+-          ${players.length > 0 ? `
+-            <div class="players-section">
+-              <h4>Player Statistics (${players.length} players)</h4>
+-              <div class="player-list">
+-                ${players.map(p => `
+-                  <div class="player-row">
+-                    <span class="player-name">${p.name}</span>
+-                    <span class="player-stats">${formatStats(p.stats)}</span>
+-                  </div>
+-                `).join('')}
+-              </div>
+-            </div>
+-          ` : `
+-            <p style="color: #a0aec0; font-style: italic;">No player stats included</p>
+-          `}
++          ${parseReviewBlock}
++
++          ${playerSection}
+ 
+           <div class="action-buttons">
+             <button id="approve-${submission.id}" class="btn btn-approve">
+               ✓ Approve & Publish
+             </button>
+             <button id="reject-${submission.id}" class="btn btn-reject">
+               ✗ Reject
+             </button>
+           </div>
+         </div>
+       `;
+     }
+ 
++    function formatScopeLabel(submissionScope) {
++      return String(submissionScope || 'game_submission').replaceAll('_', ' ');
++    }
++
++    function buildSubmissionTitle(submissionScope, submission, game, parseReview) {
++      if (submissionScope === 'season_sheet') {
++        const seasons = parseReview.detected_seasons || [];
++        return `${submission.sport || 'Sport'} Season Sheet (${seasons.join(', ') || 'Season not detected'})`;
++      }
++
++      return `${submission.sport || 'Game'} - ${game.home_team?.name || 'Home'} vs ${game.away_team?.name || 'Away'}`;
++    }
++
++    function buildDetailRows(submissionScope, submission, game, parseReview, players) {
++      const commonRows = `
++        <div class="detail-row">
++          <span class="detail-label">Sport:</span>
++          <span class="detail-value">${submission.sport || 'N/A'} (${submission.gender || 'N/A'})</span>
++        </div>
++        <div class="detail-row">
++          <span class="detail-label">Submission Method:</span>
++          <span class="detail-value">${submission.submission_method?.replace('_', ' ') || 'Manual'}</span>
++        </div>
++      `;
++
++      if (submissionScope === 'season_sheet') {
++        return `
++          ${commonRows}
++          <div class="detail-row">
++            <span class="detail-label">Spreadsheet File:</span>
++            <span class="detail-value">${parseReview.file_name || submission.original_data || 'N/A'}</span>
++          </div>
++          <div class="detail-row">
++            <span class="detail-label">Detected Seasons:</span>
++            <span class="detail-value">${(parseReview.detected_seasons || []).join(', ') || 'Not detected'}</span>
++          </div>
++          <div class="detail-row">
++            <span class="detail-label">Players Parsed:</span>
++            <span class="detail-value">${players.length}</span>
++          </div>
++        `;
++      }
++
++      return `
++        ${commonRows}
++        <div class="detail-row">
++          <span class="detail-label">Teams:</span>
++          <span class="detail-value">${game.home_team?.name || submission.home_team_id || 'Home'} vs ${game.away_team?.name || submission.away_team_id || 'Away'}</span>
++        </div>
++        <div class="detail-row">
++          <span class="detail-label">Final Score:</span>
++          <span class="detail-value">${game.home_team?.score || submission.home_score || '?'} - ${game.away_team?.score || submission.away_score || '?'}</span>
++        </div>
++        <div class="detail-row">
++          <span class="detail-label">Location:</span>
++          <span class="detail-value">${submission.location || 'N/A'}</span>
++        </div>
++      `;
++    }
++
++    function renderPlayersSection(submissionScope, players) {
++      if (players.length === 0) {
++        return '<p style="color: #a0aec0; font-style: italic;">No player stats included</p>';
++      }
++
++      const title = submissionScope === 'season_sheet'
++        ? `Parsed Player Rows (${players.length} rows)`
++        : `Player Statistics (${players.length} players)`;
++
++      return `
++        <div class="players-section">
++          <h4>${title}</h4>
++          <div class="player-list">
++            ${players.slice(0, 40).map(p => `
++              <div class="player-row">
++                <span class="player-name">${p.name}</span>
++                <span class="player-stats">${formatStats(p.stats)}</span>
++              </div>
++            `).join('')}
++          </div>
++        </div>
++      `;
++    }
++
++    function renderParseReview(submissionScope, parseReview, confidence, warnings) {
++      if (!parseReview || Object.keys(parseReview).length === 0) {
++        return '';
++      }
++
++      return `
++        <div class="parse-review">
++          <h4>Parse Review (${formatScopeLabel(submissionScope)})</h4>
++          <div class="detail-row">
++            <span class="detail-label">Confidence:</span>
++            <span class="detail-value">${confidence}${confidence !== 'N/A' ? '%' : ''}</span>
++          </div>
++          <div class="detail-row">
++            <span class="detail-label">Preview Rows:</span>
++            <span class="detail-value">${(parseReview.preview_rows || []).length}</span>
++          </div>
++          ${warnings.length ? `
++            <ul class="warning-list">
++              ${warnings.map(w => `<li>${w}</li>`).join('')}
++            </ul>
++          ` : ''}
++        </div>
++      `;
++    }
++
+     function formatStats(stats) {
+       if (!stats) return 'No stats';
+       return Object.entries(stats)
+         .map(([key, val]) => `${key}: ${val}`)
+         .join(', ');
+     }
+ 
+     async function handleApprove(submissionId) {
+       if (!confirm('Approve this submission and publish to the public site?')) {
+         return;
+       }
+ 
+       const btn = document.getElementById(`approve-${submissionId}`);
+       const originalText = btn.textContent;
+       btn.textContent = '⏳ Approving...';
+       btn.disabled = true;
+ 
+       try {
+         // Call the approval function
+         const { data, error } = await supabase.rpc('approve_game_submission', {
+           submission_id: submissionId
+         });
+ 
+         if (error) throw error;
+ 
