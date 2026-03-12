@@ -633,3 +633,483 @@ function resolveMode2Sport(value) {
       return { sport: null, gender: null };
   }
 }
+
+ (cd "$(git rev-parse --show-toplevel)" && git apply --3way <<'EOF' 
+diff --git a/src/portal/submit-game.js b/src/portal/submit-game.js
+index 7d12a814cd159a1264ce30af70c8d13e6f29fc79..ccf319c3faedeb57e48e2761da45bf0a243d6a70 100644
+--- a/src/portal/submit-game.js
++++ b/src/portal/submit-game.js
+@@ -1,79 +1,90 @@
+ import { supabase } from "../supabaseClient.js";
+ import { inspectSpreadsheet, finalizeSpreadsheetParse } from "../parsers/spreadsheetParser.js";
+ import { formatForSupabase, submitToSupabase } from "../parsers/dataFormatter.js";
+ import { parseBoxScoreText } from "../parsers/boxScoreParser.js";
+ 
+ let currentUser = null;
+ let selectedFile = null;
+ let inspectionResult = null;
+ let finalizedData = null;
+ let mode2ParsedData = null;
++let mode2SelectedFile = null;
+ 
+ const sportSelection = document.getElementById("sportSelection");
+ const seasonHint = document.getElementById("seasonHint");
+ const fileDropzone = document.getElementById("fileDropzone");
+ const spreadsheetInput = document.getElementById("spreadsheetInput");
+ const selectedFileBox = document.getElementById("selectedFile");
+ const inspectBtn = document.getElementById("inspectBtn");
+ const resetBtn = document.getElementById("resetBtn");
+ const leftStatus = document.getElementById("leftStatus");
+ 
+ const reviewCard = document.getElementById("reviewCard");
+ const reviewMetaGrid = document.getElementById("reviewMetaGrid");
+ const confidenceLabel = document.getElementById("confidenceLabel");
+ const confidenceBarFill = document.getElementById("confidenceBarFill");
+ const warningsList = document.getElementById("warningsList");
+ const mappingTableBody = document.getElementById("mappingTableBody");
+ const sheetPreviewHead = document.getElementById("sheetPreviewHead");
+ const sheetPreviewBody = document.getElementById("sheetPreviewBody");
+ const buildPreviewBtn = document.getElementById("buildPreviewBtn");
+ 
+ const finalPreviewCard = document.getElementById("finalPreviewCard");
+ const finalSummary = document.getElementById("finalSummary");
+ const playerPreviewList = document.getElementById("playerPreviewList");
+ const submitBtn = document.getElementById("submitBtn");
+ const backToReviewBtn = document.getElementById("backToReviewBtn");
+ 
+ const mode1Btn = document.getElementById("mode1Btn");
+ const mode2Btn = document.getElementById("mode2Btn");
+ const mode1Panel = document.getElementById("mode1Panel");
+ const mode2Panel = document.getElementById("mode2Panel");
+ 
+ const boxSportSelection = document.getElementById("boxSportSelection");
++const mode2SourceSelection = document.getElementById("mode2SourceSelection");
++const mode2LaneSelection = document.getElementById("mode2LaneSelection");
++const mode2TextLane = document.getElementById("mode2TextLane");
++const mode2FileLane = document.getElementById("mode2FileLane");
+ const boxScoreInput = document.getElementById("boxScoreInput");
+ const parseBoxScoreBtn = document.getElementById("parseBoxScoreBtn");
++const mode2SeasonHint = document.getElementById("mode2SeasonHint");
++const mode2FileDropzone = document.getElementById("mode2FileDropzone");
++const mode2FileInput = document.getElementById("mode2FileInput");
++const mode2SelectedFileBox = document.getElementById("mode2SelectedFile");
++const processMode2FileBtn = document.getElementById("processMode2FileBtn");
+ const boxStatus = document.getElementById("boxStatus");
+ const mode2PreviewCard = document.getElementById("mode2PreviewCard");
+ const mode2Summary = document.getElementById("mode2Summary");
+ const mode2Warnings = document.getElementById("mode2Warnings");
+ const mode2Players = document.getElementById("mode2Players");
+ const submitMode2Btn = document.getElementById("submitMode2Btn");
+ 
+ window.addEventListener("DOMContentLoaded", async () => {
+   await requireAuth();
+   setupFileUI();
++  setupMode2FileUI();
+   setupActions();
+   switchSubmitMode("mode1");
+ });
+ 
+ async function requireAuth() {
+   const { data: { session } } = await supabase.auth.getSession();
+ 
+   if (!session) {
+     window.location.href = "login.html";
+     return;
+   }
+ 
+   const { data: profile, error } = await supabase
+     .from("user_profiles")
+     .select("*")
+     .eq("id", session.user.id)
+     .single();
+ 
+   if (error || !profile) {
+     alert("Could not load your profile. Please sign in again.");
+     await supabase.auth.signOut();
+     window.location.href = "login.html";
+     return;
+   }
+ 
+@@ -105,54 +116,176 @@ function setupFileUI() {
+ 
+     const lower = file.name.toLowerCase();
+     if (!lower.endsWith(".xlsx") && !lower.endsWith(".xls") && !lower.endsWith(".csv")) {
+       alert("Please upload an Excel or CSV file.");
+       return;
+     }
+ 
+     selectedFile = file;
+     renderSelectedFile();
+     updateInspectState();
+   });
+ }
+ 
+ function setupActions() {
+   inspectBtn.addEventListener("click", handleInspect);
+   resetBtn.addEventListener("click", hardReset);
+   buildPreviewBtn.addEventListener("click", buildFinalPreview);
+   backToReviewBtn.addEventListener("click", () => {
+     finalPreviewCard.classList.add("hidden");
+     reviewCard.classList.remove("hidden");
+   });
+   submitBtn.addEventListener("click", submitSpreadsheet);
+ 
+   mode1Btn.addEventListener("click", () => switchSubmitMode("mode1"));
+   mode2Btn.addEventListener("click", () => switchSubmitMode("mode2"));
++  mode2LaneSelection.addEventListener("change", handleMode2LaneChange);
+   parseBoxScoreBtn.addEventListener("click", handleMode2Parse);
++  processMode2FileBtn.addEventListener("click", handleMode2FileProcess);
+   submitMode2Btn.addEventListener("click", submitMode2BoxScore);
+ }
+ 
++
++function setupMode2FileUI() {
++  mode2FileInput.addEventListener("change", onMode2FilePicked);
++
++  mode2FileDropzone.addEventListener("click", () => mode2FileInput.click());
++
++  mode2FileDropzone.addEventListener("dragover", (event) => {
++    event.preventDefault();
++    mode2FileDropzone.classList.add("dragover");
++  });
++
++  mode2FileDropzone.addEventListener("dragleave", () => {
++    mode2FileDropzone.classList.remove("dragover");
++  });
++
++  mode2FileDropzone.addEventListener("drop", (event) => {
++    event.preventDefault();
++    mode2FileDropzone.classList.remove("dragover");
++
++    const file = event.dataTransfer.files?.[0];
++    if (!file) return;
++
++    const lower = file.name.toLowerCase();
++    if (!lower.endsWith(".xlsx") && !lower.endsWith(".xls") && !lower.endsWith(".csv")) {
++      alert("Please upload an Excel or CSV export file.");
++      return;
++    }
++
++    mode2SelectedFile = file;
++    renderMode2SelectedFile();
++  });
++
++  handleMode2LaneChange();
++}
++
++function onMode2FilePicked(event) {
++  const file = event.target.files?.[0];
++  mode2SelectedFile = file || null;
++  renderMode2SelectedFile();
++}
++
++function renderMode2SelectedFile() {
++  if (!mode2SelectedFile) {
++    mode2SelectedFileBox.style.display = "none";
++    mode2SelectedFileBox.innerHTML = "";
++    return;
++  }
++
++  mode2SelectedFileBox.style.display = "block";
++  mode2SelectedFileBox.innerHTML = `
++    <strong>${mode2SelectedFile.name}</strong>
++    <span>${(mode2SelectedFile.size / 1024).toFixed(1)} KB • Ready to process</span>
++  `;
++}
++
++function handleMode2LaneChange() {
++  const lane = mode2LaneSelection.value;
++  const isTextLane = lane === "boxscore_text";
++
++  mode2TextLane.classList.toggle("hidden", !isTextLane);
++  mode2FileLane.classList.toggle("hidden", isTextLane);
++  mode2PreviewCard.classList.add("hidden");
++  mode2ParsedData = null;
++
++  boxStatus.textContent = isTextLane
++    ? "Waiting for pasted box score"
++    : "Waiting for export file";
++}
++
++async function handleMode2FileProcess() {
++  if (!boxSportSelection.value) {
++    alert("Select a sport first.");
++    return;
++  }
++
++  if (!mode2SelectedFile) {
++    alert("Upload an export file first.");
++    return;
++  }
++
++  processMode2FileBtn.disabled = true;
++  processMode2FileBtn.textContent = "Processing...";
++  boxStatus.textContent = "Inspecting export file...";
++
++  try {
++    const inspection = await inspectSpreadsheet(mode2SelectedFile, boxSportSelection.value);
++    const mappingSelections = Object.fromEntries(
++      inspection.mappings.map((m) => [m.originalHeader, m.mappedTo || m.suggested || ""])
++    );
++
++    const sportMeta = resolveMode2Sport(boxSportSelection.value);
++    mode2ParsedData = finalizeSpreadsheetParse(inspection, mappingSelections, {
++      sport: sportMeta.sport,
++      gender: sportMeta.gender,
++      seasonHint: mode2SeasonHint.value.trim(),
++      defaultSchoolId: currentUser.school_id || null,
++      defaultSchoolName: currentUser.school_name || null,
++    });
++
++    mode2ParsedData.submission_scope = "season_sheet";
++    mode2ParsedData.parse_review = {
++      ...(mode2ParsedData.parse_review || {}),
++      source_type: "file_export",
++      export_source: mode2SourceSelection.value,
++      file_name: mode2SelectedFile.name,
++    };
++
++    renderMode2Preview(mode2ParsedData);
++    mode2PreviewCard.classList.remove("hidden");
++    boxStatus.textContent = "Export processed. Review before submit.";
++  } catch (error) {
++    console.error(error);
++    alert(error.message || "Could not process export file.");
++    boxStatus.textContent = "Export processing failed.";
++  } finally {
++    processMode2FileBtn.disabled = false;
++    processMode2FileBtn.textContent = "Process Export File";
++  }
++}
++
+ function onFilePicked(event) {
+   const file = event.target.files?.[0];
+   selectedFile = file || null;
+   renderSelectedFile();
+   updateInspectState();
+ }
+ 
+ function renderSelectedFile() {
+   if (!selectedFile) {
+     selectedFileBox.style.display = "none";
+     selectedFileBox.innerHTML = "";
+     return;
+   }
+ 
+   selectedFileBox.style.display = "block";
+   selectedFileBox.innerHTML = `
+     <strong>${selectedFile.name}</strong>
+     <span>${(selectedFile.size / 1024).toFixed(1)} KB • Ready for inspection</span>
+   `;
+ }
+ 
+ function updateInspectState() {
+   inspectBtn.disabled = !(sportSelection.value && selectedFile);
+ }
+ 
+@@ -466,170 +599,187 @@ function switchSubmitMode(mode) {
+   mode2Panel.classList.toggle("hidden", isMode1);
+ 
+   mode1Btn.classList.toggle("portal-btn-primary", isMode1);
+   mode1Btn.classList.toggle("portal-btn-secondary", !isMode1);
+ 
+   mode2Btn.classList.toggle("portal-btn-primary", !isMode1);
+   mode2Btn.classList.toggle("portal-btn-secondary", isMode1);
+ }
+ 
+ function handleMode2Parse() {
+   const sportValue = boxSportSelection.value;
+   const text = boxScoreInput.value.trim();
+ 
+   if (!sportValue) {
+     alert("Select a sport first.");
+     return;
+   }
+ 
+   if (!text) {
+     alert("Paste a box score or game summary first.");
+     return;
+   }
+ 
+   parseBoxScoreBtn.disabled = true;
+   parseBoxScoreBtn.textContent = "Parsing...";
+-  boxStatus.textContent = "Parsing box score...";
++  boxStatus.textContent = "Parsing game text...";
+ 
+   try {
+     mode2ParsedData = parseBoxScoreText(text, sportValue);
+     renderMode2Preview(mode2ParsedData);
+     mode2PreviewCard.classList.remove("hidden");
+-    boxStatus.textContent = "Box score parsed. Review before submit.";
++    boxStatus.textContent = "Game text parsed. Review before submit.";
+   } catch (error) {
+     console.error(error);
+     alert(error.message || "Could not parse box score.");
+-    boxStatus.textContent = "Box score parsing failed.";
++    boxStatus.textContent = "Game text parsing failed.";
+   } finally {
+     parseBoxScoreBtn.disabled = false;
+     parseBoxScoreBtn.textContent = "Parse Box Score";
+   }
+ }
+ 
+ function renderMode2Preview(data) {
+   const game = data.game || {};
+   const players = data.players || [];
++  const laneLabel = data.submission_scope === "season_sheet"
++    ? "Season export"
++    : "Single-game box score";
+ 
+   mode2Summary.innerHTML = `
++    <div class="summary-row">
++      <strong>Mode</strong>
++      <span>${laneLabel}</span>
++    </div>
++    <div class="summary-row">
++      <strong>Source</strong>
++      <span>${mode2SourceSelection.value || "other"}</span>
++    </div>
+     <div class="summary-row">
+       <strong>Date</strong>
+       <span>${game.date || "Not detected"}</span>
+     </div>
+     <div class="summary-row">
+       <strong>Sport</strong>
+       <span>${game.sport || "Not detected"} ${game.gender ? `(${game.gender})` : ""}</span>
+     </div>
+     <div class="summary-row">
+       <strong>Game</strong>
+-      <span>${game.homeTeam || "Home"} ${game.homeScore ?? "?"} - ${game.awayScore ?? "?"} ${game.awayTeam || "Away"}</span>
++      <span>${data.submission_scope === "season_sheet" ? "Season-level upload" : `${game.homeTeam || "Home"} ${game.homeScore ?? "?"} - ${game.awayScore ?? "?"} ${game.awayTeam || "Away"}`}</span>
+     </div>
+     <div class="summary-row">
+       <strong>Location</strong>
+-      <span>${game.location || "Not detected"}</span>
++      <span>${data.submission_scope === "season_sheet" ? "Not required" : (game.location || "Not detected")}</span>
+     </div>
+     <div class="summary-row">
+       <strong>Players parsed</strong>
+       <span>${players.length}</span>
+     </div>
+     <div class="summary-row">
+       <strong>Confidence</strong>
+       <span>${data.confidence || 0}%</span>
+     </div>
+   `;
+ 
+   mode2Warnings.innerHTML = "";
+   const warnings = data.warnings || [];
+   if (warnings.length) {
+     warnings.forEach((warning) => {
+       const li = document.createElement("li");
+       li.textContent = warning;
+       mode2Warnings.appendChild(li);
+     });
+   } else {
+     const li = document.createElement("li");
+     li.textContent = "No major warnings found.";
+     mode2Warnings.appendChild(li);
+   }
+ 
+   mode2Players.innerHTML = players.length
+-    ? players.map((player) => `
++    ? players.slice(0, 40).map((player) => `
+         <div class="player-preview-item">
+           <strong>${escapeHtml(player.name)}</strong>
+           <span>${escapeHtml(
+             Object.entries(player.stats || {})
+               .map(([key, value]) => `${key}: ${value}`)
+               .join(", ") || "No parsed stats"
+           )}</span>
+         </div>
+       `).join("")
+     : `<div class="player-preview-item"><strong>No players detected</strong><span>Try pasting cleaner game summary text.</span></div>`;
+ }
+ 
+ async function submitMode2BoxScore() {
+   if (!mode2ParsedData) {
+-    alert("Parse a box score first.");
++    alert("Parse game text or process an export file first.");
+     return;
+   }
+ 
+   submitMode2Btn.disabled = true;
+   submitMode2Btn.textContent = "Submitting...";
+-  boxStatus.textContent = "Submitting box score...";
++  boxStatus.textContent = "Submitting Mode 2 upload...";
+ 
+   try {
+     const sportMeta = resolveMode2Sport(boxSportSelection.value);
+ 
+     const metadata = {
+       userId: currentUser.id,
+       schoolId: currentUser.school_id,
+       defaultSchoolId: currentUser.school_id,
+       defaultSchoolName: currentUser.school_name,
+-      submissionMethod: "text_paste",
+-      originalData: boxScoreInput.value.trim(),
+-      source: "athletic_director_portal",
++      submissionMethod: mode2ParsedData.submission_scope === "season_sheet" ? "csv_upload" : "text_paste",
++      originalData: mode2ParsedData.submission_scope === "season_sheet"
++        ? (mode2SelectedFile?.name || "mode2_export_file")
++        : boxScoreInput.value.trim(),
++      source: `athletic_director_portal_${mode2SourceSelection.value || "other"}`,
+       sport: sportMeta.sport,
+       gender: sportMeta.gender,
+     };
+ 
+     const formatted = await formatForSupabase(mode2ParsedData, metadata);
+     const result = await submitToSupabase(formatted);
+ 
+     if (!result.success) {
+       throw new Error(result.error || "Submission failed.");
+     }
+ 
+-    boxStatus.textContent = "✅ Box score submitted successfully and is now pending admin review.";
++    boxStatus.textContent = "✅ Mode 2 upload submitted successfully and is now pending admin review.";
+     mode2PreviewCard.classList.add("hidden");
+     boxScoreInput.value = "";
+     boxSportSelection.value = "";
++    mode2SeasonHint.value = "";
++    mode2SelectedFile = null;
++    mode2FileInput.value = "";
++    renderMode2SelectedFile();
+     mode2ParsedData = null;
+   } catch (error) {
+     console.error(error);
+-    alert(`❌ ${error.message || "Could not submit box score."}`);
+-    boxStatus.textContent = "Box score submission failed.";
++    alert(`❌ ${error.message || "Could not submit Mode 2 upload."}`);
++    boxStatus.textContent = "Mode 2 submission failed.";
+   } finally {
+     submitMode2Btn.disabled = false;
+-    submitMode2Btn.textContent = "Submit Box Score";
++    submitMode2Btn.textContent = "Submit Mode 2 Upload";
+   }
+ }
+ 
+ function resolveMode2Sport(value) {
+   switch (value) {
+     case "boys_basketball":
+       return { sport: "basketball", gender: "boys" };
+     case "girls_basketball":
+       return { sport: "basketball", gender: "girls" };
+     case "girls_volleyball":
+       return { sport: "volleyball", gender: "girls" };
+     case "boys_soccer":
+       return { sport: "soccer", gender: "boys" };
+     case "girls_soccer":
+       return { sport: "soccer", gender: "girls" };
+     case "football":
+       return { sport: "football", gender: null };
+     case "baseball":
+       return { sport: "baseball", gender: null };
+     case "softball":
+       return { sport: "softball", gender: null };
+     default:
+       return { sport: null, gender: null };
+   }
+ }
+ 
+EOF
+)
