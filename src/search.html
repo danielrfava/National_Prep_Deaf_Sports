@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>National Prep Deaf Sports - Search</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body class="public-page">
+    <header data-public-nav></header>
+
+    <main class="public-main">
+      <section class="public-hero">
+        <p class="public-kicker">Search</p>
+        <h1>Search Records</h1>
+        <p class="public-subline">Athletes, schools, seasons, and records.</p>
+        <form id="publicSearchForm" class="public-search-form">
+          <label class="sr-only" for="publicSearchInput">Search NPDS records</label>
+          <input id="publicSearchInput" type="search" placeholder="Search athlete, school, sport, or season" autocomplete="off" />
+          <button type="submit">Search</button>
+        </form>
+        <p id="searchStatus" class="public-status">Type a name, school, sport, or season.</p>
+      </section>
+
+      <section class="public-grid-two">
+        <section class="public-panel">
+          <div class="public-panel-head">
+            <h2>Athletes</h2>
+          </div>
+          <div id="athleteResults" class="public-result-list">
+            <div class="public-empty">Start typing to search.</div>
+          </div>
+        </section>
+
+        <section class="public-panel">
+          <div class="public-panel-head">
+            <h2>Schools</h2>
+          </div>
+          <div id="schoolResults" class="public-result-list">
+            <div class="public-empty">Start typing to search.</div>
+          </div>
+        </section>
+      </section>
+
+      <section class="public-panel">
+        <div class="public-panel-head">
+          <h2>Records</h2>
+        </div>
+        <div id="recordResults" class="public-result-list">
+          <div class="public-empty">Start typing to search.</div>
+        </div>
+      </section>
+    </main>
+
+    <script src="./env.js"></script>
+    <script type="module" src="./search.js"></script>
+  </body>
+</html>

@@ -1,436 +1,360 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dashboard - NPDS Portal</title>
-  <link rel="stylesheet" href="../styles.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Athletic Director Command Center - NPDS</title>
+  <link rel="stylesheet" href="../styles.css" />
   <style>
-    .portal-container {
-      max-width: 1200px;
-      margin: 40px auto;
-      padding: 20px;
-    }
-
-    .welcome-card {
-      background: white;
-      border-radius: 12px;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-      padding: 32px;
-      margin-bottom: 24px;
-    }
-
-    .welcome-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 24px;
-    }
-
-    .welcome-header h1 {
-      color: #2d3748;
-      font-size: 28px;
-    }
-
-    .school-badge {
-      display: inline-block;
-      padding: 8px 16px;
-      background: #667eea;
-      color: white;
-      border-radius: 20px;
-      font-size: 14px;
-      font-weight: 600;
-    }
-
-    .action-buttons {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-      gap: 16px;
-      margin-bottom: 32px;
-    }
-
-    .action-card {
-      border: 2px solid #e2e8f0;
-      border-radius: 8px;
-      padding: 24px;
-      text-align: center;
-      cursor: pointer;
-      transition: all 0.2s;
-      background: white;
-      text-decoration: none;
-      color: inherit;
-    }
-
-    .action-card:hover {
-      border-color: #4299e1;
-      background: #ebf8ff;
-      transform: translateY(-2px);
-      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-    }
-
-    .action-icon {
-      font-size: 48px;
-      margin-bottom: 12px;
-    }
-
-    .action-card h3 {
-      font-size: 18px;
-      margin-bottom: 8px;
-      color: #2d3748;
-    }
-
-    .action-card p {
-      font-size: 14px;
-      color: #718096;
-    }
-
-    .submissions-section {
-      background: white;
-      border-radius: 12px;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-      padding: 32px;
-    }
-
-    .section-header {
-      display: flex;
-      justify-content: space-between;
-      al ign-items: center;
-      margin-bottom: 24px;
-    }
-
-    .tab-buttons {
-      display: flex;
-      gap: 8px;
-    }
-
-    .tab-btn {
-      padding: 8px 16px;
-      border: 2px solid #e2e8f0;
-      background: white;
-      border-radius: 6px;
-      cursor: pointer;
-      font-weight: 500;
-      transition: all 0.2s;
-    }
-
-    .tab-btn.active {
-      background: #4299e1;
-      color: white;
-      border-color: #4299e1;
-    }
-
-    .submission-card {
-      border: 1px solid #e2e8f0;
-      border-radius: 8px;
-      padding: 20px;
-      margin-bottom: 16px;
-      transition: all 0.2s;
-    }
-
-    .submission-card:hover {
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    }
-
-    .submission-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 12px;
-    }
-
-    .submission-title {
-      font-size: 18px;
-      font-weight: 600;
-      color: #2d3748;
-    }
-
-    .status-badge {
-      display: inline-block;
-      padding: 4px 12px;
-      border-radius: 12px;
-      font-size: 12px;
-      font-weight: 600;
-    }
-
-    .status-pending {
-      background: #fef5e7;
-      color: #d68910;
-    }
-
-    .status-approved {
-      background: #c6f6d5;
-      color: #22543d;
-    }
-
-    .status-rejected {
-      background: #fed7d7;
-      color: #9b2c2c;
-    }
-
-    .submission-meta {
-      display: flex;
-      gap: 16px;
-      font-size: 14px;
-      color: #718096;
-      margin-bottom: 8px;
-    }
-
-    .submission-details {
-      font-size: 14px;
-      color: #4a5568;
-    }
-
-    .logout-btn {
-      padding: 8px 16px;
-      background: #e2e8f0;
-      color: #2d3748;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      font-weight: 500;
-      transition: background 0.2s;
-    }
-
-    .logout-btn:hover {
-      background: #cbd5e0;
-    }
-
-    .empty-state {
-      text-align: center;
-      padding: 60px 20px;
-      color: #a0aec0;
-    }
-
-    .empty-icon {
-      font-size: 64px;
-      margin-bottom: 16px;
-    }
-
-    @media (max-width: 768px) {
-      .welcome-header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 16px;
-      }
-
-      .action-buttons {
-        grid-template-columns: 1fr;
-      }
-
-      .submission-header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 8px;
-      }
-    }
+    :root { --bg:#0b1118; --surface:#131d2a; --surface2:#0f1a28; --border:#2b3b4f; --text:#e6edf5; --muted:#9fb0c3; --accent:#17b897; --warn:#f8cf7b; --danger:#f28b82; }
+    body { background: radial-gradient(1200px 700px at 20% -10%, #1b2b3b 0%, rgba(27,43,59,0) 55%), radial-gradient(900px 500px at 110% 10%, #16303f 0%, rgba(22,48,63,0) 50%), var(--bg); color: var(--text); min-height: 100vh; }
+    .shell { max-width: 1320px; margin: 14px auto 24px; padding: 0 14px; display: grid; gap: 12px; font-family: "Segoe UI","Inter","Montserrat",sans-serif; }
+    .panel { border: 1px solid var(--border); border-radius: 14px; background: linear-gradient(180deg, rgba(14,22,32,.95) 0%, rgba(12,19,29,.95) 100%); box-shadow: 0 14px 34px rgba(2,8,16,.4); overflow: hidden; }
+    .head { padding: 10px 14px 8px; border-bottom: 1px solid #223245; background: #141f2d; }
+    .head h2 { margin: 0 0 4px; font-size: 1rem; }
+    .head p { margin: 0; color: var(--muted); font-size: .82rem; line-height: 1.25; }
+    .body { padding: 12px 14px; }
+    .hero { padding: 12px 14px 14px; display: grid; gap: 10px; }
+    .hero-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .title { margin: 0; font-size: 1.42rem; line-height: 1.15; }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .chip { display: inline-flex; align-items: center; border: 1px solid #30445b; border-radius: 999px; padding: 5px 10px; background: #0f1a28; color: #c8d7e7; font-size: .75rem; font-weight: 700; }
+    .chip.ok { border-color: rgba(23,184,151,.48); background: rgba(23,184,151,.16); color: #b6f5e8; }
+    .chip.warn { border-color: rgba(248,207,123,.42); background: rgba(248,207,123,.16); color: #f8e8bd; }
+    .kpis { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 8px; }
+    .kpi { border: 1px solid #2a3b4f; border-radius: 12px; background: #111d2b; padding: 10px; display: grid; gap: 4px; min-height: 90px; }
+    .kpi .l { margin: 0; color: #9db1c5; font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; font-weight: 700; }
+    .kpi .v { margin: 0; font-size: 1.5rem; font-weight: 800; line-height: 1; }
+    .kpi .f { margin: 0; color: #8fa6bc; font-size: .75rem; }
+    .quick-actions { display: flex; flex-wrap: wrap; gap: 7px; }
+    .quick-btn { text-decoration: none; border: 1px solid #2d4158; border-radius: 10px; background: #101c2a; color: #dfeaf7; padding: 7px 11px; font-size: .77rem; font-weight: 800; line-height: 1; transition: .18s; }
+    .quick-btn:hover { border-color: var(--accent); background: #122233; transform: translateY(-1px); }
+    .grid { display: grid; grid-template-columns: minmax(290px,360px) minmax(0,1fr); gap: 12px; align-items: start; }
+    .insights { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
+    .insights li { border: 1px solid #2a3b4f; background: #111d2b; border-radius: 10px; padding: 8px 10px; font-size: .82rem; line-height: 1.3; color: #d8e6f5; }
+    .insights li.ok { border-color: rgba(23,184,151,.46); background: rgba(23,184,151,.13); color: #b7f4e7; }
+    .insights li.warn { border-color: rgba(248,207,123,.45); background: rgba(248,207,123,.12); color: #f8e8bd; }
+    .insights li.danger { border-color: rgba(242,139,130,.46); background: rgba(242,139,130,.12); color: #ffd3cd; }
+    .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .tabs { display: inline-grid; grid-auto-flow: column; gap: 5px; border: 1px solid #2b3c50; border-radius: 10px; background: #0d1622; padding: 3px; overflow-x: auto; }
+    .tab { border: none; background: transparent; color: #b9cadb; border-radius: 8px; padding: 7px 11px; font-size: .78rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
+    .tab.active { background: var(--accent); color: #fff; }
+    .list { display: grid; gap: 8px; }
+    .row { border: 1px solid #2a3b4f; border-radius: 11px; background: #111d2b; padding: 10px 11px; display: grid; gap: 7px; }
+    .row:hover { border-color: #3d536a; box-shadow: 0 10px 22px rgba(2,8,16,.33); }
+    .r-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; flex-wrap: wrap; }
+    .r-title { margin: 0; font-size: .92rem; font-weight: 800; }
+    .badge { display: inline-flex; border-radius: 999px; padding: 5px 10px; font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; border: 1px solid; }
+    .pending { background: rgba(248,207,123,.14); color: #f8e8bd; border-color: rgba(248,207,123,.45); }
+    .approved { background: rgba(23,184,151,.14); color: #b8f5e9; border-color: rgba(23,184,151,.42); }
+    .rejected { background: rgba(242,139,130,.12); color: #ffd4cf; border-color: rgba(242,139,130,.45); }
+    .meta { display: flex; flex-wrap: wrap; gap: 6px; }
+    .pill { border: 1px solid #2d3f55; border-radius: 999px; padding: 4px 8px; background: #0f1b29; color: #9eb4c9; font-size: .72rem; font-weight: 600; }
+    .route { display: inline-flex; width: fit-content; border: 1px solid #385775; border-radius: 999px; padding: 4px 8px; background: #12263b; color: #bcd2e6; font-size: .71rem; font-weight: 700; }
+    .detail { margin: 0; color: #b5c7d8; font-size: .78rem; line-height: 1.32; }
+    .detail strong { color: #deebf8; }
+    .detail .danger { color: var(--danger); font-weight: 700; }
+    .empty { border: 1px dashed #32465d; border-radius: 11px; background: #0f1a28; padding: 24px 16px; text-align: center; color: #a8bbce; font-size: .84rem; line-height: 1.35; }
+    .logout { border: 1px solid rgba(255,255,255,.22); background: rgba(255,255,255,.1); color: #fff; border-radius: 8px; padding: 7px 12px; font-size: .78rem; font-weight: 700; cursor: pointer; }
+    .logout:hover { background: rgba(255,255,255,.18); border-color: rgba(255,255,255,.35); }
+    @media (max-width: 1080px) { .kpis{grid-template-columns:repeat(3,minmax(0,1fr));} .grid{grid-template-columns:1fr;} }
+    @media (max-width: 760px) { .shell{margin-top:10px;padding:0 10px;} .kpis{grid-template-columns:repeat(2,minmax(0,1fr));} }
   </style>
 </head>
 <body>
   <header class="topbar">
     <div class="topbar-container">
-      <div class="brand">
+      <a class="brand" href="../index.html">
         <div class="logo">NP</div>
         <div class="brand-text">
-          <div class="brand-title">Athletic Director Dashboard</div>
+          <div class="brand-title">National Prep Deaf Sports</div>
+          <div class="brand-tag">Athletic Director Command Center</div>
         </div>
-      </div>
+      </a>
       <nav class="nav">
-        <button id="logoutBtn" class="logout-btn">Logout</button>
+        <a class="nav-link" href="submit-game.html">Submit Stats</a>
+        <a class="nav-link" href="../stats.html">Public Records</a>
       </nav>
+      <button id="logoutBtn" class="logout" type="button">Logout</button>
     </div>
   </header>
 
-  <main class="portal-container">
-    <div class="welcome-card">
-      <div class="welcome-header">
-        <div>
-          <h1>Welcome, <span id="userName">Loading...</span>!</h1>
-          <p style="color: #718096; margin-top: 8px;">
-            <span class="school-badge" id="schoolName">Loading...</span>
-          </p>
+  <main class="shell">
+    <section class="panel hero">
+      <div class="hero-head">
+        <h1 class="title">Athletic Director Dashboard</h1>
+        <span id="schoolChip" class="chip">Loading school...</span>
+      </div>
+      <div class="chips">
+        <span id="readinessChip" class="chip">Checking public readiness...</span>
+      </div>
+      <div class="quick-actions">
+        <a href="submit-game.html" class="quick-btn">Submit Stats</a>
+        <a href="../stats.html" class="quick-btn">Public School Page</a>
+        <a href="../stats.html" class="quick-btn">School Data</a>
+        <a href="#insightsPanel" class="quick-btn">Missing Data</a>
+      </div>
+      <div class="kpis">
+        <article class="kpi"><p class="l">Pending</p><p class="v" id="kpiPending">0</p><p class="f">Needs review</p></article>
+        <article class="kpi"><p class="l">Approved</p><p class="v" id="kpiApproved">0</p><p class="f">Published</p></article>
+        <article class="kpi"><p class="l">Rejected</p><p class="v" id="kpiRejected">0</p><p class="f">Needs fixes</p></article>
+        <article class="kpi"><p class="l">Sports With Data</p><p class="v" id="kpiSports">0</p><p class="f">Coverage</p></article>
+        <article class="kpi"><p class="l">Missing Sports</p><p class="v" id="kpiMissing">0</p><p class="f">Gaps</p></article>
+      </div>
+    </section>
+
+    <div class="grid">
+      <section id="insightsPanel" class="panel">
+        <div class="head"><h2>School Intelligence</h2><p>What needs attention now.</p></div>
+        <div class="body">
+          <ul id="insights" class="insights"><li>Loading insights...</li></ul>
         </div>
-      </div>
+      </section>
 
-      <div class="action-buttons">
-        <a href="submit-game.html" class="action-card">
-          <div class="action-icon">📊</div>
-          <h3>Submit Game Results</h3>
-          <p>Upload new game statistics</p>
-        </a>
-
-        <a href="../index.html" class="action-card">
-          <div class="action-icon">🏠</div>
-          <h3>View Public Site</h3>
-          <p>See published statistics</p>
-        </a>
-
-        <a href="#" class="action-card" onclick="alert('Coming soon!'); return false;">
-          <div class="action-icon">📈</div>
-          <h3>School Stats</h3>
-          <p>View your school's data</p>
-        </a>
-      </div>
-    </div>
-
-    <div class="submissions-section">
-      <div class="section-header">
-        <h2>Your Submissions</h2>
-        <div class="tab-buttons">
-          <button class="tab-btn active" data-status="all">All</button>
-          <button class="tab-btn" data-status="pending">Pending</button>
-          <button class="tab-btn" data-status="approved">Approved</button>
-          <button class="tab-btn" data-status="rejected">Rejected</button>
+      <section class="panel">
+        <div class="head toolbar">
+          <div><h2>Recent Submissions</h2><p>Status and review flow.</p></div>
+          <div class="tabs" aria-label="Submission status filters">
+            <button class="tab active" type="button" data-status="all">All</button>
+            <button class="tab" type="button" data-status="pending">Pending</button>
+            <button class="tab" type="button" data-status="approved">Approved</button>
+            <button class="tab" type="button" data-status="rejected">Rejected</button>
+          </div>
         </div>
-      </div>
-
-      <div id="submissionsContainer">
-        <div class="empty-state">
-          <div class="empty-icon">⏳</div>
-          <p>Loading submissions...</p>
-        </div>
-      </div>
+        <div class="body"><div id="submissions" class="list"><div class="empty">Loading submissions...</div></div></div>
+      </section>
     </div>
   </main>
 
   <script src="../env.js"></script>
   <script type="module">
-    import { supabase } from '../supabaseClient.js';
+    import { supabase } from "../supabaseClient.js";
+
+    const SPORTS = ["basketball", "football", "volleyball", "soccer", "baseball", "softball"];
+    const SPORT_LABELS = { basketball: "Basketball", football: "Football", volleyball: "Volleyball", soccer: "Soccer", baseball: "Baseball", softball: "Softball" };
+    const METHOD_LABELS = { csv_upload: "CSV/XLSX Upload", text_paste: "Text Paste", manual_form: "PDF Intake" };
+    const SCOPE_LABELS = { season_sheet: "Season Spreadsheet", game_submission: "Game Submission", game_boxscore: "Game Box Score", boxscore_text: "Text Box Score", export_file: "Export File", pdf_review: "PDF Review", historic_recovery: "Historic Recovery", archive_only: "Archive Only" };
 
     let currentUser = null;
-    let currentFilter = 'all';
+    let allSubs = [];
+    let sportsWithData = new Set();
+    let filter = "all";
 
-    // Initialize
-    window.addEventListener('DOMContentLoaded', async () => {
-      // Check authentication
+    const el = {
+      schoolChip: document.getElementById("schoolChip"),
+      readinessChip: document.getElementById("readinessChip"),
+      insights: document.getElementById("insights"),
+      submissions: document.getElementById("submissions"),
+      tabs: Array.from(document.querySelectorAll(".tab")),
+      kpiPending: document.getElementById("kpiPending"),
+      kpiApproved: document.getElementById("kpiApproved"),
+      kpiRejected: document.getElementById("kpiRejected"),
+      kpiSports: document.getElementById("kpiSports"),
+      kpiMissing: document.getElementById("kpiMissing"),
+      logout: document.getElementById("logoutBtn"),
+    };
+
+    window.addEventListener("DOMContentLoaded", init);
+
+    async function init() {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        window.location.href = 'login.html';
-        return;
-      }
+      if (!session) { window.location.href = "login.html"; return; }
 
-      // Get user profile
-      const { data: profile, error } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('id', session.user.id)
-        .single();
-
+      const { data: profile, error } = await supabase.from("user_profiles").select("*").eq("id", session.user.id).single();
       if (error || !profile) {
-        console.error('Error loading profile:', error);
-        alert('Error loading your profile. Please try logging in again.');
+        alert("Could not load your profile. Please sign in again.");
         await supabase.auth.signOut();
-        window.location.href = 'login.html';
+        window.location.href = "login.html";
         return;
       }
 
       currentUser = profile;
-      
-      // Update UI
-      document.getElementById('userName').textContent = profile.full_name;
-      document.getElementById('schoolName').textContent = profile.school_name || 'Your School';
+      const school = profile.school_name || "Your School";
+      el.schoolChip.textContent = school;
 
-      // Load submissions
-      await loadSubmissions();
+      el.logout.addEventListener("click", async () => { await supabase.auth.signOut(); window.location.href = "login.html"; });
+      el.tabs.forEach((tab) => tab.addEventListener("click", () => { el.tabs.forEach((t) => t.classList.remove("active")); tab.classList.add("active"); filter = tab.dataset.status || "all"; renderSubmissions(); }));
 
-      // Setup tab filters
-      document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-          btn.classList.add('active');
-          currentFilter = btn.dataset.status;
-          loadSubmissions();
-        });
-      });
+      await loadData();
+    }
 
-      // Setup logout
-      document.getElementById('logoutBtn').addEventListener('click', async () => {
-        await supabase.auth.signOut();
-        window.location.href = 'login.html';
-      });
-    });
-
-    async function loadSubmissions() {
-      const container = document.getElementById('submissionsContainer');
-      container.innerHTML = '<div class="empty-state"><div class="empty-icon">⏳</div><p>Loading submissions...</p></div>';
+    async function loadData() {
+      el.submissions.innerHTML = '<div class="empty">Loading submissions...</div>';
+      el.insights.innerHTML = "<li>Loading insights...</li>";
 
       try {
-        let query = supabase
-          .from('game_submissions')
-          .select('*')
-          .eq('submitted_by', currentUser.id)
-          .order('created_at', { ascending: false });
-
-        if (currentFilter !== 'all') {
-          query = query.eq('status', currentFilter);
-        }
-
-        const { data: submissions, error } = await query;
-
-        if (error) throw error;
-
-        if (!submissions || submissions.length === 0) {
-          container.innerHTML = `
-            <div class="empty-state">
-              <div class="empty-icon">📭</div>
-              <h3>No submissions yet</h3>
-              <p>Click "Submit Game Results" above to add your first game!</p>
-            </div>
-          `;
-          return;
-        }
-
-        // Render submissions
-        container.innerHTML = submissions.map(sub => renderSubmission(sub)).join('');
-
+        const [subs, sportSet] = await Promise.all([fetchSubmissions(), fetchSportsWithData()]);
+        allSubs = subs;
+        sportsWithData = sportSet;
+        updateKpis();
+        updateReadiness();
+        renderInsights();
+        renderSubmissions();
       } catch (error) {
-        console.error('Error loading submissions:', error);
-        container.innerHTML = `
-          <div class="empty-state">
-            <div class="empty-icon">⚠️</div>
-            <p>Error loading submissions. Please refresh the page.</p>
-          </div>
-        `;
+        console.error(error);
+        el.insights.innerHTML = '<li class="danger">Could not load insights.</li>';
+        el.submissions.innerHTML = '<div class="empty">Could not load submissions.</div>';
       }
     }
 
-    function renderSubmission(submission) {
-      const gameData = submission.game_data || {};
-      const game = gameData.game || {};
-      const date = new Date(submission.created_at).toLocaleDateString();
-      const gameDate = submission.game_date ? new Date(submission.game_date).toLocaleDateString() : 'N/A';
+    async function fetchSubmissions() {
+      const { data, error } = await supabase
+        .from("game_submissions")
+        .select("id, created_at, reviewed_at, status, sport, gender, game_date, home_team_id, away_team_id, home_score, away_score, rejection_reason, submission_method, game_data")
+        .eq("submitted_by", currentUser.id)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data || [];
+    }
 
-      let statusClass = 'status-pending';
-      let statusText = 'Pending Review';
-      if (submission.status === 'approved') {
-        statusClass = 'status-approved';
-        statusText = '✓ Approved';
-      } else if (submission.status === 'rejected') {
-        statusClass = 'status-rejected';
-        statusText = '✗ Rejected';
+    async function fetchSportsWithData() {
+      const set = new Set();
+      if (!currentUser?.school_id && !currentUser?.school_name) return set;
+
+      let rows = [];
+      if (currentUser.school_id) rows = await fetchRowsBy("school_id", currentUser.school_id).catch(() => []);
+      if ((!rows || rows.length === 0) && currentUser.school_name) rows = await fetchRowsBy("school", currentUser.school_name).catch(() => []);
+
+      (rows || []).forEach((row) => { const key = normSport(row?.sport); if (key) set.add(key); });
+      return set;
+    }
+
+    async function fetchRowsBy(column, value) {
+      const rows = [];
+      const size = 1000;
+      let start = 0;
+      while (true) {
+        const { data, error } = await supabase.from("raw_stat_rows").select("sport").order("id", { ascending: true }).eq(column, value).range(start, start + size - 1);
+        if (error) throw error;
+        const chunk = data || [];
+        rows.push(...chunk);
+        if (chunk.length < size) break;
+        start += size;
       }
+      return rows;
+    }
 
-      return `
-        <div class="submission-card">
-          <div class="submission-header">
-            <div class="submission-title">
-              ${submission.sport || 'Game'} - ${game.home_team?.name || submission.home_team_id || 'Home'} vs ${game.away_team?.name || submission.away_team_id || 'Away'}
-            </div>
-            <span class="status-badge ${statusClass}">${statusText}</span>
-          </div>
-          
-          <div class="submission-meta">
-            <span>📅 Game Date: ${gameDate}</span>
-            <span>⏰ Submitted: ${date}</span>
-            <span>📊 ${submission.submission_method?.replace('_', ' ') || 'Manual'}</span>
-          </div>
-          
-          <div class="submission-details">
-            <strong>Score:</strong> ${game.home_team?.score || submission.home_score || '?'} - ${game.away_team?.score || submission.away_score || '?'}
-            ${submission.rejection_reason ? `<br><strong style="color: #c62828;">Reason:</strong> ${submission.rejection_reason}` : ''}
-          </div>
+    function normSport(v) {
+      const s = String(v || "").toLowerCase();
+      if (s.includes("basketball")) return "basketball";
+      if (s.includes("football")) return "football";
+      if (s.includes("volleyball")) return "volleyball";
+      if (s.includes("soccer")) return "soccer";
+      if (s.includes("baseball")) return "baseball";
+      if (s.includes("softball")) return "softball";
+      return "";
+    }
+
+    function updateKpis() {
+      const pending = allSubs.filter((s) => statusKey(s.status) === "pending").length;
+      const approved = allSubs.filter((s) => statusKey(s.status) === "approved").length;
+      const rejected = allSubs.filter((s) => statusKey(s.status) === "rejected").length;
+      const withData = SPORTS.filter((s) => sportsWithData.has(s));
+      const missing = SPORTS.filter((s) => !sportsWithData.has(s));
+      el.kpiPending.textContent = String(pending);
+      el.kpiApproved.textContent = String(approved);
+      el.kpiRejected.textContent = String(rejected);
+      el.kpiSports.textContent = String(withData.length);
+      el.kpiMissing.textContent = String(missing.length);
+    }
+
+    function updateReadiness() {
+      const isReady = SPORTS.some((s) => sportsWithData.has(s));
+      el.readinessChip.classList.remove("ok", "warn");
+      if (isReady) { el.readinessChip.classList.add("ok"); el.readinessChip.textContent = "School public: active"; }
+      else { el.readinessChip.classList.add("warn"); el.readinessChip.textContent = "School not public yet"; }
+    }
+
+    function renderInsights() {
+      const pending = allSubs.filter((s) => statusKey(s.status) === "pending").length;
+      const approved = allSubs.filter((s) => statusKey(s.status) === "approved").length;
+      const rejected = allSubs.filter((s) => statusKey(s.status) === "rejected").length;
+      const missing = SPORTS.filter((s) => !sportsWithData.has(s)).map((s) => SPORT_LABELS[s]);
+      const latestApproved = allSubs.find((s) => statusKey(s.status) === "approved");
+      const items = [];
+      items.push({ tone: pending ? "warn" : "ok", text: pending ? `${pending} submission${pending === 1 ? "" : "s"} waiting` : "No pending submissions" });
+      if (rejected) items.push({ tone: "danger", text: `${rejected} rejected submission${rejected === 1 ? "" : "s"}` });
+      items.push({ tone: missing.length ? "warn" : "ok", text: missing.length ? `Missing sports: ${missing.slice(0,3).join(", ")}${missing.length > 3 ? ", ..." : ""}` : "All tracked sports covered" });
+      items.push({ tone: SPORTS.some((s) => sportsWithData.has(s)) ? "ok" : "warn", text: SPORTS.some((s) => sportsWithData.has(s)) ? `${SPORTS.filter((s) => sportsWithData.has(s)).length} sports visible` : "Approve records to activate visibility" });
+      if (latestApproved) items.push({ tone: "", text: `Latest approved: ${displayDate(latestApproved.reviewed_at || latestApproved.created_at)}` });
+      else if (!approved) items.push({ tone: "", text: "No approved records yet" });
+      if (!allSubs.length) items.push({ tone: "", text: "No submissions yet" });
+      el.insights.innerHTML = items.map((i) => `<li class="${i.tone ? i.tone : ""}">${esc(i.text)}</li>`).join("");
+    }
+
+    function renderSubmissions() {
+      const rows = filter === "all" ? allSubs : allSubs.filter((s) => statusKey(s.status) === filter);
+      if (!rows.length) {
+        const msg = filter === "all" ? "No submissions yet" : `No ${filter} submissions`;
+        el.submissions.innerHTML = `<div class="empty">${esc(msg)}</div>`;
+        return;
+      }
+      el.submissions.innerHTML = rows.map(renderSubmission).join("");
+    }
+
+    function renderSubmission(s) {
+      const status = statusKey(s.status);
+      const statusLabel = status === "approved" ? "Approved" : status === "rejected" ? "Rejected" : "Pending";
+      const scope = scopeKey(s);
+      const scopeLabel = SCOPE_LABELS[scope] || titleCase(scope.replace(/_/g, " "));
+      const sport = sportLabel(s.sport, s.gender);
+      const method = METHOD_LABELS[String(s.submission_method || "").toLowerCase()] || titleCase(String(s.submission_method || "manual").replace(/_/g, " "));
+      const game = s?.game_data?.game || {};
+      const home = game?.home_team?.name || s.home_team_id || "";
+      const away = game?.away_team?.name || s.away_team_id || "";
+      const useMatchup = home && away && (scope === "game_submission" || scope === "game_boxscore" || scope === "boxscore_text");
+      const title = useMatchup ? `${sport} - ${home} vs ${away}` : `${sport} - ${scopeLabel}`;
+      const homeScore = game?.home_team?.score ?? s.home_score;
+      const awayScore = game?.away_team?.score ?? s.away_score;
+      const hasScore = homeScore !== null && homeScore !== undefined && awayScore !== null && awayScore !== undefined;
+      const route = s?.game_data?.parse_review?.route_label || "";
+      const detail = hasScore
+        ? `<strong>Score:</strong> ${esc(String(homeScore))} - ${esc(String(awayScore))}`
+        : `<strong>Scope:</strong> ${esc(scopeLabel)}`;
+      const rejection = s.rejection_reason ? ` | <span class="danger"><strong>Reason:</strong> ${esc(s.rejection_reason)}</span>` : "";
+
+      return `<article class="row">
+        <div class="r-top">
+          <h3 class="r-title">${esc(title)}</h3>
+          <span class="badge ${status}">${statusLabel}</span>
         </div>
-      `;
+        <div class="meta">
+          <span class="pill">Submitted: ${esc(displayDate(s.created_at))}</span>
+          <span class="pill">Game Date: ${esc(s.game_date ? displayDate(s.game_date) : "N/A")}</span>
+          <span class="pill">Method: ${esc(method)}</span>
+          <span class="pill">Type: ${esc(scopeLabel)}</span>
+        </div>
+        ${route ? `<span class="route">Route: ${esc(route)}</span>` : ""}
+        <p class="detail">${detail}${rejection}</p>
+      </article>`;
     }
+
+    function scopeKey(s) {
+      const p = s?.game_data?.parse_review || {};
+      return p.upload_lane || s?.game_data?.submission_scope || "game_submission";
+    }
+
+    function sportLabel(sport, gender) {
+      const s = String(sport || "").toLowerCase().trim();
+      const g = String(gender || "").toLowerCase().trim();
+      const base = SPORT_LABELS[s] || titleCase(s || "Unknown sport");
+      return (g === "boys" || g === "girls") ? `${titleCase(g)} ${base}` : base;
+    }
+
+    function statusKey(status) {
+      const s = String(status || "").toLowerCase().trim();
+      if (s === "approved" || s === "rejected") return s;
+      return "pending";
+    }
+
+    function displayDate(v) {
+      if (!v) return "N/A";
+      const d = new Date(v);
+      return Number.isNaN(d.getTime()) ? "N/A" : d.toLocaleDateString();
+    }
+
+    function titleCase(v) { return String(v || "").split(" ").filter(Boolean).map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(" "); }
+    function esc(v) { return String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;").replace(/'/g, "&#39;"); }
   </script>
 </body>
 </html>

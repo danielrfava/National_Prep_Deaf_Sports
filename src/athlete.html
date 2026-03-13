@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>National Prep Deaf Sports - Athlete Profile</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body class="public-page">
+    <header data-public-nav></header>
+
+    <main class="public-main">
+      <section id="athleteCard" class="athlete-card">
+        <p class="public-kicker">Athlete Profile</p>
+        <h1 id="athleteName" class="athlete-name">Loading athlete...</h1>
+        <p id="athleteMeta" class="athlete-meta">Loading profile data...</p>
+        <div id="athleteChips" class="athlete-chip-row"></div>
+      </section>
+
+      <section id="sportsContainer" class="public-main" style="width:100%;margin:0;gap:12px;padding:0;"></section>
+
+      <section id="rankingsSection" class="sport-section" hidden>
+        <div class="sport-head">
+          <h2>Rankings and Record Appearances</h2>
+        </div>
+        <ul id="rankingsList" class="rankings-list"></ul>
+      </section>
+    </main>
+
+    <script src="./env.js"></script>
+    <script type="module" src="./athlete.js"></script>
+  </body>
+</html>

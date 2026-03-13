@@ -6,7 +6,7 @@
     <title>National Prep Deaf Sports</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
-<body class="landing-page landing-shell">
+  <body class="landing-page landing-shell show-home">
     <div class="video-background">
       <video autoplay muted loop playsinline id="bgVideo">
         <source src="./assets/videos/video_1.mp4" type="video/mp4" />
@@ -15,7 +15,7 @@
       <div class="video-overlay video-overlay-strong"></div>
     </div>
 
-    <header id="homeTopbar" class="topbar landing-topbar">
+    <header data-public-nav class="topbar public-topbar landing-topbar">
       <div class="topbar-container">
         <a class="brand" href="index.html" aria-label="National Prep Deaf Sports home">
           <div class="logo">NP</div>
@@ -25,42 +25,25 @@
           </div>
         </a>
 
-        <nav class="nav" aria-label="Primary">
-          <a class="nav-link nav-link-active" href="index.html">Search</a>
-          <a class="nav-link" href="schools.html">Schools</a>
-          <a class="nav-link" href="stats.html">Research</a>
-          <a class="nav-link" href="about.html">About</a>
+        <nav class="nav public-nav" aria-label="Primary">
+          <a class="nav-link nav-link-active" data-nav-key="search" href="search.html" aria-current="page">Search</a>
+          <a class="nav-link" data-nav-key="schools" href="schools.html">Schools</a>
+          <a class="nav-link" data-nav-key="research" href="stats.html">Research</a>
+          <a class="nav-link" data-nav-key="about" href="about.html">About</a>
+          <a class="nav-link" data-nav-key="login" href="portal/login.html">Log In</a>
         </nav>
-
-        <div class="search-auth-group">
-          <a href="portal/login.html" class="login-btn" title="Athletic Director / Admin Login">
-            <span class="login-icon">👤</span>
-            <span class="login-text">Log In</span>
-          </a>
-        </div>
       </div>
     </header>
 
     <main class="landing-content landing-content-home">
       <div class="landing-center landing-center-home">
-        <div class="landing-logo intro-only" id="introLogo">
-          <div class="logo-circle">NP</div>
-        </div>
-
-        <h1 class="landing-title" id="homeTitle">National Prep Deaf Sports</h1>
-
-        <p class="landing-tagline intro-only" id="introTagline">
-          Celebrating Deaf High School Athletics<br />
-          From Past to Present
-        </p>
-
         <section id="searchHero" class="search-hero">
-          <h2 class="home-headline">The home for Deaf school athletics</h2>
+          <h1 class="home-headline">The Home for Deaf Sports Records</h1>
           <p class="home-subheadline">
-            Preserving records, history, and recognition for Deaf athletes and schools
+            Search athletes, schools, seasons, and records across generations of Deaf sports.
           </p>
 
-          <form class="home-search-form" action="stats.html" method="get">
+          <form class="home-search-form" action="search.html" method="get">
             <label class="sr-only" for="homeSearch">Search athletes, schools, records, and history</label>
             <input
               id="homeSearch"
@@ -77,23 +60,128 @@
     </main>
 
     <script type="module">
+      import { mountPublicTopNav } from "./components/publicTopNav.js";
+      import { attachSearchAutocomplete } from "./components/searchAutocomplete.js";
+
+      mountPublicTopNav({ active: "search", landing: true });
+
       const video = document.getElementById("bgVideo");
       const body = document.body;
+      const searchInput = document.getElementById("homeSearch");
+      const searchForm = document.querySelector(".home-search-form");
+      const searchNavLink = document.querySelector('[data-nav-key="search"]');
+      const searchHero = document.getElementById("searchHero");
+      let searchActivated = false;
 
-      window.addEventListener("load", () => {
-        if (video) {
-          video.style.opacity = "1";
+      function activateSearchState() {
+        if (searchActivated) {
+          return;
         }
 
-        setTimeout(() => {
-          body.classList.add("show-home");
-        }, 1800);
+        searchActivated = true;
+        body.classList.add("show-home", "search-active");
+
+        if (video) {
+          video.classList.add("video-fade-out");
+          video.pause();
+        }
+      }
+
+      window.addEventListener("DOMContentLoaded", () => {
+        body.classList.add("show-home");
+
+        if (video) {
+          video.addEventListener(
+            "error",
+            () => {
+              body.classList.add("video-unavailable");
+            },
+            { once: true }
+          );
+          video.addEventListener(
+            "stalled",
+            () => {
+              body.classList.add("video-unavailable");
+            },
+            { once: true }
+          );
+          video.style.opacity = "1";
+          const playPromise = video.play();
+          if (playPromise && typeof playPromise.catch === "function") {
+            playPromise.catch(() => {
+              body.classList.add("video-unavailable");
+            });
+          }
+        }
       });
 
       document.addEventListener("visibilitychange", () => {
         if (!video) return;
-        if (document.hidden) video.pause();
-        else video.play();
+
+        if (document.hidden) {
+          video.pause();
+          return;
+        }
+
+        if (!searchActivated) {
+          const playPromise = video.play();
+          if (playPromise && typeof playPromise.catch === "function") {
+            playPromise.catch(() => {
+              body.classList.add("video-unavailable");
+            });
+          }
+        }
+      });
+
+      if (searchNavLink) {
+        searchNavLink.addEventListener("click", (event) => {
+          event.preventDefault();
+          activateSearchState();
+          searchHero?.scrollIntoView({ behavior: "smooth", block: "center" });
+          searchInput?.focus({ preventScroll: true });
+        });
+      }
+
+      if (searchInput) {
+        searchInput.addEventListener("focus", activateSearchState);
+        searchInput.addEventListener("input", activateSearchState);
+      }
+
+      if (searchForm) {
+        searchForm.addEventListener("submit", () => {
+          activateSearchState();
+        });
+      }
+
+      attachSearchAutocomplete(searchInput, {
+        onSelect(result) {
+          activateSearchState();
+
+          if (result.type === "athlete") {
+            const params = new URLSearchParams({
+              name: result.title,
+              school: result.school || "",
+            });
+            if (result.schoolId) {
+              params.set("school_id", result.schoolId);
+            }
+            window.location.href = `athlete.html?${params.toString()}`;
+            return;
+          }
+
+          if (result.type === "school") {
+            if (result.schoolId) {
+              window.location.href = `stats.html?school=${encodeURIComponent(result.schoolId)}`;
+              return;
+            }
+
+            const schoolQuery = result.title || result.query || "";
+            window.location.href = `stats.html${schoolQuery ? `?q=${encodeURIComponent(schoolQuery)}` : ""}`;
+            return;
+          }
+
+          window.location.href = `search.html?q=${encodeURIComponent(result.query || result.title || "")}`;
+        },
       });
     </script>
   </body>

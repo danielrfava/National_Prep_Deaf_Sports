@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>National Prep Deaf Sports - Schools</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body class="public-page">
+    <header data-public-nav></header>
+
+    <main class="public-main">
+      <section class="public-hero">
+        <p class="public-kicker">Schools</p>
+        <h1>School Directory</h1>
+        <p class="public-subline">Public schools with real record coverage.</p>
+        <p id="schoolsStatus" class="public-status">Loading schools...</p>
+      </section>
+
+      <section class="public-panel">
+        <div class="public-panel-head">
+          <h2>Schools</h2>
+        </div>
+        <div id="schoolsGrid" class="public-result-list public-grid-cards">
+          <div class="public-empty">Loading schools...</div>
+        </div>
+      </section>
+    </main>
+
+    <script src="./env.js"></script>
+    <script type="module" src="./schools.js"></script>
+  </body>
+</html>

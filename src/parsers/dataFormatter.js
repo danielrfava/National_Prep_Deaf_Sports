@@ -1,7 +1,7 @@
 import { supabase } from "../supabaseClient.js";
 
 export async function formatForSupabase(parsedData, metadata) {
-  console.log("🔄 Converting to Supabase JSON format...");
+  console.log("Converting to Supabase JSON format...");
 
   const parsedSport = parsedData?.game?.sport || metadata?.sport || "basketball";
   const parsedGender = parsedData?.game?.gender ?? metadata?.gender ?? null;

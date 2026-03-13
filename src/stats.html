@@ -6,32 +6,8 @@
     <title>National Prep Deaf Sports - Research</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
-  <body>
-    <header class="topbar">
-      <div class="topbar-container">
-        <a class="brand" href="index.html" aria-label="National Prep Deaf Sports home">
-          <div class="logo">NP</div>
-          <div class="brand-text">
-            <div class="brand-title">National Prep Deaf Sports</div>
-            <div class="brand-tag">Deaf High School Athletics</div>
-          </div>
-        </a>
-
-        <nav class="nav" aria-label="Primary">
-          <a class="nav-link" href="index.html">Search</a>
-          <a class="nav-link" href="schools.html">Schools</a>
-          <a class="nav-link nav-link-active" href="stats.html">Research</a>
-          <a class="nav-link" href="about.html">About</a>
-        </nav>
-
-        <div class="search-auth-group">
-          <a href="portal/login.html" class="login-btn" title="Athletic Director / Admin Login">
-            <span class="login-icon">👤</span>
-            <span class="login-text">Log In</span>
-          </a>
-        </div>
-      </div>
-    </header>
+  <body class="public-page">
+    <header data-public-nav></header>
 
     <section class="mode-tabs-wrap" aria-label="Stats modes">
       <div class="container mode-tabs-container" role="tablist" aria-label="Statistics mode tabs">
@@ -41,7 +17,7 @@
       </div>
     </section>
 
-    <main class="container">
+    <main class="container public-main">
       <section id="individualModePanel" data-mode-panel="individual">
         <section class="filters" aria-label="Filters">
           <div class="filter-grid">
@@ -73,6 +49,13 @@
               </select>
             </div>
 
+            <div class="filter-field">
+              <label for="seasonFilter">Season</label>
+              <select id="seasonFilter">
+                <option value="">All seasons</option>
+              </select>
+            </div>
+
             <div class="filter-field" id="footballVariantFilterField" style="display: none;">
               <label for="footballVariantFilter">Football Type</label>
               <select id="footballVariantFilter">
@@ -90,6 +73,10 @@
                 <option value="career-extended">Career (Extended Eligibility)</option>
               </select>
             </div>
+          </div>
+
+          <div class="filter-actions">
+            <button id="applyFiltersBtn" type="button" class="apply-filters-btn">Explore Records</button>
           </div>
 
           <p id="status" class="status" aria-live="polite"></p>
