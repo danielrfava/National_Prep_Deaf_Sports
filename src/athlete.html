@@ -15,9 +15,18 @@
         <h1 id="athleteName" class="athlete-name">Loading athlete...</h1>
         <p id="athleteMeta" class="athlete-meta">Loading profile data...</p>
         <div id="athleteChips" class="athlete-chip-row"></div>
+        <div id="athleteSummaryGrid" class="athlete-summary-grid"></div>
+        <div id="athleteActions" class="athlete-action-row"></div>
       </section>
 
-      <section id="sportsContainer" class="public-main" style="width:100%;margin:0;gap:12px;padding:0;"></section>
+      <section id="sportExperience" class="sport-section">
+        <div class="sport-head">
+          <h2>Sport Breakdown</h2>
+          <p class="sport-subhead">Career-first view with season details for each sport this athlete actually played.</p>
+        </div>
+        <div id="sportTabs" class="athlete-sport-tabs" aria-label="Athlete sports"></div>
+        <div id="sportsContainer" class="athlete-sport-panel"></div>
+      </section>
 
       <section id="rankingsSection" class="sport-section" hidden>
         <div class="sport-head">

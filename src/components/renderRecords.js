@@ -846,7 +846,7 @@ export function renderRecords(container, statsView = 'season', filters = {}, rec
   currentStatsView = statsView;
   currentFilters = filters;
 
-    const newContext = getSortContext(statsView, filters);
+  const newContext = getSortContext(statsView, filters);
 
   if (newContext !== lastSortContext) {
     currentSort.column = null;
@@ -854,8 +854,9 @@ export function renderRecords(container, statsView = 'season', filters = {}, rec
     lastSortContext = newContext;
   }
 
-if (records && statsView === 'season') {
+if (Array.isArray(records)) {
   rawRecords = records;
+  currentPage = 1;
 }
 
 let displayRecords = [...rawRecords];
@@ -875,6 +876,15 @@ if (statsView === 'career-standard') {
 } else if (statsView === 'career-extended') {
   displayRecords = aggregateCareerStats(displayRecords, Infinity);
 }
+currentRecords = [...displayRecords];
+
+if (!currentRecords.length) {
+  container.innerHTML = "<p>No records found.</p>";
+  return {
+    renderedCount: 0,
+    sourceCount: rawRecords.length,
+  };
+}
   // Determine which columns to hide based on filters
   const hideSchool = filters.schoolId && filters.schoolId !== '';
   const hideSport = filters.sport && filters.sport !== '';
@@ -889,7 +899,6 @@ if (statsView === 'career-standard') {
       currentStatCategory = 'batting'; // Default for baseball/softball
     }
   }
-    currentRecords = [...displayRecords];
 // Apply user-selected sort (after default sort logic)
 if (currentSort.column && currentRecords.length > 0) {
   const sportTypeForSort = detectSportType(
@@ -966,10 +975,6 @@ if (currentRecords.length > 0 && !currentSort.column) {
     currentSort.ascending = defaultKey === 'era';
   }
 }
-  if (!displayRecords.length) {
-    container.innerHTML = "<p>No records found.</p>";
-    return;
-  }
 
 // Determine sport type safely based on filter
 let sportType = 'mixed';
@@ -988,7 +993,10 @@ const canShowAdvancedToggle =
   sportType !== 'mixed' &&
   ['basketball', 'baseball', 'softball', 'football'].includes(sportType);
 
-const totalPages = Math.ceil(currentRecords.length / recordsPerPage);
+const totalPages = Math.max(1, Math.ceil(currentRecords.length / recordsPerPage));
+if (currentPage > totalPages) {
+  currentPage = totalPages;
+}
 const start = (currentPage - 1) * recordsPerPage;
 const end = start + recordsPerPage;
 const pageRecords = currentRecords.slice(start, end);
@@ -1019,7 +1027,7 @@ const pageRecords = currentRecords.slice(start, end);
     ${categoryTabsHTML}
     <div class="pagination-controls">
       <div class="pagination-info">
-      Showing ${start + 1}-${Math.min(end, displayRecords.length)} of ${displayRecords.length} ${
+      Showing ${start + 1}-${Math.min(end, currentRecords.length)} of ${currentRecords.length} ${
        statsView === 'career-standard'
         ? 'players (4-year standard)'
         : statsView === 'career-extended'
@@ -1129,11 +1137,11 @@ const pageRecords = currentRecords.slice(start, end);
       }
     });
   }
-  // Apply intelligent default sort
-  const defaultKey = getDefaultSortKey(
-  filters.sport || displayRecords[0]?.sport,
-  currentStatCategory
-  );
+
+  return {
+    renderedCount: currentRecords.length,
+    sourceCount: rawRecords.length,
+  };
 }
 
 function renderTableRows(records, startIndex = 0, sportType = 'basketball', hideSchool = false, hideSport = false, columns = [], latestSeason = "") {

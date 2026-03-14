@@ -13,11 +13,8 @@ const footballVariantFilter = document.querySelector("#footballVariantFilter");
 const footballVariantFilterField = document.querySelector("#footballVariantFilterField");
 const statsViewFilter = document.querySelector("#statsViewFilter");
 const applyFiltersBtn = document.querySelector("#applyFiltersBtn");
-const modeTabs = Array.from(document.querySelectorAll(".mode-tab"));
-const modePanels = Array.from(document.querySelectorAll("[data-mode-panel]"));
 
 let activeRequest = 0;
-let currentMode = "individual";
 let allSchools = [];
 let hasAppliedFilters = false;
 
@@ -53,7 +50,7 @@ function hasMeaningfulFilters(query, filters) {
   );
 }
 
-function renderResearchEmptyState(message = "Choose filters to explore records.") {
+function renderResearchEmptyState(message = "Select filters, then click Explore Records.") {
   if (!recordsContainer) return;
 
   recordsContainer.innerHTML = `
@@ -76,67 +73,20 @@ function toggleFootballVariantFilter() {
   }
 }
 
-function setMode(mode) {
-  currentMode = mode;
-
-  modeTabs.forEach((tab) => {
-    const isActive = tab.dataset.mode === mode;
-    tab.classList.toggle("active", isActive);
-    tab.setAttribute("aria-selected", String(isActive));
-  });
-
-  modePanels.forEach((panel) => {
-    panel.hidden = panel.dataset.modePanel !== mode;
-  });
-
-  if (mode !== "individual") {
-    updateStatus("");
-    return;
-  }
-
-  if (!hasAppliedFilters) {
-    updateStatus("Choose filters, then click Explore Records.");
-    renderResearchEmptyState();
-  }
-}
-
-function setupModeTabs() {
-  if (!modeTabs.length || !modePanels.length) return;
-
-  modeTabs.forEach((tab) => {
-    tab.addEventListener("click", () => {
-      const mode = tab.dataset.mode;
-      if (!mode || mode === currentMode) {
-        return;
-      }
-
-      setMode(mode);
-    });
-  });
-}
-
 function onFiltersChanged() {
-  if (currentMode !== "individual") {
-    return;
-  }
-
   hasAppliedFilters = false;
-  updateStatus("Filters updated. Click Explore Records.");
-  renderResearchEmptyState("Select sport, school, season, or search text, then click Explore Records.");
+  updateStatus("Select filters, then click Explore Records.");
+  renderResearchEmptyState("Select filters, then click Explore Records.");
 }
 
 async function runSearch({ force = false } = {}) {
-  if (currentMode !== "individual") {
-    return;
-  }
-
   const query = (filterInput?.value || "").trim();
   const filters = buildFilters();
 
   if (!hasMeaningfulFilters(query, filters)) {
     hasAppliedFilters = false;
-    updateStatus("Choose filters to explore records.");
-    renderResearchEmptyState();
+    updateStatus("Select filters, then click Explore Records.");
+    renderResearchEmptyState("Select filters, then click Explore Records.");
     return;
   }
 
@@ -158,8 +108,14 @@ async function runSearch({ force = false } = {}) {
     }
 
     const statsView = statsViewFilter ? statsViewFilter.value : "season";
-    renderRecords(recordsContainer, statsView, filters, records);
-    updateStatus(`${records.length} record(s) loaded.`);
+    const renderSummary = renderRecords(recordsContainer, statsView, filters, records);
+
+    if (!renderSummary?.renderedCount) {
+      updateStatus("No records found.");
+      return;
+    }
+
+    updateStatus(`${renderSummary.renderedCount} record(s) shown.`);
   } catch (error) {
     if (requestId !== activeRequest) {
       return;
@@ -232,12 +188,9 @@ function applyInitialParams() {
     seasonFilter.value = initialSeason;
   }
 
-  return Boolean(initialQuery || initialSchool || initialSport || initialSeason);
 }
 
 async function init() {
-  setupModeTabs();
-  setMode("individual");
   updateStatus("Loading filters...");
 
   try {
@@ -253,17 +206,11 @@ async function init() {
     populateSimpleSelect(sportFilter, sports || [], "All sports");
     populateSimpleSelect(seasonFilter, seasons || [], "All seasons");
 
-    const shouldAutoRun = applyInitialParams();
-
-    if (shouldAutoRun) {
-      hasAppliedFilters = true;
-      await runSearch({ force: true });
-      return;
-    }
+    applyInitialParams();
 
     hasAppliedFilters = false;
-    updateStatus("Choose filters, then click Explore Records.");
-    renderResearchEmptyState();
+    updateStatus("Select filters, then click Explore Records.");
+    renderResearchEmptyState("Select filters, then click Explore Records.");
   } catch (error) {
     console.error(error);
     updateStatus("Could not load filters.");

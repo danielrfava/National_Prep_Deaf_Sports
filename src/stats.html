@@ -9,97 +9,73 @@
   <body class="public-page">
     <header data-public-nav></header>
 
-    <section class="mode-tabs-wrap" aria-label="Stats modes">
-      <div class="container mode-tabs-container" role="tablist" aria-label="Statistics mode tabs">
-        <button class="mode-tab active" id="modeTabIndividual" type="button" role="tab" aria-selected="true" aria-controls="individualModePanel" data-mode="individual">Individual</button>
-        <button class="mode-tab" id="modeTabTeam" type="button" role="tab" aria-selected="false" aria-controls="teamModePanel" data-mode="team">Team</button>
-        <button class="mode-tab" id="modeTabCoaches" type="button" role="tab" aria-selected="false" aria-controls="coachesModePanel" data-mode="coaches">Coaches</button>
-      </div>
-    </section>
-
     <main class="container public-main">
-      <section id="individualModePanel" data-mode-panel="individual">
-        <section class="filters" aria-label="Filters">
-          <div class="filter-grid">
-            <div class="filter-field">
-              <label for="athleteFilter">Search</label>
-              <input id="athleteFilter" type="search" placeholder="Search athlete name" autocomplete="off" />
-            </div>
-
-            <div class="filter-field">
-              <label for="divisionFilter">Division</label>
-              <select id="divisionFilter">
-                <option value="">All</option>
-                <option value="d1">Division 1</option>
-                <option value="d2">Division 2</option>
-              </select>
-            </div>
-
-            <div class="filter-field">
-              <label for="schoolFilter">School</label>
-              <select id="schoolFilter">
-                <option value="">All schools</option>
-              </select>
-            </div>
-
-            <div class="filter-field">
-              <label for="sportFilter">Sport</label>
-              <select id="sportFilter">
-                <option value="">All sports</option>
-              </select>
-            </div>
-
-            <div class="filter-field">
-              <label for="seasonFilter">Season</label>
-              <select id="seasonFilter">
-                <option value="">All seasons</option>
-              </select>
-            </div>
-
-            <div class="filter-field" id="footballVariantFilterField" style="display: none;">
-              <label for="footballVariantFilter">Football Type</label>
-              <select id="footballVariantFilter">
-                <option value="">All Types</option>
-                <option value="8-man">8-Man</option>
-                <option value="11-man">11-Man</option>
-              </select>
-            </div>
-
-            <div class="filter-field">
-              <label for="statsViewFilter">Stats View</label>
-              <select id="statsViewFilter">
-                <option value="season">Season</option>
-                <option value="career-standard">Career (4-Year Standard)</option>
-                <option value="career-extended">Career (Extended Eligibility)</option>
-              </select>
-            </div>
+      <section class="filters" aria-label="Filters">
+        <div class="filter-grid">
+          <div class="filter-field">
+            <label for="athleteFilter">Search</label>
+            <input id="athleteFilter" type="search" placeholder="Search athlete name" autocomplete="off" />
           </div>
 
-          <div class="filter-actions">
-            <button id="applyFiltersBtn" type="button" class="apply-filters-btn">Explore Records</button>
+          <div class="filter-field">
+            <label for="divisionFilter">Division</label>
+            <select id="divisionFilter">
+              <option value="">All</option>
+              <option value="d1">Division 1</option>
+              <option value="d2">Division 2</option>
+            </select>
           </div>
 
-          <p id="status" class="status" aria-live="polite"></p>
-        </section>
+          <div class="filter-field">
+            <label for="schoolFilter">School</label>
+            <select id="schoolFilter">
+              <option value="">All schools</option>
+            </select>
+          </div>
 
-        <section>
-          <h2>Player Statistics</h2>
-          <div id="records"></div>
-        </section>
+          <div class="filter-field">
+            <label for="sportFilter">Sport</label>
+            <select id="sportFilter">
+              <option value="">All sports</option>
+            </select>
+          </div>
+
+          <div class="filter-field">
+            <label for="seasonFilter">Season</label>
+            <select id="seasonFilter">
+              <option value="">All seasons</option>
+            </select>
+          </div>
+
+          <div class="filter-field" id="footballVariantFilterField" style="display: none;">
+            <label for="footballVariantFilter">Football Type</label>
+            <select id="footballVariantFilter">
+              <option value="">All Types</option>
+              <option value="8-man">8-Man</option>
+              <option value="11-man">11-Man</option>
+            </select>
+          </div>
+
+          <div class="filter-field">
+            <label for="statsViewFilter">Stats View</label>
+            <select id="statsViewFilter">
+              <option value="season">Season</option>
+              <option value="career-standard">Career (4-Year Standard)</option>
+              <option value="career-extended">Career (Extended Eligibility)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="filter-actions">
+          <button id="applyFiltersBtn" type="button" class="apply-filters-btn">Explore Records</button>
+        </div>
+
+        <p id="status" class="status" aria-live="polite"></p>
       </section>
 
-      <section id="teamModePanel" data-mode-panel="team" hidden>
-        <section class="mode-placeholder" aria-label="Team mode">
-          <h2>Team Rankings</h2>
-          <p>Team rankings mode is coming soon. We will add offense and defense ranking views here.</p>
-        </section>
-      </section>
-
-      <section id="coachesModePanel" data-mode-panel="coaches" hidden>
-        <section class="mode-placeholder" aria-label="Coaches mode">
-          <h2>Winning Coaches</h2>
-          <p>Coaches mode is coming soon. We will add coach and program records after game data is ready.</p>
-        </section>
+      <section>
+        <h2>Player Statistics</h2>
+        <div id="records"></div>
       </section>
     </main>
 

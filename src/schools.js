@@ -24,10 +24,7 @@ async function loadSchools() {
       .map((school) => {
         const name = school.full_name || school.short_name || school.id;
         const division = school.division ? `Division ${String(school.division).toUpperCase()}` : "Division N/A";
-        const hasRealSchoolId = school.id && !String(school.id).startsWith("signal:");
-        const href = hasRealSchoolId
-          ? `stats.html?school=${encodeURIComponent(school.id)}`
-          : `stats.html?q=${encodeURIComponent(name)}`;
+        const href = `stats.html?school=${encodeURIComponent(school.id)}`;
 
         return `
           <a class="public-result-card public-link-card" href="${href}">

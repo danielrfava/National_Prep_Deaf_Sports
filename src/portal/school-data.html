@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>School Data - NPDS</title>
+  <link rel="stylesheet" href="../styles.css" />
+  <style>
+    :root { --bg:#0b1118; --surface:#131d2a; --surface2:#0f1a28; --border:#2b3b4f; --text:#e6edf5; --muted:#9fb0c3; --accent:#17b897; --warn:#f8cf7b; --danger:#f28b82; }
+    body { background: radial-gradient(1200px 700px at 20% -10%, #1b2b3b 0%, rgba(27,43,59,0) 55%), radial-gradient(900px 500px at 110% 10%, #16303f 0%, rgba(22,48,63,0) 50%), var(--bg); color: var(--text); min-height: 100vh; }
+    .shell { max-width: 1320px; margin: 14px auto 28px; padding: 0 14px; display: grid; gap: 12px; font-family: "Segoe UI","Inter","Montserrat",sans-serif; }
+    .panel { border: 1px solid var(--border); border-radius: 14px; background: linear-gradient(180deg, rgba(14,22,32,.95) 0%, rgba(12,19,29,.95) 100%); box-shadow: 0 14px 34px rgba(2,8,16,.4); overflow: hidden; }
+    .head { padding: 10px 14px 8px; border-bottom: 1px solid #223245; background: #141f2d; }
+    .head h2 { margin: 0 0 4px; font-size: 1rem; }
+    .head p { margin: 0; color: var(--muted); font-size: .82rem; line-height: 1.25; }
+    .body { padding: 12px 14px; }
+    .hero { padding: 14px; display: grid; gap: 12px; }
+    .hero-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .title { margin: 0; font-size: 1.5rem; line-height: 1.1; }
+    .subline { margin: 0; color: var(--muted); font-size: .86rem; }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .chip { display: inline-flex; align-items: center; border: 1px solid #30445b; border-radius: 999px; padding: 5px 10px; background: #0f1a28; color: #c8d7e7; font-size: .75rem; font-weight: 700; }
+    .chip.ok { border-color: rgba(23,184,151,.48); background: rgba(23,184,151,.16); color: #b6f5e8; }
+    .chip.warn { border-color: rgba(248,207,123,.42); background: rgba(248,207,123,.16); color: #f8e8bd; }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    .action { text-decoration: none; border: 1px solid #2d4158; border-radius: 10px; background: #101c2a; color: #dfeaf7; padding: 8px 11px; font-size: .78rem; font-weight: 800; line-height: 1; }
+    .action:hover { border-color: var(--accent); background: #122233; }
+    .state-notice { border: 1px solid #30445b; border-radius: 14px; background: #101b28; padding: 12px 14px; display: grid; gap: 10px; }
+    .state-notice.locked { border-color: rgba(248,207,123,.42); background: rgba(71,55,26,.24); }
+    .state-notice.empty { border-color: rgba(141,177,216,.28); background: rgba(16,29,43,.88); }
+    .state-kicker { margin: 0; color: #9db8cf; font-size: .72rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+    .state-title { margin: 0; font-size: 1rem; line-height: 1.2; color: #eef6fd; }
+    .state-copy { margin: 0; color: #bfd0df; font-size: .83rem; line-height: 1.4; }
+    .state-checklist { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+    .state-checklist li { border: 1px solid #2a3b4f; border-radius: 10px; background: rgba(11,17,24,.46); padding: 9px 10px; display: grid; gap: 4px; }
+    .state-checklist strong { color: #eef6fd; font-size: .82rem; }
+    .state-checklist span { color: #a7bbce; font-size: .77rem; line-height: 1.35; }
+    .kpis { display: grid; grid-template-columns: repeat(6,minmax(0,1fr)); gap: 8px; }
+    .kpi { border: 1px solid #2a3b4f; border-radius: 12px; background: #111d2b; padding: 10px; display: grid; gap: 4px; min-height: 90px; }
+    .kpi .l { margin: 0; color: #9db1c5; font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; font-weight: 700; }
+    .kpi .v { margin: 0; font-size: 1.45rem; font-weight: 800; line-height: 1; }
+    .kpi .f { margin: 0; color: #8fa6bc; font-size: .75rem; }
+    .grid { display: grid; grid-template-columns: minmax(300px,360px) minmax(0,1fr); gap: 12px; align-items: start; }
+    .stack { display: grid; gap: 12px; }
+    .list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+    .list-item { border: 1px solid #2a3b4f; border-radius: 10px; background: #111d2b; padding: 9px 10px; display: grid; gap: 5px; }
+    .list-item strong { color: #eef6fd; }
+    .meta { color: #9fb3c7; font-size: .76rem; line-height: 1.35; }
+    .tabs { display: inline-grid; grid-auto-flow: column; gap: 5px; border: 1px solid #2b3c50; border-radius: 10px; background: #0d1622; padding: 3px; overflow-x: auto; }
+    .tab { border: none; background: transparent; color: #b9cadb; border-radius: 8px; padding: 7px 11px; font-size: .78rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
+    .tab.active { background: var(--accent); color: #fff; }
+    .section-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+    .empty { border: 1px dashed #32465d; border-radius: 11px; background: #0f1a28; padding: 22px 16px; text-align: center; color: #a8bbce; font-size: .84rem; line-height: 1.35; }
+    .logout { border: 1px solid rgba(255,255,255,.22); background: rgba(255,255,255,.1); color: #fff; border-radius: 8px; padding: 7px 12px; font-size: .78rem; font-weight: 700; cursor: pointer; }
+    .logout:hover { background: rgba(255,255,255,.18); border-color: rgba(255,255,255,.35); }
+    @media (max-width: 1120px) { .kpis{grid-template-columns:repeat(3,minmax(0,1fr));} .grid{grid-template-columns:1fr;} .section-grid{grid-template-columns:1fr;} }
+    @media (max-width: 760px) { .shell{margin-top:10px;padding:0 10px;} .kpis{grid-template-columns:repeat(2,minmax(0,1fr));} }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-container">
+      <a class="brand" href="../index.html">
+        <div class="logo">NP</div>
+        <div class="brand-text">
+          <div class="brand-title">National Prep Deaf Sports</div>
+          <div class="brand-tag">School Data</div>
+        </div>
+      </a>
+      <nav class="nav">
+        <a class="nav-link" href="dashboard.html">Dashboard</a>
+        <a class="nav-link" href="submit-game.html">Submit Stats</a>
+      </nav>
+      <button id="logoutBtn" class="logout" type="button">Logout</button>
+    </div>
+  </header>
+
+  <main class="shell">
+    <section class="panel hero">
+      <div class="hero-head">
+        <div>
+          <h1 id="schoolDataTitle" class="title">School Data</h1>
+          <p id="schoolDataSubline" class="subline">Loading school intelligence...</p>
+        </div>
+        <div class="chips">
+          <span id="visibilityChip" class="chip">Checking visibility...</span>
+          <span id="seasonChip" class="chip">Season coverage</span>
+        </div>
+      </div>
+      <div class="actions">
+        <a href="dashboard.html" class="action">Back to Dashboard</a>
+        <a href="submit-game.html" class="action">Submit Stats</a>
+        <a id="publicSchoolLink" href="../stats.html" class="action">Public Research</a>
+      </div>
+      <section id="stateNotice" class="state-notice" hidden>
+        <p id="stateNoticeKicker" class="state-kicker">Private School State</p>
+        <h2 id="stateNoticeTitle" class="state-title">Loading school state...</h2>
+        <p id="stateNoticeCopy" class="state-copy">Checking school visibility and access.</p>
+        <ul id="stateNoticeList" class="state-checklist"></ul>
+      </section>
+      <div class="kpis">
+        <article class="kpi"><p class="l">Approved Records</p><p id="kpiRecords" class="v">0</p><p class="f">Published rows</p></article>
+        <article class="kpi"><p class="l">Pending Submissions</p><p id="kpiPending" class="v">0</p><p class="f">Needs review</p></article>
+        <article class="kpi"><p class="l">Sports With Data</p><p id="kpiSports" class="v">0</p><p class="f">Tracked coverage</p></article>
+        <article class="kpi"><p class="l">Missing Sports</p><p id="kpiMissingSports" class="v">0</p><p class="f">Coverage gaps</p></article>
+        <article class="kpi"><p class="l">Latest Season</p><p id="kpiLatestSeason" class="v">-</p><p class="f">Most recent rows</p></article>
+        <article class="kpi"><p class="l">Approved Staff</p><p id="kpiStaff" class="v">0</p><p class="f">Active helpers</p></article>
+      </div>
+    </section>
+
+    <div class="grid">
+      <div class="stack">
+        <section class="panel">
+          <div class="head"><h2>Coverage Snapshot</h2><p>What your school already has and what is still missing.</p></div>
+          <div class="body"><ul id="coverageList" class="list"><li class="empty">Loading coverage...</li></ul></div>
+        </section>
+
+        <section class="panel">
+          <div class="head"><h2>Milestone Watch</h2><p>Closest individual thresholds based on your current approved data.</p></div>
+          <div class="body"><ul id="milestoneList" class="list"><li class="empty">Loading milestones...</li></ul></div>
+        </section>
+
+        <section class="panel">
+          <div class="head"><h2>Recently Approved</h2><p>Latest school submissions that cleared review.</p></div>
+          <div class="body"><ul id="recentList" class="list"><li class="empty">Loading recent approvals...</li></ul></div>
+        </section>
+      </div>
+
+      <section class="panel">
+        <div class="head">
+          <h2>Sport Intelligence</h2>
+          <p>School-only leaders, current season snapshots, and missing-year checks.</p>
+        </div>
+        <div class="body stack">
+          <div id="sportTabs" class="tabs" aria-label="Sports"></div>
+          <div class="section-grid">
+            <section>
+              <h3>All-Time Leaders</h3>
+              <ul id="allTimeList" class="list"><li class="empty">Choose a sport to view leaders.</li></ul>
+            </section>
+            <section>
+              <h3>Current Season Leaders</h3>
+              <ul id="seasonLeaderList" class="list"><li class="empty">Choose a sport to view current season leaders.</li></ul>
+            </section>
+            <section>
+              <h3>Coverage Gaps</h3>
+              <ul id="sportGapList" class="list"><li class="empty">Choose a sport to view coverage gaps.</li></ul>
+            </section>
+            <section>
+              <h3>Sport Summary</h3>
+              <ul id="sportSummaryList" class="list"><li class="empty">Choose a sport to view school-only intelligence.</li></ul>
+            </section>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script src="../env.js"></script>
+  <script type="module" src="./school-data.js"></script>
+</body>
+</html>

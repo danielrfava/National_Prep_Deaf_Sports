@@ -1,4 +1,9 @@
-import { supabase } from "../supabaseClient.js";
+import {
+  buildAthleteProfileHref,
+  fetchPublicSearchRows,
+  groupAthleteSearchResults,
+  groupSchoolSearchResults,
+} from "../services/publicEntityService.js";
 
 export function attachSearchAutocomplete(input, options = {}) {
   if (!input) return { destroy: () => {} };
@@ -125,171 +130,44 @@ export function attachSearchAutocomplete(input, options = {}) {
 }
 
 async function fetchPreviewResults(query, maxRows) {
-  const safe = query.replace(/%/g, "\\%").replace(/_/g, "\\_");
-  const like = `%${safe}%`;
-
-  const filters = [
-    `school.ilike.${like}`,
-    `sport.ilike.${like}`,
-    `season.ilike.${like}`,
-    `stat_row->>Athlete Name.ilike.${like}`,
-    `stat_row->>athlete_name.ilike.${like}`,
-    `stat_row->>name.ilike.${like}`,
-  ].join(",");
-
-  const baseQuery = () =>
-    supabase
-      .from("raw_stat_rows")
-      .select("id, school_id, school, sport, season, stat_row")
-      .order("season", { ascending: false })
-      .limit(120);
-
-  let response = await baseQuery().or(filters);
-  if (response.error) {
-    response = await baseQuery().or(
-      [`school.ilike.${like}`, `sport.ilike.${like}`, `season.ilike.${like}`].join(",")
-    );
-  }
-
-  if (response.error) {
-    console.error(response.error);
+  try {
+    const rows = await fetchPublicSearchRows(query, { limit: 60 });
+    const athleteItems = buildAthleteItems(rows, query);
+    const schoolItems = buildSchoolItems(rows);
+    return [...athleteItems, ...schoolItems].slice(0, maxRows);
+  } catch (error) {
+    console.error(error);
     return [];
   }
-
-  const rows = response.data || [];
-  const athleteItems = buildAthleteItems(rows);
-  const schoolItems = buildSchoolItems(rows);
-  const recordItems = buildRecordItems(rows);
-
-  return [...athleteItems, ...schoolItems, ...recordItems].slice(0, maxRows);
 }
 
-function buildAthleteItems(rows) {
-  const groups = new Map();
-
-  rows.forEach((row) => {
-    const athlete = extractAthleteName(row.stat_row);
-    if (!athlete) return;
-
-    const school = String(row.school || "Unknown School").trim();
-    const key = `${athlete.toLowerCase()}::${school.toLowerCase()}`;
-
-    if (!groups.has(key)) {
-      groups.set(key, {
-        type: "athlete",
-        typeLabel: "Athlete",
-        title: athlete,
-        school,
-        schoolId: row.school_id || "",
-        sports: new Set(),
-        seasons: new Set(),
-      });
-    }
-
-    const item = groups.get(key);
-    if (row.sport) item.sports.add(row.sport);
-    if (row.season) item.seasons.add(row.season);
-  });
-
-  return Array.from(groups.values())
-    .map((item) => {
-      const sports = Array.from(item.sports).slice(0, 3).join(" | ") || "Sport unknown";
-      const seasons = buildSeasonRange(Array.from(item.seasons));
-      return {
-        ...item,
-        meta: `${item.school} | ${sports}${seasons ? ` | ${seasons}` : ""}`,
-      };
-    })
-    .sort((a, b) => a.title.localeCompare(b.title))
-    .slice(0, 5);
+function buildAthleteItems(rows, query) {
+  return groupAthleteSearchResults(rows, { query, limit: 5 }).map((item) => ({
+    ...item,
+    type: "athlete",
+    typeLabel: "Athlete",
+    title: item.displayName || item.athlete,
+    meta: `${item.school} | ${item.sports.slice(0, 3).join(" | ") || "Sport unknown"}${
+      item.seasonRange ? ` | ${item.seasonRange}` : ""
+    }${item.classTag ? ` | ${item.classTag}` : ""}`,
+  }));
 }
 
 function buildSchoolItems(rows) {
-  const groups = new Map();
-
-  rows.forEach((row) => {
-    const school = String(row.school || "").trim();
-    if (!school) return;
-
-    const key = school.toLowerCase();
-    if (!groups.has(key)) {
-      groups.set(key, {
-        type: "school",
-        typeLabel: "School",
-        title: school,
-        schoolId: row.school_id || "",
-        sports: new Set(),
-      });
-    }
-
-    const item = groups.get(key);
-    if (!item.schoolId && row.school_id) item.schoolId = row.school_id;
-    if (row.sport) item.sports.add(row.sport);
-  });
-
-  return Array.from(groups.values())
-    .map((item) => ({
-      ...item,
-      meta: item.sports.size
-        ? `Sports: ${Array.from(item.sports).slice(0, 3).join(", ")}`
-        : "School records",
-    }))
-    .sort((a, b) => a.title.localeCompare(b.title))
-    .slice(0, 2);
-}
-
-function buildRecordItems(rows) {
-  return rows
-    .slice(0, 3)
-    .map((row) => {
-      const athlete = extractAthleteName(row.stat_row) || "Unknown athlete";
-      const sport = row.sport || "Unknown sport";
-      const school = row.school || "Unknown school";
-      const season = row.season || "";
-      return {
-        type: "record",
-        typeLabel: "Record",
-        title: athlete,
-        query: athlete,
-        schoolId: row.school_id || "",
-        meta: `${school} | ${sport}${season ? ` | ${season}` : ""}`,
-      };
-    });
-}
-
-function buildSeasonRange(seasons) {
-  const clean = seasons
-    .map((value) => String(value || "").trim())
-    .filter(Boolean)
-    .sort();
-
-  if (!clean.length) return "";
-  if (clean.length === 1) return clean[0];
-  return `${clean[0]}-${clean[clean.length - 1]}`;
-}
-
-function extractAthleteName(statRow) {
-  if (!statRow || typeof statRow !== "object") return "";
-  return String(
-    statRow["Athlete Name"] ||
-      statRow.athlete_name ||
-      statRow.player_name ||
-      statRow.player ||
-      statRow.name ||
-      ""
-  ).trim();
+  return groupSchoolSearchResults(rows, { limit: 2 }).map((item) => ({
+    ...item,
+    type: "school",
+    typeLabel: "School",
+    title: item.school,
+    meta: item.sports.length
+      ? `Sports: ${item.sports.slice(0, 3).join(", ")}${item.seasonRange ? ` | ${item.seasonRange}` : ""}`
+      : "School records",
+  }));
 }
 
 function defaultSelectHandler(result) {
   if (result.type === "athlete") {
-    const params = new URLSearchParams({
-      name: result.title,
-      school: result.school || "",
-    });
-    if (result.schoolId) {
-      params.set("school_id", result.schoolId);
-    }
-    window.location.href = `athlete.html?${params.toString()}`;
+    window.location.href = buildAthleteProfileHref(result);
     return;
   }
 

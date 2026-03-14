@@ -28,48 +28,66 @@
     </header>
 
     <main class="portal-auth-main">
-      <section class="portal-login-card">
-        <p class="public-kicker">Athletic Director Portal</p>
-        <h1 class="portal-login-title">Athletic Director Log In</h1>
-        <p class="portal-login-subline">Submit stats and manage your school's records.</p>
+      <div class="portal-auth-stack">
+        <section class="portal-login-card">
+          <p class="public-kicker">School Dashboard</p>
+          <h1 class="portal-login-title">School Staff Log In</h1>
+          <p class="portal-login-subline">Approved school staff can submit stats and manage school records.</p>
 
-        <div id="alert" class="portal-alert" hidden></div>
+          <div id="alert" class="portal-alert" hidden></div>
 
-        <form id="loginForm" class="portal-login-form" novalidate>
-          <label class="portal-label" for="email">Email Address</label>
-          <input
-            type="email"
-            id="email"
-            name="email"
-            required
-            autocomplete="email"
-            placeholder="your.email@school.edu"
-          />
+          <form id="loginForm" class="portal-login-form" novalidate>
+            <label class="portal-label" for="email">Email Address</label>
+            <input
+              type="email"
+              id="email"
+              name="email"
+              required
+              autocomplete="email"
+              placeholder="your.email@school.edu"
+            />
 
-          <label class="portal-label" for="password">Password</label>
-          <input
-            type="password"
-            id="password"
-            name="password"
-            required
-            autocomplete="current-password"
-            placeholder="Enter password"
-          />
+            <label class="portal-label" for="password">Password</label>
+            <input
+              type="password"
+              id="password"
+              name="password"
+              required
+              autocomplete="current-password"
+              placeholder="Enter password"
+            />
 
-          <button type="submit" class="portal-login-btn" id="loginBtn">Sign In</button>
-        </form>
+            <button type="submit" class="portal-login-btn" id="loginBtn">Sign In</button>
+          </form>
 
-        <div class="portal-login-links">
-          <a href="../index.html">Back to Public Site</a>
-          <a href="mailto:danielrfava@gmail.com?subject=NPDS%20Portal%20Access%20Request">Need an account? Request Access</a>
-        </div>
-      </section>
+          <div class="portal-login-links">
+            <a href="../index.html">Back to Public Site</a>
+            <a href="mailto:danielrfava@gmail.com?subject=NPDS%20Portal%20School%20Access">Need help with approval?</a>
+          </div>
+        </section>
+
+        <section class="portal-secondary-card" aria-labelledby="createAccountTitle">
+          <p class="portal-secondary-kicker">Need school access to submit stats?</p>
+          <h2 id="createAccountTitle" class="portal-secondary-title">Create your school access request</h2>
+          <p class="portal-secondary-copy">
+            New school accounts are reviewed before dashboard access is approved.
+          </p>
+          <a class="portal-secondary-action" href="create-account.html">Create School Account</a>
+        </section>
+      </div>
     </main>
 
     <script src="../env.js"></script>
     <script type="module">
       import { supabase } from "../supabaseClient.js";
       import { mountPublicTopNav } from "../components/publicTopNav.js";
+      import {
+        consumePortalFlash,
+        getBlockedAccessMessage,
+        isAdminProfile,
+        isApprovedSchoolProfile,
+        setPortalFlash,
+      } from "./schoolAccess.js";
 
       mountPublicTopNav({ active: "login", basePath: "../" });
 
@@ -89,26 +107,39 @@
         alertDiv.hidden = true;
       }
 
+      const flash = consumePortalFlash();
+      if (flash?.message) {
+        showAlert(flash.message, flash.type || "error");
+      }
+
       async function routeByRole(userId) {
         const { data: profile, error: profileError } = await supabase
           .from("user_profiles")
-          .select("role")
+          .select("*")
           .eq("id", userId)
           .single();
 
         if (profileError) throw profileError;
 
-        if (profile?.role === "athletic_director") {
-          window.location.href = "dashboard.html";
-          return;
-        }
-
-        if (profile?.role === "admin") {
+        if (isAdminProfile(profile)) {
           window.location.href = "../admin/admin-dashboard.html";
           return;
         }
 
-        throw new Error("You do not have access to this portal.");
+        if (isApprovedSchoolProfile(profile)) {
+          window.location.href = "dashboard.html";
+          return;
+        }
+
+        if (profile) {
+          window.location.href = "dashboard.html";
+          return;
+        }
+
+        const blockedMessage = getBlockedAccessMessage(profile);
+        setPortalFlash(blockedMessage);
+        await supabase.auth.signOut();
+        throw new Error(blockedMessage);
       }
 
       form?.addEventListener("submit", async (event) => {
@@ -141,8 +172,8 @@
 
         try {
           await routeByRole(session.user.id);
-        } catch (_error) {
-          // stay on login if role lookup fails
+        } catch (error) {
+          showAlert(error.message || "You do not have access to this portal.");
         }
       });
     </script>

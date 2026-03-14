@@ -1,10 +1,23 @@
 import { supabase } from "../supabaseClient.js";
+import { mapSubmissionMethod } from "../portal/schoolAccess.js";
 
 export async function formatForSupabase(parsedData, metadata) {
   console.log("Converting to Supabase JSON format...");
 
   const parsedSport = parsedData?.game?.sport || metadata?.sport || "basketball";
   const parsedGender = parsedData?.game?.gender ?? metadata?.gender ?? null;
+  const submittedBy = String(metadata?.userId || "").trim();
+  const submitterSchoolId = String(
+    metadata?.schoolId || metadata?.defaultSchoolId || ""
+  ).trim();
+
+  if (!submittedBy) {
+    throw new Error("Submission failed because the signed-in user could not be verified.");
+  }
+
+  if (!submitterSchoolId) {
+    throw new Error("Submission failed because your approved school assignment is missing.");
+  }
 
   const homeSchoolId = await getSchoolId(parsedData?.game?.homeTeam);
   const awaySchoolId = await getSchoolId(parsedData?.game?.awayTeam);
@@ -49,10 +62,10 @@ export async function formatForSupabase(parsedData, metadata) {
       warnings: parsedData?.warnings || [],
     },
 
-    submission_method: metadata?.submissionMethod || "csv_upload",
+    submission_method: mapSubmissionMethod(metadata?.submissionMethod),
     original_data: metadata?.originalData || null,
-    submitted_by: metadata?.userId,
-    submitter_school_id: metadata?.schoolId,
+    submitted_by: submittedBy,
+    submitter_school_id: submitterSchoolId,
   };
 
   return supabaseJSON;

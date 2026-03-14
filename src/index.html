@@ -62,6 +62,7 @@
     <script type="module">
       import { mountPublicTopNav } from "./components/publicTopNav.js";
       import { attachSearchAutocomplete } from "./components/searchAutocomplete.js";
+      import { buildAthleteProfileHref } from "./services/publicEntityService.js";
 
       mountPublicTopNav({ active: "search", landing: true });
 
@@ -158,14 +159,7 @@
           activateSearchState();
 
           if (result.type === "athlete") {
-            const params = new URLSearchParams({
-              name: result.title,
-              school: result.school || "",
-            });
-            if (result.schoolId) {
-              params.set("school_id", result.schoolId);
-            }
-            window.location.href = `athlete.html?${params.toString()}`;
+            window.location.href = buildAthleteProfileHref(result);
             return;
           }
 

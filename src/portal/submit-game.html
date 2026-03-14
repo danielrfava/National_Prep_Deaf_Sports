@@ -44,12 +44,12 @@
     display: block;
   }
 
-  .mode-grid {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 5px;
-    margin-bottom: 5px;
-  }
+    .mode-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 5px;
+      margin-bottom: 5px;
+    }
 
   .mode-card {
     appearance: none;
@@ -473,6 +473,162 @@
       color: #9fb0c3;
     }
 
+    .template-toolkit {
+      display: grid;
+      gap: 8px;
+      padding: 10px;
+      border: 1px solid #294055;
+      border-radius: 12px;
+      background:
+        radial-gradient(120% 140% at 0% 0%, rgba(23, 184, 151, 0.08), rgba(23, 184, 151, 0) 46%),
+        #0f1926;
+    }
+
+    .template-toolkit-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .template-kicker {
+      display: block;
+      margin-bottom: 3px;
+      font-size: 0.68rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #8ec6ba;
+    }
+
+    .template-title {
+      display: block;
+      color: #f3f9ff;
+      font-size: 0.84rem;
+      font-weight: 800;
+    }
+
+    .template-description {
+      margin: 4px 0 0;
+      color: #a7bbd0;
+      font-size: 0.76rem;
+      line-height: 1.32;
+      max-width: 620px;
+    }
+
+    .template-action-row {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .portal-btn-inline {
+      padding: 0.42rem 0.64rem;
+      font-size: 0.74rem;
+      border-radius: 8px;
+      min-height: 34px;
+    }
+
+    .template-inline-note {
+      margin: 0;
+      color: #8fa6bd;
+      font-size: 0.74rem;
+      line-height: 1.3;
+    }
+
+    .template-drawer {
+      display: grid;
+      gap: 10px;
+      padding: 10px;
+      border: 1px solid #2a3b4f;
+      border-radius: 10px;
+      background: rgba(10, 18, 28, 0.72);
+    }
+
+    .template-drawer-head {
+      display: grid;
+      gap: 4px;
+    }
+
+    .template-drawer-head strong {
+      color: #eff7ff;
+      font-size: 0.83rem;
+    }
+
+    .template-drawer-head p {
+      margin: 0;
+      color: #9bb0c5;
+      font-size: 0.76rem;
+      line-height: 1.32;
+    }
+
+    .template-guide-grid,
+    .template-history-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .template-guide-card,
+    .template-history-card {
+      display: grid;
+      gap: 8px;
+      border: 1px solid #293b4f;
+      border-radius: 10px;
+      background: #101a27;
+      padding: 10px;
+    }
+
+    .template-guide-card strong,
+    .template-history-card strong {
+      color: #edf6ff;
+      font-size: 0.78rem;
+    }
+
+    .template-chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .template-chip {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: #132739;
+      border: 1px solid #2f4f69;
+      color: #d6eafc;
+      font-size: 0.71rem;
+      font-weight: 700;
+    }
+
+    .template-note-list {
+      margin: 0;
+      padding-left: 18px;
+      color: #b9ccde;
+      font-size: 0.75rem;
+      line-height: 1.35;
+    }
+
+    .template-note-list li + li {
+      margin-top: 5px;
+    }
+
+    .template-history-card p {
+      margin: 0;
+      color: #9bb0c5;
+      font-size: 0.75rem;
+      line-height: 1.32;
+    }
+
+    .template-card-actions {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
     .btn-row {
       display: flex;
       gap: 6px;
@@ -796,6 +952,11 @@
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
 
+      .template-guide-grid,
+      .template-history-grid {
+        grid-template-columns: 1fr;
+      }
+
       .portal-grid {
         grid-template-columns: 1fr;
       }
@@ -818,6 +979,10 @@
     @media (max-width: 640px) {
       .mode-grid {
         grid-template-columns: 1fr;
+      }
+
+      .template-toolkit-head {
+        flex-direction: column;
       }
 
       .portal-shell {
@@ -860,7 +1025,7 @@
         <div class="logo">NP</div>
         <div class="brand-text">
           <div class="brand-title">National Prep Deaf Sports</div>
-          <div class="brand-tag">Athletic Director Portal</div>
+          <div class="brand-tag">School Submission Portal</div>
         </div>
       </div>
       <nav class="nav">
@@ -887,16 +1052,6 @@
         <span class="mode-kicker">Mode 2</span>
         <strong class="mode-title">PDF Reports</strong>
         <span class="mode-copy">PDF review lane with preview-first rules and admin routing.</span>
-      </button>
-      <button id="modeCardHistoric" class="mode-card" data-mode="historic" type="button">
-        <span class="mode-kicker">Mode 3</span>
-        <strong class="mode-title">Historic Recovery</strong>
-        <span class="mode-copy">Planned next phase after Supabase historic schema and routing are ready.</span>
-      </button>
-      <button id="modeCardArchive" class="mode-card" data-mode="archive" type="button">
-        <span class="mode-kicker">Mode 4</span>
-        <strong class="mode-title">Archive Only</strong>
-        <span class="mode-copy">Planned next phase after archive storage and proof metadata are finalized.</span>
       </button>
     </section>
 
@@ -938,6 +1093,34 @@
                 <button id="mode1Btn" class="portal-btn portal-btn-primary" type="button">Spreadsheet</button>
                 <button id="mode2Btn" class="portal-btn portal-btn-secondary" type="button">Flexible</button>
               </div>
+            </div>
+
+            <div id="templateToolkit" class="template-toolkit">
+              <div class="template-toolkit-head">
+                <div>
+                  <span class="template-kicker">Upload Helpers</span>
+                  <strong id="templateToolkitTitle" class="template-title">Templates for Spreadsheet Uploads</strong>
+                  <p id="templateToolkitDescription" class="template-description">
+                    Select basketball or volleyball to unlock sport-specific templates. Historical downloads stay available below.
+                  </p>
+                </div>
+                <div class="template-action-row">
+                  <button id="downloadTemplateBtn" class="portal-btn portal-btn-secondary portal-btn-inline" type="button">
+                    Download Template
+                  </button>
+                  <button id="headerGuideBtn" class="portal-btn portal-btn-secondary portal-btn-inline" type="button">
+                    Header Guide
+                  </button>
+                  <button id="historicalTemplateBtn" class="portal-btn portal-btn-secondary portal-btn-inline" type="button">
+                    Historical Template
+                  </button>
+                </div>
+              </div>
+              <p id="templateToolkitContext" class="template-inline-note">
+                First-wave downloads cover basketball, volleyball, historical individual-season stats, and historical schedule/results.
+              </p>
+              <div id="headerGuidePanel" class="template-drawer hidden"></div>
+              <div id="historicalTemplatePanel" class="template-drawer hidden"></div>
             </div>
 
             <div id="mode1QuickIntake" class="form-stack">
@@ -1262,51 +1445,6 @@ Tyler Brooks: 11 points, 4 rebounds, 7 assists"
             <div class="preview-actions">
               <button id="submitPdfBtn" class="portal-btn portal-btn-success" type="button">Submit PDF for Review</button>
             </div>
-          </div>
-        </section>
-      </div>
-
-      <div id="modeHistoricPanel" class="wizard-panel hidden">
-        <section class="portal-card">
-          <div class="portal-card-header">
-            <h2>Mode 3 - Historic Recovery Engine</h2>
-            <p>Planned after Mode 1/2 validation and Supabase historic schema readiness.</p>
-          </div>
-          <div class="portal-card-body">
-            <div class="warnings-box">
-              <div class="section-head">
-                <h3>Hold For Next Phase</h3>
-                <p>We will activate this lane right after you provide the Supabase historic summary.</p>
-              </div>
-              <ul class="warnings-list">
-                <li>Planned flow: era + source type + user goal + known facts + files.</li>
-                <li>Scorebook photos remain preservation-first and review-routed.</li>
-                <li>No auto-publish path for historic submissions.</li>
-              </ul>
-            </div>
-            <div class="status-pill" style="margin-top: 12px;">Mode 3 is staged and intentionally paused.</div>
-          </div>
-        </section>
-      </div>
-
-      <div id="modeArchivePanel" class="wizard-panel hidden">
-        <section class="portal-card">
-          <div class="portal-card-header">
-            <h2>Mode 4 - Archive Proof Layer</h2>
-            <p>Planned after archive storage wiring is finalized in Supabase.</p>
-          </div>
-          <div class="portal-card-body">
-            <div class="warnings-box">
-              <div class="section-head">
-                <h3>Hold For Next Phase</h3>
-                <p>This lane will open once archive file persistence and proof metadata are confirmed.</p>
-              </div>
-              <ul class="warnings-list">
-                <li>Archive-only keeps evidence even when extraction is weak.</li>
-                <li>Archive intake remains review-routed and never auto-published.</li>
-              </ul>
-            </div>
-            <div class="status-pill" style="margin-top: 12px;">Mode 4 is staged and intentionally paused.</div>
           </div>
         </section>
       </div>

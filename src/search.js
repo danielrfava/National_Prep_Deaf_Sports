@@ -1,13 +1,17 @@
-import { supabase } from "./supabaseClient.js";
 import { mountPublicTopNav } from "./components/publicTopNav.js";
 import { attachSearchAutocomplete } from "./components/searchAutocomplete.js";
+import {
+  buildAthleteProfileHref,
+  fetchPublicSearchRows,
+  groupAthleteSearchResults,
+  groupSchoolSearchResults,
+} from "./services/publicEntityService.js";
 
 const searchInput = document.getElementById("publicSearchInput");
 const searchForm = document.getElementById("publicSearchForm");
 const statusLine = document.getElementById("searchStatus");
 const athletesContainer = document.getElementById("athleteResults");
 const schoolsContainer = document.getElementById("schoolResults");
-const recordsContainer = document.getElementById("recordResults");
 
 let debounceId = null;
 
@@ -44,14 +48,7 @@ searchForm.addEventListener("submit", (event) => {
 attachSearchAutocomplete(searchInput, {
   onSelect(result) {
     if (result.type === "athlete") {
-      const params = new URLSearchParams({
-        name: result.title,
-        school: result.school || "",
-      });
-      if (result.schoolId) {
-        params.set("school_id", result.schoolId);
-      }
-      window.location.href = `athlete.html?${params.toString()}`;
+      window.location.href = buildAthleteProfileHref(result);
       return;
     }
 
@@ -93,138 +90,18 @@ async function runSearch(query) {
   statusLine.textContent = "Searching...";
 
   try {
-    const rows = await fetchSearchRows(query);
-    const athleteRows = extractAthleteGroups(rows);
-    const schoolRows = extractSchoolGroups(rows);
-    const recordRows = rows.slice(0, 12);
+    const rows = await fetchPublicSearchRows(query, { limit: 90 });
+    const athleteRows = groupAthleteSearchResults(rows, { query, limit: 12 });
+    const schoolRows = groupSchoolSearchResults(rows, { limit: 12 });
 
-    statusLine.textContent = `${rows.length} record(s) found`;
+    statusLine.textContent = `${athleteRows.length} athlete match(es) and ${schoolRows.length} school match(es)`;
     renderAthletes(athleteRows);
     renderSchools(schoolRows);
-    renderRecords(recordRows);
   } catch (error) {
     console.error(error);
     statusLine.textContent = "Could not run search right now.";
     renderErrorState();
   }
-}
-
-async function fetchSearchRows(query) {
-  const safe = query.replace(/%/g, "\\%").replace(/_/g, "\\_");
-  const like = `%${safe}%`;
-  const richFilter = [
-    `school.ilike.${like}`,
-    `sport.ilike.${like}`,
-    `season.ilike.${like}`,
-    `stat_row->>Athlete Name.ilike.${like}`,
-    `stat_row->>athlete_name.ilike.${like}`,
-    `stat_row->>name.ilike.${like}`,
-  ].join(",");
-
-  const baseQuery = () =>
-    supabase
-      .from("raw_stat_rows")
-      .select("id, school_id, school, sport, season, stat_row")
-      .order("season", { ascending: false })
-      .limit(120);
-
-  let response = await baseQuery().or(richFilter);
-
-  if (response.error) {
-    const fallbackFilter = [
-      `school.ilike.${like}`,
-      `sport.ilike.${like}`,
-      `season.ilike.${like}`,
-    ].join(",");
-    response = await baseQuery().or(fallbackFilter);
-  }
-
-  if (response.error) {
-    throw response.error;
-  }
-
-  return response.data || [];
-}
-
-function extractAthleteName(statRow) {
-  if (!statRow || typeof statRow !== "object") return "";
-
-  return String(
-    statRow["Athlete Name"] ||
-      statRow.athlete_name ||
-      statRow.player_name ||
-      statRow.player ||
-      statRow.name ||
-      ""
-  ).trim();
-}
-
-function extractAthleteGroups(rows) {
-  const grouped = new Map();
-
-  rows.forEach((row) => {
-    const athlete = extractAthleteName(row.stat_row);
-    if (!athlete) return;
-
-    const school = String(row.school || "Unknown School");
-    const key = `${athlete.toLowerCase()}::${school.toLowerCase()}`;
-
-    if (!grouped.has(key)) {
-      grouped.set(key, {
-        athlete,
-        school,
-        sports: new Set(),
-        seasons: new Set(),
-      });
-    }
-
-    const item = grouped.get(key);
-    if (row.sport) item.sports.add(row.sport);
-    if (row.season) item.seasons.add(row.season);
-  });
-
-  return Array.from(grouped.values())
-    .map((item) => ({
-      athlete: item.athlete,
-      school: item.school,
-      sports: Array.from(item.sports).slice(0, 3),
-      seasons: Array.from(item.seasons).sort().slice(-2),
-    }))
-    .sort((a, b) => a.athlete.localeCompare(b.athlete))
-    .slice(0, 12);
-}
-
-function extractSchoolGroups(rows) {
-  const grouped = new Map();
-
-  rows.forEach((row) => {
-    const school = String(row.school || "").trim();
-    if (!school) return;
-
-    if (!grouped.has(school.toLowerCase())) {
-      grouped.set(school.toLowerCase(), {
-        school,
-        sports: new Set(),
-        seasons: new Set(),
-        schoolId: row.school_id || "",
-      });
-    }
-
-    const item = grouped.get(school.toLowerCase());
-    if (!item.schoolId && row.school_id) item.schoolId = row.school_id;
-    if (row.sport) item.sports.add(row.sport);
-    if (row.season) item.seasons.add(row.season);
-  });
-
-  return Array.from(grouped.values())
-    .map((item) => ({
-      school: item.school,
-      schoolId: item.schoolId,
-      sports: Array.from(item.sports).slice(0, 3),
-      seasons: Array.from(item.seasons).sort().slice(-2),
-    }))
-    .sort((a, b) => a.school.localeCompare(b.school))
-    .slice(0, 12);
 }
 
 function renderAthletes(rows) {
@@ -235,21 +112,15 @@ function renderAthletes(rows) {
 
   athletesContainer.innerHTML = rows
     .map((row) => {
-      const sports = row.sports.length ? row.sports.join(" | ") : "Sport data pending";
-      const seasons = row.seasons.length ? row.seasons.join(", ") : "Season unknown";
-      const params = new URLSearchParams({
-        name: row.athlete,
-        school: row.school,
-      });
-      if (row.schoolId) {
-        params.set("school_id", row.schoolId);
-      }
+      const sports = row.sports.length ? row.sports.slice(0, 3).join(" | ") : "Sport data pending";
+      const seasons = row.seasonRange || "Season unknown";
+      const classTag = row.classTag ? ` | ${row.classTag}` : "";
 
       return `
-        <a class="public-result-card public-link-card" href="athlete.html?${params.toString()}">
-          <h3>${escapeHtml(row.athlete)}</h3>
+        <a class="public-result-card public-link-card" href="${buildAthleteProfileHref(row)}">
+          <h3>${escapeHtml(row.displayName || row.athlete)}</h3>
           <p>${escapeHtml(row.school)}</p>
-          <p class="muted">${escapeHtml(`${sports} | ${seasons}`)}</p>
+          <p class="muted">${escapeHtml(`${sports} | ${seasons}${classTag}`)}</p>
         </a>
       `;
     })
@@ -265,7 +136,7 @@ function renderSchools(rows) {
   schoolsContainer.innerHTML = rows
     .map((row) => {
       const sports = row.sports.length ? row.sports.join(", ") : "No sports yet";
-      const seasons = row.seasons.length ? row.seasons.join(", ") : "No seasons yet";
+      const seasons = row.seasonRange || "No seasons yet";
       const href = row.schoolId
         ? `stats.html?school=${encodeURIComponent(row.schoolId)}`
         : `stats.html?q=${encodeURIComponent(row.school)}`;
@@ -281,43 +152,16 @@ function renderSchools(rows) {
     .join("");
 }
 
-function renderRecords(rows) {
-  if (!rows.length) {
-    recordsContainer.innerHTML = `<div class="public-empty">No record matches.</div>`;
-    return;
-  }
-
-  recordsContainer.innerHTML = rows
-    .map((row) => {
-      const athlete = extractAthleteName(row.stat_row) || "Unknown athlete";
-      const sport = row.sport || "Unknown sport";
-      const school = row.school || "Unknown school";
-      const season = row.season || "Unknown season";
-      const href = `stats.html?q=${encodeURIComponent(athlete)}${row.school_id ? `&school=${encodeURIComponent(row.school_id)}` : ""}`;
-
-      return `
-        <a class="public-result-card public-link-card" href="${href}">
-          <h3>${escapeHtml(athlete)}</h3>
-          <p>${escapeHtml(`${school} | ${sport}`)}</p>
-          <p class="muted">${escapeHtml(`Season: ${season}`)}</p>
-        </a>
-      `;
-    })
-    .join("");
-}
-
 function renderEmptyState() {
   const empty = `<div class="public-empty">Start typing to search.</div>`;
   athletesContainer.innerHTML = empty;
   schoolsContainer.innerHTML = empty;
-  recordsContainer.innerHTML = empty;
 }
 
 function renderErrorState() {
   const empty = `<div class="public-empty">Search unavailable right now.</div>`;
   athletesContainer.innerHTML = empty;
   schoolsContainer.innerHTML = empty;
-  recordsContainer.innerHTML = empty;
 }
 
 function escapeHtml(value) {

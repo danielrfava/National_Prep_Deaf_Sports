@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Athletic Director Command Center - NPDS</title>
+  <title>School Dashboard - NPDS</title>
   <link rel="stylesheet" href="../styles.css" />
   <style>
     :root { --bg:#0b1118; --surface:#131d2a; --surface2:#0f1a28; --border:#2b3b4f; --text:#e6edf5; --muted:#9fb0c3; --accent:#17b897; --warn:#f8cf7b; --danger:#f28b82; }
@@ -30,6 +30,7 @@
     .quick-btn { text-decoration: none; border: 1px solid #2d4158; border-radius: 10px; background: #101c2a; color: #dfeaf7; padding: 7px 11px; font-size: .77rem; font-weight: 800; line-height: 1; transition: .18s; }
     .quick-btn:hover { border-color: var(--accent); background: #122233; transform: translateY(-1px); }
     .grid { display: grid; grid-template-columns: minmax(290px,360px) minmax(0,1fr); gap: 12px; align-items: start; }
+    .left-rail { display: grid; gap: 12px; align-content: start; }
     .insights { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
     .insights li { border: 1px solid #2a3b4f; background: #111d2b; border-radius: 10px; padding: 8px 10px; font-size: .82rem; line-height: 1.3; color: #d8e6f5; }
     .insights li.ok { border-color: rgba(23,184,151,.46); background: rgba(23,184,151,.13); color: #b7f4e7; }
@@ -55,10 +56,44 @@
     .detail strong { color: #deebf8; }
     .detail .danger { color: var(--danger); font-weight: 700; }
     .empty { border: 1px dashed #32465d; border-radius: 11px; background: #0f1a28; padding: 24px 16px; text-align: center; color: #a8bbce; font-size: .84rem; line-height: 1.35; }
+    .mini-toggle { border: 1px solid #2e4259; background: #101b28; color: #dce8f4; border-radius: 9px; padding: 7px 10px; font-size: .76rem; font-weight: 700; cursor: pointer; }
+    .mini-toggle:hover { border-color: var(--accent); background: #132233; }
+    .staff-banner { margin: 0 0 10px; border: 1px solid #2e4258; border-radius: 10px; background: #101a27; color: #bdd0e1; padding: 8px 10px; font-size: .76rem; line-height: 1.35; }
+    .staff-banner.info { border-color: #2e4258; color: #bfd0df; }
+    .staff-banner.success { border-color: rgba(23,184,151,.45); background: rgba(23,184,151,.12); color: #bcf7ea; }
+    .staff-banner.error { border-color: rgba(242,139,130,.45); background: rgba(242,139,130,.11); color: #ffd5cf; }
+    .staff-list { display: grid; gap: 8px; }
+    .staff-row { border: 1px solid #2a3b4f; border-radius: 11px; background: #111d2b; padding: 10px 11px; display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 10px; align-items: start; }
+    .staff-main { min-width: 0; display: grid; gap: 7px; }
+    .staff-primary { min-width: 0; }
+    .staff-name { margin: 0 0 3px; font-size: .9rem; font-weight: 800; color: #edf5fd; }
+    .staff-email { margin: 0; color: #a9bbcd; font-size: .76rem; overflow-wrap: anywhere; }
+    .staff-meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+    .staff-tag { display: inline-flex; align-items: center; border: 1px solid #30445b; border-radius: 999px; background: #0f1a28; color: #c6d6e7; padding: 4px 8px; font-size: .7rem; font-weight: 700; }
+    .staff-tag.active { border-color: rgba(23,184,151,.46); background: rgba(23,184,151,.14); color: #b7f4e7; }
+    .staff-tag.archived { border-color: rgba(248,207,123,.42); background: rgba(248,207,123,.13); color: #f8e8bd; }
+    .staff-date { color: #8fa4b9; font-size: .72rem; font-weight: 600; }
+    .staff-actions { display: flex; justify-content: flex-end; align-items: flex-start; min-width: 94px; }
+    .staff-menu { position: relative; }
+    .staff-menu summary { list-style: none; border: 1px solid #2f4359; border-radius: 9px; background: #101b28; color: #deebf8; padding: 7px 10px; font-size: .74rem; font-weight: 700; cursor: pointer; }
+    .staff-menu summary::-webkit-details-marker { display: none; }
+    .staff-menu-panel { position: absolute; right: 0; top: calc(100% + 8px); z-index: 20; min-width: 200px; border: 1px solid #30455b; border-radius: 11px; background: #0f1824; box-shadow: 0 18px 36px rgba(2,8,16,.46); padding: 10px; display: grid; gap: 8px; }
+    .staff-menu-label { color: #a8bed2; font-size: .72rem; font-weight: 700; }
+    .staff-menu-panel select { width: 100%; border: 1px solid #35506b; border-radius: 8px; background: #101b28; color: #edf5fd; padding: 7px 8px; font-size: .78rem; }
+    .staff-action-btn { border: 1px solid #2f4359; border-radius: 8px; background: #132233; color: #eaf4fd; padding: 7px 9px; font-size: .75rem; font-weight: 700; cursor: pointer; }
+    .staff-action-btn:hover { border-color: var(--accent); }
+    .staff-action-btn.archive { border-color: rgba(248,207,123,.42); color: #f8e8bd; }
+    .staff-action-btn.restore { border-color: rgba(23,184,151,.42); color: #bcf7ea; }
+    .staff-note-pill { display: inline-flex; border: 1px solid #2f4257; border-radius: 999px; background: #0f1926; color: #9fb3c7; padding: 5px 8px; font-size: .71rem; font-weight: 700; }
+    .staff-extra { margin: 0; color: #9fb4c8; font-size: .76rem; line-height: 1.35; }
+    .limited-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
+    .limited-card { border: 1px solid #2a3b4f; border-radius: 12px; background: #111d2b; padding: 11px; display: grid; gap: 6px; }
+    .limited-card-label { margin: 0; color: #95aac0; font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; font-weight: 700; }
+    .limited-card-value { margin: 0; color: #eef6fd; font-size: .92rem; line-height: 1.35; }
     .logout { border: 1px solid rgba(255,255,255,.22); background: rgba(255,255,255,.1); color: #fff; border-radius: 8px; padding: 7px 12px; font-size: .78rem; font-weight: 700; cursor: pointer; }
     .logout:hover { background: rgba(255,255,255,.18); border-color: rgba(255,255,255,.35); }
     @media (max-width: 1080px) { .kpis{grid-template-columns:repeat(3,minmax(0,1fr));} .grid{grid-template-columns:1fr;} }
-    @media (max-width: 760px) { .shell{margin-top:10px;padding:0 10px;} .kpis{grid-template-columns:repeat(2,minmax(0,1fr));} }
+    @media (max-width: 760px) { .shell{margin-top:10px;padding:0 10px;} .kpis{grid-template-columns:repeat(2,minmax(0,1fr));} .staff-row{grid-template-columns:1fr;} .staff-actions{justify-content:flex-start;} .staff-menu-panel{left:0;right:auto;} .limited-grid{grid-template-columns:1fr;} }
   </style>
 </head>
 <body>
@@ -68,7 +103,7 @@
         <div class="logo">NP</div>
         <div class="brand-text">
           <div class="brand-title">National Prep Deaf Sports</div>
-          <div class="brand-tag">Athletic Director Command Center</div>
+          <div class="brand-tag">School Dashboard</div>
         </div>
       </a>
       <nav class="nav">
@@ -82,19 +117,20 @@
   <main class="shell">
     <section class="panel hero">
       <div class="hero-head">
-        <h1 class="title">Athletic Director Dashboard</h1>
+        <h1 class="title">School Dashboard</h1>
         <span id="schoolChip" class="chip">Loading school...</span>
       </div>
       <div class="chips">
         <span id="readinessChip" class="chip">Checking public readiness...</span>
       </div>
-      <div class="quick-actions">
+      <div id="accountStatusBanner" class="staff-banner info" hidden></div>
+      <div id="dashboardQuickActions" class="quick-actions">
         <a href="submit-game.html" class="quick-btn">Submit Stats</a>
         <a href="../stats.html" class="quick-btn">Public School Page</a>
-        <a href="../stats.html" class="quick-btn">School Data</a>
+        <a href="school-data.html" class="quick-btn" id="schoolDataLink">School Data</a>
         <a href="#insightsPanel" class="quick-btn">Missing Data</a>
       </div>
-      <div class="kpis">
+      <div id="dashboardKpis" class="kpis">
         <article class="kpi"><p class="l">Pending</p><p class="v" id="kpiPending">0</p><p class="f">Needs review</p></article>
         <article class="kpi"><p class="l">Approved</p><p class="v" id="kpiApproved">0</p><p class="f">Published</p></article>
         <article class="kpi"><p class="l">Rejected</p><p class="v" id="kpiRejected">0</p><p class="f">Needs fixes</p></article>
@@ -103,13 +139,34 @@
       </div>
     </section>
 
-    <div class="grid">
-      <section id="insightsPanel" class="panel">
-        <div class="head"><h2>School Intelligence</h2><p>What needs attention now.</p></div>
-        <div class="body">
-          <ul id="insights" class="insights"><li>Loading insights...</li></ul>
-        </div>
-      </section>
+    <section id="limitedDashboardPanel" class="panel" hidden>
+      <div class="head"><h2>Account Status</h2><p>School access requests stay under review until an admin approves them.</p></div>
+      <div class="body">
+        <div id="limitedDashboardMessage" class="staff-banner info"></div>
+        <div id="limitedDashboardMeta" class="limited-grid"></div>
+      </div>
+    </section>
+
+    <div id="dashboardGrid" class="grid">
+      <div class="left-rail">
+        <section id="insightsPanel" class="panel">
+          <div class="head"><h2>School Intelligence</h2><p>What needs attention now.</p></div>
+          <div class="body">
+            <ul id="insights" class="insights"><li>Loading insights...</li></ul>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="head toolbar">
+            <div><h2>School Staff</h2><p>Approved helpers tied to this school dashboard.</p></div>
+            <button id="toggleArchivedBtn" class="mini-toggle" type="button">Show Archived Staff</button>
+          </div>
+          <div class="body">
+            <div id="staffMessage" class="staff-banner" hidden></div>
+            <div id="staffList" class="staff-list"><div class="empty">Loading school staff...</div></div>
+          </div>
+        </section>
+      </div>
 
       <section class="panel">
         <div class="head toolbar">
@@ -127,234 +184,6 @@
   </main>
 
   <script src="../env.js"></script>
-  <script type="module">
-    import { supabase } from "../supabaseClient.js";
-
-    const SPORTS = ["basketball", "football", "volleyball", "soccer", "baseball", "softball"];
-    const SPORT_LABELS = { basketball: "Basketball", football: "Football", volleyball: "Volleyball", soccer: "Soccer", baseball: "Baseball", softball: "Softball" };
-    const METHOD_LABELS = { csv_upload: "CSV/XLSX Upload", text_paste: "Text Paste", manual_form: "PDF Intake" };
-    const SCOPE_LABELS = { season_sheet: "Season Spreadsheet", game_submission: "Game Submission", game_boxscore: "Game Box Score", boxscore_text: "Text Box Score", export_file: "Export File", pdf_review: "PDF Review", historic_recovery: "Historic Recovery", archive_only: "Archive Only" };
-
-    let currentUser = null;
-    let allSubs = [];
-    let sportsWithData = new Set();
-    let filter = "all";
-
-    const el = {
-      schoolChip: document.getElementById("schoolChip"),
-      readinessChip: document.getElementById("readinessChip"),
-      insights: document.getElementById("insights"),
-      submissions: document.getElementById("submissions"),
-      tabs: Array.from(document.querySelectorAll(".tab")),
-      kpiPending: document.getElementById("kpiPending"),
-      kpiApproved: document.getElementById("kpiApproved"),
-      kpiRejected: document.getElementById("kpiRejected"),
-      kpiSports: document.getElementById("kpiSports"),
-      kpiMissing: document.getElementById("kpiMissing"),
-      logout: document.getElementById("logoutBtn"),
-    };
-
-    window.addEventListener("DOMContentLoaded", init);
-
-    async function init() {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { window.location.href = "login.html"; return; }
-
-      const { data: profile, error } = await supabase.from("user_profiles").select("*").eq("id", session.user.id).single();
-      if (error || !profile) {
-        alert("Could not load your profile. Please sign in again.");
-        await supabase.auth.signOut();
-        window.location.href = "login.html";
-        return;
-      }
-
-      currentUser = profile;
-      const school = profile.school_name || "Your School";
-      el.schoolChip.textContent = school;
-
-      el.logout.addEventListener("click", async () => { await supabase.auth.signOut(); window.location.href = "login.html"; });
-      el.tabs.forEach((tab) => tab.addEventListener("click", () => { el.tabs.forEach((t) => t.classList.remove("active")); tab.classList.add("active"); filter = tab.dataset.status || "all"; renderSubmissions(); }));
-
-      await loadData();
-    }
-
-    async function loadData() {
-      el.submissions.innerHTML = '<div class="empty">Loading submissions...</div>';
-      el.insights.innerHTML = "<li>Loading insights...</li>";
-
-      try {
-        const [subs, sportSet] = await Promise.all([fetchSubmissions(), fetchSportsWithData()]);
-        allSubs = subs;
-        sportsWithData = sportSet;
-        updateKpis();
-        updateReadiness();
-        renderInsights();
-        renderSubmissions();
-      } catch (error) {
-        console.error(error);
-        el.insights.innerHTML = '<li class="danger">Could not load insights.</li>';
-        el.submissions.innerHTML = '<div class="empty">Could not load submissions.</div>';
-      }
-    }
-
-    async function fetchSubmissions() {
-      const { data, error } = await supabase
-        .from("game_submissions")
-        .select("id, created_at, reviewed_at, status, sport, gender, game_date, home_team_id, away_team_id, home_score, away_score, rejection_reason, submission_method, game_data")
-        .eq("submitted_by", currentUser.id)
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data || [];
-    }
-
-    async function fetchSportsWithData() {
-      const set = new Set();
-      if (!currentUser?.school_id && !currentUser?.school_name) return set;
-
-      let rows = [];
-      if (currentUser.school_id) rows = await fetchRowsBy("school_id", currentUser.school_id).catch(() => []);
-      if ((!rows || rows.length === 0) && currentUser.school_name) rows = await fetchRowsBy("school", currentUser.school_name).catch(() => []);
-
-      (rows || []).forEach((row) => { const key = normSport(row?.sport); if (key) set.add(key); });
-      return set;
-    }
-
-    async function fetchRowsBy(column, value) {
-      const rows = [];
-      const size = 1000;
-      let start = 0;
-      while (true) {
-        const { data, error } = await supabase.from("raw_stat_rows").select("sport").order("id", { ascending: true }).eq(column, value).range(start, start + size - 1);
-        if (error) throw error;
-        const chunk = data || [];
-        rows.push(...chunk);
-        if (chunk.length < size) break;
-        start += size;
-      }
-      return rows;
-    }
-
-    function normSport(v) {
-      const s = String(v || "").toLowerCase();
-      if (s.includes("basketball")) return "basketball";
-      if (s.includes("football")) return "football";
-      if (s.includes("volleyball")) return "volleyball";
-      if (s.includes("soccer")) return "soccer";
-      if (s.includes("baseball")) return "baseball";
-      if (s.includes("softball")) return "softball";
-      return "";
-    }
-
-    function updateKpis() {
-      const pending = allSubs.filter((s) => statusKey(s.status) === "pending").length;
-      const approved = allSubs.filter((s) => statusKey(s.status) === "approved").length;
-      const rejected = allSubs.filter((s) => statusKey(s.status) === "rejected").length;
-      const withData = SPORTS.filter((s) => sportsWithData.has(s));
-      const missing = SPORTS.filter((s) => !sportsWithData.has(s));
-      el.kpiPending.textContent = String(pending);
-      el.kpiApproved.textContent = String(approved);
-      el.kpiRejected.textContent = String(rejected);
-      el.kpiSports.textContent = String(withData.length);
-      el.kpiMissing.textContent = String(missing.length);
-    }
-
-    function updateReadiness() {
-      const isReady = SPORTS.some((s) => sportsWithData.has(s));
-      el.readinessChip.classList.remove("ok", "warn");
-      if (isReady) { el.readinessChip.classList.add("ok"); el.readinessChip.textContent = "School public: active"; }
-      else { el.readinessChip.classList.add("warn"); el.readinessChip.textContent = "School not public yet"; }
-    }
-
-    function renderInsights() {
-      const pending = allSubs.filter((s) => statusKey(s.status) === "pending").length;
-      const approved = allSubs.filter((s) => statusKey(s.status) === "approved").length;
-      const rejected = allSubs.filter((s) => statusKey(s.status) === "rejected").length;
-      const missing = SPORTS.filter((s) => !sportsWithData.has(s)).map((s) => SPORT_LABELS[s]);
-      const latestApproved = allSubs.find((s) => statusKey(s.status) === "approved");
-      const items = [];
-      items.push({ tone: pending ? "warn" : "ok", text: pending ? `${pending} submission${pending === 1 ? "" : "s"} waiting` : "No pending submissions" });
-      if (rejected) items.push({ tone: "danger", text: `${rejected} rejected submission${rejected === 1 ? "" : "s"}` });
-      items.push({ tone: missing.length ? "warn" : "ok", text: missing.length ? `Missing sports: ${missing.slice(0,3).join(", ")}${missing.length > 3 ? ", ..." : ""}` : "All tracked sports covered" });
-      items.push({ tone: SPORTS.some((s) => sportsWithData.has(s)) ? "ok" : "warn", text: SPORTS.some((s) => sportsWithData.has(s)) ? `${SPORTS.filter((s) => sportsWithData.has(s)).length} sports visible` : "Approve records to activate visibility" });
-      if (latestApproved) items.push({ tone: "", text: `Latest approved: ${displayDate(latestApproved.reviewed_at || latestApproved.created_at)}` });
-      else if (!approved) items.push({ tone: "", text: "No approved records yet" });
-      if (!allSubs.length) items.push({ tone: "", text: "No submissions yet" });
-      el.insights.innerHTML = items.map((i) => `<li class="${i.tone ? i.tone : ""}">${esc(i.text)}</li>`).join("");
-    }
-
-    function renderSubmissions() {
-      const rows = filter === "all" ? allSubs : allSubs.filter((s) => statusKey(s.status) === filter);
-      if (!rows.length) {
-        const msg = filter === "all" ? "No submissions yet" : `No ${filter} submissions`;
-        el.submissions.innerHTML = `<div class="empty">${esc(msg)}</div>`;
-        return;
-      }
-      el.submissions.innerHTML = rows.map(renderSubmission).join("");
-    }
-
-    function renderSubmission(s) {
-      const status = statusKey(s.status);
-      const statusLabel = status === "approved" ? "Approved" : status === "rejected" ? "Rejected" : "Pending";
-      const scope = scopeKey(s);
-      const scopeLabel = SCOPE_LABELS[scope] || titleCase(scope.replace(/_/g, " "));
-      const sport = sportLabel(s.sport, s.gender);
-      const method = METHOD_LABELS[String(s.submission_method || "").toLowerCase()] || titleCase(String(s.submission_method || "manual").replace(/_/g, " "));
-      const game = s?.game_data?.game || {};
-      const home = game?.home_team?.name || s.home_team_id || "";
-      const away = game?.away_team?.name || s.away_team_id || "";
-      const useMatchup = home && away && (scope === "game_submission" || scope === "game_boxscore" || scope === "boxscore_text");
-      const title = useMatchup ? `${sport} - ${home} vs ${away}` : `${sport} - ${scopeLabel}`;
-      const homeScore = game?.home_team?.score ?? s.home_score;
-      const awayScore = game?.away_team?.score ?? s.away_score;
-      const hasScore = homeScore !== null && homeScore !== undefined && awayScore !== null && awayScore !== undefined;
-      const route = s?.game_data?.parse_review?.route_label || "";
-      const detail = hasScore
-        ? `<strong>Score:</strong> ${esc(String(homeScore))} - ${esc(String(awayScore))}`
-        : `<strong>Scope:</strong> ${esc(scopeLabel)}`;
-      const rejection = s.rejection_reason ? ` | <span class="danger"><strong>Reason:</strong> ${esc(s.rejection_reason)}</span>` : "";
-
-      return `<article class="row">
-        <div class="r-top">
-          <h3 class="r-title">${esc(title)}</h3>
-          <span class="badge ${status}">${statusLabel}</span>
-        </div>
-        <div class="meta">
-          <span class="pill">Submitted: ${esc(displayDate(s.created_at))}</span>
-          <span class="pill">Game Date: ${esc(s.game_date ? displayDate(s.game_date) : "N/A")}</span>
-          <span class="pill">Method: ${esc(method)}</span>
-          <span class="pill">Type: ${esc(scopeLabel)}</span>
-        </div>
-        ${route ? `<span class="route">Route: ${esc(route)}</span>` : ""}
-        <p class="detail">${detail}${rejection}</p>
-      </article>`;
-    }
-
-    function scopeKey(s) {
-      const p = s?.game_data?.parse_review || {};
-      return p.upload_lane || s?.game_data?.submission_scope || "game_submission";
-    }
-
-    function sportLabel(sport, gender) {
-      const s = String(sport || "").toLowerCase().trim();
-      const g = String(gender || "").toLowerCase().trim();
-      const base = SPORT_LABELS[s] || titleCase(s || "Unknown sport");
-      return (g === "boys" || g === "girls") ? `${titleCase(g)} ${base}` : base;
-    }
-
-    function statusKey(status) {
-      const s = String(status || "").toLowerCase().trim();
-      if (s === "approved" || s === "rejected") return s;
-      return "pending";
-    }
-
-    function displayDate(v) {
-      if (!v) return "N/A";
-      const d = new Date(v);
-      return Number.isNaN(d.getTime()) ? "N/A" : d.toLocaleDateString();
-    }
-
-    function titleCase(v) { return String(v || "").split(" ").filter(Boolean).map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(" "); }
-    function esc(v) { return String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;").replace(/'/g, "&#39;"); }
-  </script>
+  <script type="module" src="./dashboard.js"></script>
 </body>
 </html>

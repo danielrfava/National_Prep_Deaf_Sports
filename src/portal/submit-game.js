@@ -2,6 +2,19 @@ import { supabase } from "../supabaseClient.js";
 import { inspectSpreadsheet, finalizeSpreadsheetParse } from "../parsers/spreadsheetParser.js";
 import { formatForSupabase, submitToSupabase } from "../parsers/dataFormatter.js";
 import { parseBoxScoreText } from "../parsers/boxScoreParser.js";
+import {
+  getHistoricalTemplates,
+  getTemplateDefinitionById,
+  resolveSportTemplate,
+  triggerTemplateDownload,
+} from "./submissionTemplateCatalog.js";
+import {
+  fetchCurrentSessionProfile,
+  getBlockedAccessMessage,
+  isAdminProfile,
+  isApprovedSchoolProfile,
+  setPortalFlash,
+} from "./schoolAccess.js";
 
 const MODE2_MAPPING_STORAGE_KEY = "npds_mode2_mapping_profiles_v1";
 
@@ -13,6 +26,10 @@ let mode2ParsedData = null;
 let mode2SelectedFile = null;
 let pdfSelectedFile = null;
 let pdfDraftPayload = null;
+let activeSubmissionMode = "modern";
+let activeSubmitMode = "mode1";
+let templateGuideOpen = false;
+let historicalTemplatesOpen = false;
 
 const sportSelection = document.getElementById("sportSelection");
 const seasonHint = document.getElementById("seasonHint");
@@ -48,12 +65,16 @@ const mode1QuickIntake = document.getElementById("mode1QuickIntake");
 const mode2QuickHint = document.getElementById("mode2QuickHint");
 const modeCardModern = document.getElementById("modeCardModern");
 const modeCardPdf = document.getElementById("modeCardPdf");
-const modeCardHistoric = document.getElementById("modeCardHistoric");
-const modeCardArchive = document.getElementById("modeCardArchive");
 const modeModernPanel = document.getElementById("modeModernPanel");
 const modePdfPanel = document.getElementById("modePdfPanel");
-const modeHistoricPanel = document.getElementById("modeHistoricPanel");
-const modeArchivePanel = document.getElementById("modeArchivePanel");
+const templateToolkitTitle = document.getElementById("templateToolkitTitle");
+const templateToolkitDescription = document.getElementById("templateToolkitDescription");
+const templateToolkitContext = document.getElementById("templateToolkitContext");
+const downloadTemplateBtn = document.getElementById("downloadTemplateBtn");
+const headerGuideBtn = document.getElementById("headerGuideBtn");
+const historicalTemplateBtn = document.getElementById("historicalTemplateBtn");
+const headerGuidePanel = document.getElementById("headerGuidePanel");
+const historicalTemplatePanel = document.getElementById("historicalTemplatePanel");
 
 const boxSportSelection = document.getElementById("boxSportSelection");
 const mode2SourceSelection = document.getElementById("mode2SourceSelection");
@@ -93,26 +114,31 @@ window.addEventListener("DOMContentLoaded", async () => {
   setupActions();
   switchSubmissionMode("modern");
   switchSubmitMode("mode1");
+  renderTemplateToolkit();
 });
 
 async function requireAuth() {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  const { session, profile, profileError } = await fetchCurrentSessionProfile();
 
   if (!session) {
     window.location.href = "login.html";
     return;
   }
 
-  const { data: profile, error } = await supabase
-    .from("user_profiles")
-    .select("*")
-    .eq("id", session.user.id)
-    .single();
+  if (profileError || !profile) {
+    setPortalFlash("Could not load your profile. Please sign in again.");
+    await supabase.auth.signOut();
+    window.location.href = "login.html";
+    return;
+  }
 
-  if (error || !profile) {
-    alert("Could not load your profile. Please sign in again.");
+  if (isAdminProfile(profile)) {
+    window.location.href = "../admin/admin-dashboard.html";
+    return;
+  }
+
+  if (!isApprovedSchoolProfile(profile)) {
+    setPortalFlash(getBlockedAccessMessage(profile));
     await supabase.auth.signOut();
     window.location.href = "login.html";
     return;
@@ -123,7 +149,10 @@ async function requireAuth() {
 }
 
 function setupFileUI() {
-  sportSelection.addEventListener("change", updateInspectState);
+  sportSelection.addEventListener("change", () => {
+    updateInspectState();
+    renderTemplateToolkit();
+  });
   spreadsheetInput.addEventListener("change", onFilePicked);
 
   fileDropzone.addEventListener("click", () => spreadsheetInput.click());
@@ -238,8 +267,28 @@ function setupActions() {
   mode1Btn.addEventListener("click", () => switchSubmitMode("mode1"));
   mode2Btn.addEventListener("click", () => switchSubmitMode("mode2"));
 
+  if (downloadTemplateBtn) {
+    downloadTemplateBtn.addEventListener("click", handleTemplateDownloadClick);
+  }
+
+  if (headerGuideBtn) {
+    headerGuideBtn.addEventListener("click", handleHeaderGuideClick);
+  }
+
+  if (historicalTemplateBtn) {
+    historicalTemplateBtn.addEventListener("click", handleHistoricalTemplatesClick);
+  }
+
+  if (historicalTemplatePanel) {
+    historicalTemplatePanel.addEventListener("click", handleHistoricalTemplatePanelClick);
+  }
+
   if (mode2LaneSelection) {
     mode2LaneSelection.addEventListener("change", handleMode2LaneChange);
+  }
+
+  if (boxSportSelection) {
+    boxSportSelection.addEventListener("change", renderTemplateToolkit);
   }
 
   if (parseBoxScoreBtn) {
@@ -260,14 +309,6 @@ function setupActions() {
 
   if (modeCardPdf) {
     modeCardPdf.addEventListener("click", () => switchSubmissionMode("pdf"));
-  }
-
-  if (modeCardHistoric) {
-    modeCardHistoric.addEventListener("click", () => switchSubmissionMode("historic"));
-  }
-
-  if (modeCardArchive) {
-    modeCardArchive.addEventListener("click", () => switchSubmissionMode("archive"));
   }
 
   if (pdfInspectBtn) {
@@ -354,6 +395,221 @@ function updateInspectState() {
 
 function setStatus(message) {
   leftStatus.textContent = message;
+}
+
+function renderTemplateToolkit() {
+  if (!templateToolkitTitle || !templateToolkitDescription || !templateToolkitContext) {
+    return;
+  }
+
+  const context = buildTemplateToolkitContext();
+  const activeTemplate = context.activeTemplate;
+
+  templateToolkitTitle.textContent = context.title;
+  templateToolkitDescription.textContent = context.description;
+  templateToolkitContext.textContent = context.contextNote;
+
+  if (downloadTemplateBtn) {
+    downloadTemplateBtn.textContent = activeTemplate ? `Download ${activeTemplate.label}` : "Download Template";
+    downloadTemplateBtn.disabled = !context.canDownloadCurrentTemplate;
+  }
+
+  if (headerGuideBtn) {
+    headerGuideBtn.disabled = !context.canShowHeaderGuide;
+  }
+
+  if (headerGuidePanel) {
+    const showGuide = templateGuideOpen && context.canShowHeaderGuide;
+    headerGuidePanel.classList.toggle("hidden", !showGuide);
+    headerGuidePanel.innerHTML = showGuide ? renderHeaderGuide(activeTemplate) : "";
+  }
+
+  if (historicalTemplatePanel) {
+    historicalTemplatePanel.classList.toggle("hidden", !historicalTemplatesOpen);
+    historicalTemplatePanel.innerHTML = historicalTemplatesOpen ? renderHistoricalTemplatePanel() : "";
+  }
+}
+
+function buildTemplateToolkitContext() {
+  if (activeSubmissionMode !== "modern") {
+    return {
+      title: "Templates are available in the spreadsheet workflow",
+      description: "Switch back to the modern spreadsheet lane to access current-sport templates and historical downloads.",
+      contextNote: "PDF review remains review-routed only. No spreadsheet template applies there.",
+      activeTemplate: null,
+      canDownloadCurrentTemplate: false,
+      canShowHeaderGuide: false,
+    };
+  }
+
+  if (activeSubmitMode === "mode1") {
+    return buildLaneTemplateContext({
+      laneLabel: "Spreadsheet upload",
+      selectedSportValue: sportSelection?.value || "",
+      allowSportTemplate: true,
+    });
+  }
+
+  const selectedLane = mode2LaneSelection?.value || "boxscore_text";
+  const isExportLane = selectedLane === "export_file";
+
+  return buildLaneTemplateContext({
+    laneLabel: isExportLane ? "Flexible export file" : "Flexible text box score",
+    selectedSportValue: boxSportSelection?.value || "",
+    allowSportTemplate: isExportLane,
+  });
+}
+
+function buildLaneTemplateContext({ laneLabel, selectedSportValue, allowSportTemplate }) {
+  const activeTemplate = allowSportTemplate ? resolveSportTemplate(selectedSportValue) : null;
+
+  if (!allowSportTemplate) {
+    return {
+      title: "Templates support spreadsheet-style uploads",
+      description: "Text box score intake does not use downloadable headers. Historical templates remain available when you need structured spreadsheets.",
+      contextNote: "Switch to Spreadsheet or Flexible Export File to use sport-specific templates.",
+      activeTemplate: null,
+      canDownloadCurrentTemplate: false,
+      canShowHeaderGuide: false,
+    };
+  }
+
+  if (activeTemplate) {
+    return {
+      title: `${activeTemplate.label} ready`,
+      description: `${activeTemplate.description} This is the best fit for the ${laneLabel} lane right now.`,
+      contextNote: "Historical templates remain separate for archive-heavy intake and team schedule/results work.",
+      activeTemplate,
+      canDownloadCurrentTemplate: true,
+      canShowHeaderGuide: true,
+    };
+  }
+
+  if (selectedSportValue) {
+    return {
+      title: "First-wave templates are selective tonight",
+      description: "Current sport-aware templates are available for basketball and volleyball. Other sports can still use the historical starter files for structured intake.",
+      contextNote: "Pick basketball or volleyball for a parser-matched template, or open Historical Template for archive-focused downloads.",
+      activeTemplate: null,
+      canDownloadCurrentTemplate: false,
+      canShowHeaderGuide: false,
+    };
+  }
+
+  return {
+    title: "Templates for Spreadsheet Uploads",
+    description: "Select basketball or volleyball to unlock a parser-matched file and header guide for this lane.",
+    contextNote: "Historical individual-season and schedule/results templates stay available even before a sport is selected.",
+    activeTemplate: null,
+    canDownloadCurrentTemplate: false,
+    canShowHeaderGuide: false,
+  };
+}
+
+function handleTemplateDownloadClick() {
+  const context = buildTemplateToolkitContext();
+  if (!context.canDownloadCurrentTemplate || !context.activeTemplate) {
+    return;
+  }
+
+  triggerTemplateDownload(context.activeTemplate);
+}
+
+function handleHeaderGuideClick() {
+  const context = buildTemplateToolkitContext();
+  if (!context.canShowHeaderGuide || !context.activeTemplate) {
+    return;
+  }
+
+  templateGuideOpen = !templateGuideOpen;
+  renderTemplateToolkit();
+}
+
+function handleHistoricalTemplatesClick() {
+  historicalTemplatesOpen = !historicalTemplatesOpen;
+  renderTemplateToolkit();
+}
+
+function handleHistoricalTemplatePanelClick(event) {
+  const button = event.target.closest("[data-template-download]");
+  if (!button) {
+    return;
+  }
+
+  const template = getTemplateDefinitionById(button.dataset.templateDownload);
+  if (!template) {
+    return;
+  }
+
+  triggerTemplateDownload(template);
+}
+
+function renderHeaderGuide(template) {
+  if (!template) {
+    return "";
+  }
+
+  return `
+    <div class="template-drawer-head">
+      <span class="template-kicker">Header Guide</span>
+      <strong>${escapeHtml(template.label)}</strong>
+      <p>${escapeHtml(template.description)}</p>
+    </div>
+    <div class="template-guide-grid">
+      ${template.guideSections
+        .map(
+          (section) => `
+            <article class="template-guide-card">
+              <strong>${escapeHtml(section.label)}</strong>
+              <div class="template-chip-row">
+                ${section.headers.map((header) => `<span class="template-chip">${escapeHtml(header)}</span>`).join("")}
+              </div>
+            </article>
+          `
+        )
+        .join("")}
+    </div>
+    <ul class="template-note-list">
+      ${template.notes.map((note) => `<li>${escapeHtml(note)}</li>`).join("")}
+    </ul>
+  `;
+}
+
+function renderHistoricalTemplatePanel() {
+  return `
+    <div class="template-drawer-head">
+      <span class="template-kicker">Historical Templates</span>
+      <strong>Archive-friendly starter files</strong>
+      <p>These templates are built for older season totals and school schedule/results work where admin review is still expected.</p>
+    </div>
+    <div class="template-history-grid">
+      ${getHistoricalTemplates()
+        .map(
+          (template) => `
+            <article class="template-history-card">
+              <strong>${escapeHtml(template.label)}</strong>
+              <p>${escapeHtml(template.description)}</p>
+              <div class="template-chip-row">
+                ${template.headers.map((header) => `<span class="template-chip">${escapeHtml(header)}</span>`).join("")}
+              </div>
+              <ul class="template-note-list">
+                ${template.notes.map((note) => `<li>${escapeHtml(note)}</li>`).join("")}
+              </ul>
+              <div class="template-card-actions">
+                <button
+                  class="portal-btn portal-btn-secondary portal-btn-inline"
+                  type="button"
+                  data-template-download="${escapeHtmlAttr(template.id)}"
+                >
+                  Download CSV
+                </button>
+              </div>
+            </article>
+          `
+        )
+        .join("")}
+    </div>
+  `;
 }
 
 function ensureSchoolConfigured() {
@@ -655,7 +911,7 @@ async function submitSpreadsheet() {
       defaultSchoolName: currentUser.school_name,
       submissionMethod: "csv_upload",
       originalData: selectedFile ? selectedFile.name : null,
-      source: "athletic_director_portal",
+      source: "school_dashboard",
       selectedSportValue: sportSelection.value,
       seasonHint: seasonHint.value.trim() || null,
     };
@@ -690,6 +946,7 @@ function hardReset() {
   reviewCard.classList.add("hidden");
   finalPreviewCard.classList.add("hidden");
   setStatus("Waiting for file");
+  renderTemplateToolkit();
 }
 
 function escapeHtml(value) {
@@ -706,18 +963,15 @@ function escapeHtmlAttr(value) {
 }
 
 function switchSubmissionMode(mode) {
+  activeSubmissionMode = mode;
   const panelMap = {
     modern: modeModernPanel,
     pdf: modePdfPanel,
-    historic: modeHistoricPanel,
-    archive: modeArchivePanel,
   };
 
   const cardMap = {
     modern: modeCardModern,
     pdf: modeCardPdf,
-    historic: modeCardHistoric,
-    archive: modeCardArchive,
   };
 
   Object.entries(panelMap).forEach(([key, panel]) => {
@@ -733,9 +987,12 @@ function switchSubmissionMode(mode) {
   if (mode === "modern") {
     switchSubmitMode("mode1");
   }
+
+  renderTemplateToolkit();
 }
 
 function switchSubmitMode(mode) {
+  activeSubmitMode = mode;
   const isMode1 = mode === "mode1";
 
   mode1Panel.classList.toggle("hidden", !isMode1);
@@ -759,6 +1016,8 @@ function switchSubmitMode(mode) {
   if (!isMode1) {
     handleMode2LaneChange();
   }
+
+  renderTemplateToolkit();
 }
 
 function handleMode2LaneChange() {
@@ -787,6 +1046,8 @@ function handleMode2LaneChange() {
       ? "Waiting for pasted box score"
       : "Waiting for export file";
   }
+
+  renderTemplateToolkit();
 }
 
 function handleMode2Parse() {
@@ -1220,7 +1481,7 @@ async function submitMode2BoxScore() {
       originalData: isExportLane
         ? mode2SelectedFile?.name || "mode2_export_file"
         : boxScoreInput.value.trim(),
-      source: `athletic_director_portal_${sourceValue}`,
+      source: `school_dashboard_${sourceValue}`,
       sport: sportMeta.sport,
       gender: sportMeta.gender,
       selectedSportValue: boxSportSelection.value,
@@ -1397,7 +1658,7 @@ async function handlePdfInspect() {
       metadata: {
         submissionMethod: "manual_form",
         originalData: pdfSelectedFile.name,
-        source: "athletic_director_portal_pdf",
+        source: "school_dashboard_pdf",
         selectedSportValue: pdfSportSelection.value,
         seasonHint: seasonValue || null,
       },

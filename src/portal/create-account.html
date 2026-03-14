@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>NPDS - Create School Account</title>
+    <link rel="stylesheet" href="../styles.css" />
+  </head>
+  <body class="public-page portal-auth-page">
+    <header data-public-nav class="topbar public-topbar">
+      <div class="topbar-container">
+        <a class="brand" href="../index.html" aria-label="National Prep Deaf Sports home">
+          <div class="logo">NP</div>
+          <div class="brand-text">
+            <div class="brand-title">National Prep Deaf Sports</div>
+            <div class="brand-tag">Deaf High School Athletics</div>
+          </div>
+        </a>
+
+        <nav class="nav public-nav" aria-label="Primary">
+          <a class="nav-link" href="../search.html">Search</a>
+          <a class="nav-link" href="../schools.html">Schools</a>
+          <a class="nav-link" href="../stats.html">Research</a>
+          <a class="nav-link" href="../about.html">About</a>
+          <a class="nav-link nav-link-active" href="login.html" aria-current="page">Log In</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="portal-auth-main">
+      <div class="portal-auth-stack">
+        <section class="portal-login-card portal-login-card-wide">
+          <p class="public-kicker">School Dashboard Access</p>
+          <h1 class="portal-login-title">Create School Account</h1>
+          <p class="portal-login-subline">
+            Request access to your school dashboard. All school accounts are reviewed before approval.
+          </p>
+
+          <div id="alert" class="portal-alert" hidden></div>
+
+          <form id="requestForm" class="portal-login-form portal-auth-grid" novalidate>
+            <div class="portal-auth-grid-2">
+              <div class="portal-field">
+                <label class="portal-label" for="fullName">Full Name</label>
+                <input id="fullName" name="fullName" type="text" autocomplete="name" required />
+              </div>
+
+              <div class="portal-field">
+                <label class="portal-label" for="email">Email</label>
+                <input id="email" name="email" type="email" autocomplete="email" required />
+              </div>
+
+              <div class="portal-field">
+                <label class="portal-label" for="password">Password</label>
+                <input id="password" name="password" type="password" autocomplete="new-password" minlength="8" required />
+                <p class="portal-field-help">Use at least 8 characters so you can sign in after approval.</p>
+              </div>
+
+              <div class="portal-field">
+                <label class="portal-label" for="confirmPassword">Confirm Password</label>
+                <input id="confirmPassword" name="confirmPassword" type="password" autocomplete="new-password" minlength="8" required />
+              </div>
+
+              <div class="portal-field">
+                <label class="portal-label" for="schoolSearch">School</label>
+                <div class="portal-combobox">
+                  <input
+                    id="schoolSearch"
+                    name="schoolSearch"
+                    type="text"
+                    autocomplete="off"
+                    placeholder="Start typing your school name"
+                    aria-autocomplete="list"
+                    aria-expanded="false"
+                    aria-controls="schoolOptionsList"
+                    required
+                  />
+                  <input id="school" name="school" type="hidden" />
+                  <div id="schoolOptionsList" class="portal-combobox-list" role="listbox" hidden></div>
+                </div>
+                <p class="portal-field-help">Select the canonical school record from the list.</p>
+                <a
+                  class="portal-field-inline-link"
+                  href="mailto:danielrfava@gmail.com?subject=NPDS%20School%20Request%20-%20School%20Not%20Listed"
+                >
+                  School not listed? Request to add school
+                </a>
+              </div>
+
+              <div class="portal-field">
+                <label class="portal-label" for="role">Role</label>
+                <select id="role" name="role" required>
+                  <option value="">Select role</option>
+                </select>
+              </div>
+
+              <div class="portal-field">
+                <label class="portal-label" for="jobTitle">Job Title</label>
+                <input id="jobTitle" name="jobTitle" type="text" autocomplete="organization-title" required />
+              </div>
+
+              <div class="portal-field">
+                <label class="portal-label" for="referenceAdName">Athletic Director Name</label>
+                <input id="referenceAdName" name="referenceAdName" type="text" autocomplete="name" />
+                <p id="referenceNameHelp" class="portal-field-help">
+                  Required for non-Athletic Director requests.
+                </p>
+              </div>
+
+              <div class="portal-field">
+                <label class="portal-label" for="referenceAdEmail">Athletic Director Email</label>
+                <input id="referenceAdEmail" name="referenceAdEmail" type="email" autocomplete="email" />
+                <p id="referenceEmailHelp" class="portal-field-help">
+                  Required for non-Athletic Director requests.
+                </p>
+              </div>
+
+              <div class="portal-field portal-field-full">
+                <label class="portal-label" for="verificationNotes">Verification Notes (optional)</label>
+                <textarea
+                  id="verificationNotes"
+                  name="verificationNotes"
+                  placeholder="Share anything helpful for review, such as why you are helping with submissions or who asked you to assist."
+                ></textarea>
+                <p id="verificationHelp" class="portal-field-help">
+                  Optional, but useful for manual review.
+                </p>
+              </div>
+
+              <div class="portal-field portal-field-full">
+                <label class="portal-checkbox-row" for="recordsAgreement">
+                  <input id="recordsAgreement" name="recordsAgreement" type="checkbox" required />
+                  <span class="portal-checkbox-copy">
+                    I understand submissions must reflect real school records and may be reviewed before approval.
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            <div class="portal-auth-actions">
+              <button type="submit" class="portal-login-btn" id="submitBtn">Submit Request</button>
+              <a class="portal-secondary-action" href="login.html">Back to Login</a>
+            </div>
+          </form>
+
+          <div id="successState" hidden>
+            <p class="portal-card-note">
+              Your request has been submitted for review. Access will be granted after approval.
+            </p>
+            <div class="portal-auth-actions">
+              <a class="portal-secondary-action" href="login.html">Return to Login</a>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <script src="../env.js"></script>
+    <script type="module" src="./create-account.js"></script>
+  </body>
+</html>

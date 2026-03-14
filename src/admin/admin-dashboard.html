@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Admin - Review Submissions</title>
+  <title>NPDS Admin Review</title>
   <link rel="stylesheet" href="../styles.css">
   <style>
     .admin-container {
@@ -273,9 +273,529 @@
       font-weight: 500;
     }
 
+    body {
+      min-height: 100vh;
+      background:
+        radial-gradient(1200px 700px at 20% -10%, #1b2b3b 0%, rgba(27, 43, 59, 0) 55%),
+        radial-gradient(1000px 640px at 110% 10%, #16303f 0%, rgba(22, 48, 63, 0) 50%),
+        #09111a;
+      color: #e9f2fb;
+    }
+
+    .admin-container {
+      max-width: 1480px;
+      margin: 16px auto 30px;
+      padding: 0 14px;
+      display: grid;
+      gap: 14px;
+    }
+
+    .admin-hero,
+    .admin-section,
+    .modal-content {
+      border: 1px solid #2b3e53;
+      border-radius: 16px;
+      background: linear-gradient(180deg, rgba(17, 28, 41, 0.96) 0%, rgba(12, 21, 31, 0.96) 100%);
+      box-shadow: 0 18px 36px rgba(2, 8, 16, 0.4);
+    }
+
+    .admin-hero {
+      padding: 16px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .admin-hero-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+
+    .admin-hero h1 {
+      margin: 0 0 5px;
+      font-size: 1.6rem;
+      line-height: 1.1;
+    }
+
+    .admin-hero p,
+    .section-head p,
+    .review-subline,
+    .modal-copy {
+      margin: 0;
+      color: #9db0c4;
+      font-size: 0.82rem;
+      line-height: 1.45;
+    }
+
+    .hero-chip,
+    .status-chip,
+    .meta-pill,
+    .tag-pill {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-size: 0.72rem;
+      font-weight: 800;
+      border: 1px solid #30465c;
+      background: #112031;
+      color: #d7e5f3;
+    }
+
+    .hero-chip,
+    .status-chip.pending {
+      border-color: rgba(23, 184, 151, 0.4);
+      background: rgba(23, 184, 151, 0.16);
+      color: #bcf7ea;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .status-chip.warn {
+      border-color: rgba(248, 207, 123, 0.42);
+      background: rgba(248, 207, 123, 0.14);
+      color: #f8e8bd;
+    }
+
+    .status-chip.danger {
+      border-color: rgba(242, 139, 130, 0.4);
+      background: rgba(242, 139, 130, 0.14);
+      color: #ffd4cf;
+    }
+
+    .stats-grid {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      margin-bottom: 0;
+    }
+
+    .stat-card {
+      border: 1px solid #294157;
+      border-radius: 14px;
+      background: #102031;
+      box-shadow: none;
+      padding: 12px;
+      display: grid;
+      gap: 5px;
+    }
+
+    .stat-value {
+      font-size: 1.7rem;
+      line-height: 1;
+      font-weight: 900;
+      color: #f5fbff;
+    }
+
+    .stat-label {
+      margin-top: 0;
+      color: #92a9be;
+      font-size: 0.72rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .stat-foot {
+      color: #9db0c4;
+      font-size: 0.76rem;
+    }
+
+    .admin-grid {
+      display: grid;
+      grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+      gap: 14px;
+      align-items: start;
+    }
+
+    .admin-section {
+      overflow: hidden;
+    }
+
+    .section-head {
+      padding: 14px 16px 12px;
+      border-bottom: 1px solid #24384c;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .section-head h2 {
+      margin: 0 0 4px;
+      font-size: 1rem;
+    }
+
+    .section-body {
+      padding: 14px 16px 16px;
+    }
+
+    .review-stack {
+      display: grid;
+      gap: 12px;
+    }
+
+    .review-card {
+      border: 1px solid #293d51;
+      border-radius: 14px;
+      background: #101d2c;
+      padding: 12px;
+      display: grid;
+      gap: 10px;
+      margin-bottom: 0;
+      transition: border-color 0.18s ease, transform 0.18s ease;
+    }
+
+    .review-card:hover {
+      border-color: #3e5a74;
+      box-shadow: none;
+      transform: translateY(-1px);
+    }
+
+    .review-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 10px;
+      margin-bottom: 0;
+      padding-bottom: 0;
+      border-bottom: none;
+      flex-wrap: wrap;
+    }
+
+    .review-title {
+      margin-bottom: 4px;
+      font-size: 0.96rem;
+      line-height: 1.25;
+      color: #f2f8ff;
+      font-weight: 800;
+    }
+
+    .review-meta,
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .detail-card {
+      border: 1px solid #26384b;
+      border-radius: 12px;
+      background: #0f1926;
+      padding: 9px 10px;
+      display: grid;
+      gap: 4px;
+    }
+
+    .detail-label {
+      color: #8fa5bb;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      font-weight: 800;
+    }
+
+    .detail-value {
+      color: #eef6fd;
+      font-size: 0.82rem;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+
+    .review-note {
+      margin: 0;
+      color: #dce8f5;
+      font-size: 0.8rem;
+      line-height: 1.45;
+    }
+
+    .section-kicker {
+      margin: 0 0 6px;
+      color: #8fa5bb;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-weight: 800;
+    }
+
+    .alert-note {
+      border: 1px solid rgba(248, 207, 123, 0.4);
+      border-radius: 12px;
+      background: rgba(248, 207, 123, 0.12);
+      padding: 10px 11px;
+      color: #f8e8bd;
+      font-size: 0.78rem;
+      line-height: 1.4;
+    }
+
+    .issue-stack {
+      display: grid;
+      gap: 8px;
+    }
+
+    .issue-box {
+      border: 1px solid #30465c;
+      border-radius: 12px;
+      padding: 10px 11px;
+      display: grid;
+      gap: 8px;
+      background: #0f1926;
+    }
+
+    .issue-box.warn {
+      border-color: rgba(248, 207, 123, 0.4);
+      background: rgba(248, 207, 123, 0.12);
+    }
+
+    .issue-box.danger {
+      border-color: rgba(242, 139, 130, 0.4);
+      background: rgba(242, 139, 130, 0.12);
+    }
+
+    .issue-box.ok {
+      border-color: rgba(23, 184, 151, 0.4);
+      background: rgba(23, 184, 151, 0.12);
+    }
+
+    .issue-box h4 {
+      margin: 0;
+      font-size: 0.8rem;
+      color: #eef6fd;
+    }
+
+    .issue-list {
+      margin: 0;
+      padding-left: 18px;
+      display: grid;
+      gap: 5px;
+      color: #dce8f5;
+      font-size: 0.78rem;
+      line-height: 1.4;
+    }
+
+    .preview-block {
+      display: grid;
+      gap: 8px;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      border: 1px solid #26384b;
+      border-radius: 12px;
+      background: #0f1825;
+    }
+
+    .preview-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.77rem;
+    }
+
+    .preview-table th,
+    .preview-table td {
+      border-bottom: 1px solid #203246;
+      padding: 8px 9px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .preview-table th {
+      background: #152434;
+      color: #9fb4c8;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      font-size: 0.68rem;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .json-preview {
+      margin: 0;
+      border: 1px solid #26384b;
+      border-radius: 12px;
+      background: #0d1722;
+      color: #cfe0ef;
+      padding: 12px;
+      max-height: 280px;
+      overflow: auto;
+      font-size: 0.74rem;
+      line-height: 1.45;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .output-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .destination-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .destination-row {
+      border: 1px solid #26384b;
+      border-radius: 12px;
+      background: #0f1926;
+      padding: 10px 11px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: start;
+    }
+
+    .destination-name {
+      margin: 0 0 4px;
+      color: #eef6fd;
+      font-size: 0.82rem;
+      font-weight: 800;
+    }
+
+    .destination-meta {
+      margin: 0;
+      color: #9fb4c8;
+      font-size: 0.76rem;
+      line-height: 1.35;
+    }
+
+    .destination-count {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 52px;
+      border: 1px solid #35506b;
+      border-radius: 999px;
+      padding: 5px 9px;
+      background: #112337;
+      color: #d8ebfb;
+      font-size: 0.74rem;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .output-note {
+      margin: 0;
+      color: #9fb4c8;
+      font-size: 0.76rem;
+      line-height: 1.45;
+    }
+
+    .action-buttons {
+      gap: 8px;
+      margin-top: 0;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      flex: none;
+      border-radius: 10px;
+      padding: 8px 11px;
+      font-size: 0.8rem;
+      font-weight: 800;
+      border: 1px solid #33485d;
+      background: #132334;
+      color: #eaf4fd;
+    }
+
+    .btn:hover {
+      transform: translateY(-1px);
+    }
+
+    .btn-approve {
+      background: #132334;
+      color: #bcf7ea;
+      border-color: rgba(23, 184, 151, 0.4);
+    }
+
+    .btn-reject {
+      background: #132334;
+      color: #ffd4cf;
+      border-color: rgba(242, 139, 130, 0.4);
+    }
+
+    .btn-secondary {
+      background: #132334;
+      color: #dce8f5;
+    }
+
+    .request-role-select,
+    .form-group textarea {
+      width: 100%;
+      border: 1px solid #36506a;
+      background: #0f1925;
+      color: #eef6fd;
+      border-radius: 10px;
+      padding: 8px 10px;
+      font-size: 0.8rem;
+      font-family: inherit;
+    }
+
+    .modal {
+      background: rgba(2, 8, 16, 0.68);
+      padding: 16px;
+    }
+
+    .modal-content {
+      width: min(540px, 100%);
+      background: linear-gradient(180deg, rgba(17, 28, 41, 0.98) 0%, rgba(12, 21, 31, 0.98) 100%);
+      color: #e9f2fb;
+      padding: 18px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .modal-header {
+      margin-bottom: 0;
+      font-size: 1.05rem;
+    }
+
+    .form-group {
+      margin-bottom: 0;
+    }
+
+    .form-group label {
+      color: #dce8f5;
+      font-size: 0.8rem;
+    }
+
+    .empty-state {
+      border: 1px dashed #32465d;
+      border-radius: 12px;
+      background: #0f1a28;
+      padding: 28px 18px;
+      color: #9db0c4;
+      font-size: 0.84rem;
+      line-height: 1.45;
+    }
+
     @media (max-width: 768px) {
+      .admin-container {
+        padding: 0 10px;
+      }
+
+      .stats-grid,
+      .detail-grid,
+      .admin-grid {
+        grid-template-columns: 1fr;
+      }
+
       .review-header {
         flex-direction: column;
+      }
+
+      .output-grid,
+      .detail-grid {
+        grid-template-columns: 1fr;
       }
 
       .action-buttons {
@@ -294,479 +814,98 @@
       <div class="brand">
         <div class="logo">NP</div>
         <div class="brand-text">
-          <div class="brand-title">Admin - Review Panel</div>
+          <div class="brand-title">NPDS Admin Review</div>
         </div>
       </div>
       <nav class="nav">
-        <a href="../index.html" style="color: white; margin-right: 16px;">View Public Site</a>
-        <button id="logoutBtn" class="logout-btn">Logout</button>
+        <a class="nav-link" href="../index.html">View Public Site</a>
+        <button id="logoutBtn" class="logout-btn" type="button">Logout</button>
       </nav>
     </div>
   </header>
 
   <main class="admin-container">
-    <!-- Stats Overview -->
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-value" id="pendingCount">0</div>
-        <div class="stat-label">Pending Review</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value" id="approvedToday">0</div>
-        <div class="stat-label">Approved Today</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value" id="totalSubmissions">0</div>
-        <div class="stat-label">Total Submissions</div>
-      </div>
-    </div>
-
-    <!-- Pending Submissions -->
-    <div class="pending-section">
-      <h2 style="margin-bottom: 24px;">Pending Submissions</h2>
-      <div id="submissionsContainer">
-        <div class="empty-state">
-          <div class="empty-icon">...</div>
-          <p>Loading submissions...</p>
+    <section class="admin-hero">
+      <div class="admin-hero-head">
+        <div>
+          <h1>Admin Review Workspace</h1>
+          <p>Approve real school staff carefully. Review publish output before anything reaches live records.</p>
         </div>
+        <span id="adminIdentityChip" class="hero-chip">Loading admin...</span>
       </div>
+      <div class="stats-grid">
+        <article class="stat-card">
+          <div class="stat-label">Pending School Access</div>
+          <div class="stat-value" id="pendingUsersCount">0</div>
+          <div class="stat-foot">New school staff requests waiting for review</div>
+        </article>
+        <article class="stat-card">
+          <div class="stat-label">Pending Submissions</div>
+          <div class="stat-value" id="pendingSubmissionsCount">0</div>
+          <div class="stat-foot">Submission queue before publish</div>
+        </article>
+        <article class="stat-card">
+          <div class="stat-label">Approved Today</div>
+          <div class="stat-value" id="approvedTodayCount">0</div>
+          <div class="stat-foot">Submission approvals completed today</div>
+        </article>
+        <article class="stat-card">
+          <div class="stat-label">Total Submissions</div>
+          <div class="stat-value" id="totalSubmissionsCount">0</div>
+          <div class="stat-foot">All recorded school submission attempts</div>
+        </article>
+      </div>
+    </section>
+
+    <div class="admin-grid">
+      <section class="admin-section">
+        <div class="section-head">
+          <div>
+            <h2>Pending School Access</h2>
+            <p>Verify school, role, reference contact, and whether the request looks legitimate before approval.</p>
+          </div>
+        </div>
+        <div class="section-body">
+          <div id="pendingUsersContainer" class="review-stack">
+            <div class="empty-state">Loading school access requests...</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="admin-section">
+        <div class="section-head">
+          <div>
+            <h2>Pending Submissions</h2>
+            <p>Review school mapping, seasons, recognized stat fields, parsed rows, and publish output before approving.</p>
+          </div>
+        </div>
+        <div class="section-body">
+          <div id="submissionsContainer" class="review-stack">
+            <div class="empty-state">Loading submissions...</div>
+          </div>
+        </div>
+      </section>
     </div>
   </main>
 
-  <!-- Reject Modal -->
   <div id="rejectModal" class="modal">
     <div class="modal-content">
-      <div class="modal-header">Reject Submission</div>
+      <div id="rejectModalTitle" class="modal-header">Reject Submission</div>
+      <p id="rejectModalCopy" class="modal-copy">Add a short review note so the admin trail stays accountable.</p>
       <form id="rejectForm">
         <div class="form-group">
-          <label for="rejectReason">Reason for rejection:</label>
-          <textarea id="rejectReason" placeholder="Please explain why this submission is being rejected..." required></textarea>
+          <label for="rejectReason">Review note</label>
+          <textarea id="rejectReason" placeholder="Explain why this request or submission is being rejected." required></textarea>
         </div>
         <div class="action-buttons">
           <button type="submit" class="btn btn-reject">Confirm Rejection</button>
-          <button type="button" class="btn" style="background: #e2e8f0; color: #2d3748;" onclick="closeRejectModal()">Cancel</button>
+          <button id="cancelRejectBtn" type="button" class="btn btn-secondary">Cancel</button>
         </div>
       </form>
     </div>
   </div>
 
   <script src="../env.js"></script>
-  <script type="module">
-    import { supabase } from '../supabaseClient.js';
-
-    let currentUser = null;
-    let currentSubmissionId = null;
-
-    // Initialize
-    window.addEventListener('DOMContentLoaded', async () => {
-      // Check authentication
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        window.location.href = '../portal/login.html';
-        return;
-      }
-
-      // Get user profile
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('id', session.user.id)
-        .single();
-
-      if (!profile || profile.role !== 'admin') {
-        alert('Access denied. Admin privileges required.');
-        window.location.href = '../portal/dashboard.html';
-        return;
-      }
-
-      currentUser = profile;
-
-      // Load data
-      await loadStats();
-      await loadPendingSubmissions();
-
-      // Setup logout
-      document.getElementById('logoutBtn').addEventListener('click', async () => {
-        await supabase.auth.signOut();
-        window.location.href = '../portal/login.html';
-      });
-
-      // Setup reject form
-      document.getElementById('rejectForm').addEventListener('submit', handleReject);
-    });
-
-    async function loadStats() {
-      try {
-        // Pending count
-        const { count: pendingCount } = await supabase
-          .from('game_submissions')
-          .select('*', { count: 'exact', head: true })
-          .eq('status', 'pending');
-
-        document.getElementById('pendingCount').textContent = pendingCount || 0;
-
-        // Approved today
-        const today = new Date().toISOString().split('T')[0];
-        const { count: approvedToday } = await supabase
-          .from('game_submissions')
-          .select('*', { count: 'exact', head: true })
-          .eq('status', 'approved')
-          .gte('reviewed_at', today);
-
-        document.getElementById('approvedToday').textContent = approvedToday || 0;
-
-        // Total submissions
-        const { count: totalSubmissions } = await supabase
-          .from('game_submissions')
-          .select('*', { count: 'exact', head: true });
-
-        document.getElementById('totalSubmissions').textContent = totalSubmissions || 0;
-
-      } catch (error) {
-        console.error('Error loading stats:', error);
-      }
-    }
-
-    async function loadPendingSubmissions() {
-      const container = document.getElementById('submissionsContainer');
-      
-      try {
-        const { data: submissions, error } = await supabase
-          .from('game_submissions')
-          .select('*, user_profiles!submitted_by(full_name, school_name)')
-          .eq('status', 'pending')
-          .order('created_at', { ascending: true });
-
-        if (error) throw error;
-
-        if (!submissions || submissions.length === 0) {
-          container.innerHTML = `
-            <div class="empty-state">
-              <div class="empty-icon">OK</div>
-              <h3>All caught up!</h3>
-              <p>No pending submissions to review.</p>
-            </div>
-          `;
-          return;
-        }
-
-        container.innerHTML = submissions.map(sub => renderReviewCard(sub)).join('');
-
-        // Add event listeners to buttons
-        submissions.forEach(sub => {
-          document.getElementById(`approve-${sub.id}`)?.addEventListener('click', () => handleApprove(sub.id));
-          document.getElementById(`reject-${sub.id}`)?.addEventListener('click', () => openRejectModal(sub.id));
-        });
-
-      } catch (error) {
-        console.error('Error loading submissions:', error);
-        container.innerHTML = `
-          <div class="empty-state">
-            <div class="empty-icon">ERR</div>
-            <p>Error loading submissions. Please refresh the page.</p>
-          </div>
-        `;
-      }
-    }
-
-    function renderReviewCard(submission) {
-      const submitter = submission.user_profiles || {};
-      const gameData = submission.game_data || {};
-      const game = gameData.game || {};
-      const parseReview = gameData.parse_review || {};
-      const players = gameData.players || [];
-      const previewPlayers = players.slice(0, 8);
-      const hiddenPlayersCount = Math.max(players.length - previewPlayers.length, 0);
-
-      const submittedDate = new Date(submission.created_at).toLocaleString();
-      const gameDate = submission.game_date ? new Date(submission.game_date).toLocaleDateString() : "N/A";
-
-      const scope = gameData.submission_scope || "game_submission";
-      const submissionType = getSubmissionType(scope, submission, game, parseReview);
-      const submissionTypeLabel = formatSubmissionTypeLabel(submissionType);
-
-      const sportLabel = `${submission.sport || "N/A"} (${submission.gender || "N/A"})`;
-      const homeTeam = getTeamName(game.home_team, submission.home_team_id, "Home");
-      const awayTeam = getTeamName(game.away_team, submission.away_team_id, "Away");
-      const finalScore = `${game.home_team?.score ?? submission.home_score ?? "?"} - ${game.away_team?.score ?? submission.away_score ?? "?"}`;
-      const detectedSeasons = Array.isArray(parseReview.detected_seasons) && parseReview.detected_seasons.length
-        ? parseReview.detected_seasons.join(", ")
-        : "Not detected";
-      const parseConfidence = parseReview.confidence ?? gameData.confidence ?? "N/A";
-      const parseConfidenceDisplay = formatConfidence(parseConfidence);
-      const sourceType = parseReview.source_type || "not_provided";
-
-      const reviewTitle = submissionType === "pdf_review"
-        ? `${submission.sport || "PDF"} - PDF Review Submission`
-        : submissionType === "individual_stats"
-        ? `${submission.sport || "Stats"} - Individual Player Stats Upload`
-        : `${submission.sport || "Game"} - ${homeTeam} vs ${awayTeam}`;
-
-      const detailRows = submissionType === "pdf_review"
-        ? `
-            <div class="detail-row">
-              <span class="detail-label">Sport:</span>
-              <span class="detail-value">${sportLabel}</span>
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">Upload Type:</span>
-              <span class="detail-value">${submissionTypeLabel}</span>
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">Detected Seasons:</span>
-              <span class="detail-value">${detectedSeasons}</span>
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">Parse Confidence:</span>
-              <span class="detail-value">${parseConfidenceDisplay}</span>
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">Submission Method:</span>
-              <span class="detail-value">${submission.submission_method?.replace("_", " ") || "Manual"} (${sourceType})</span>
-            </div>
-          `
-        : submissionType === "individual_stats"
-        ? `
-            <div class="detail-row">
-              <span class="detail-label">Sport:</span>
-              <span class="detail-value">${sportLabel}</span>
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">Upload Type:</span>
-              <span class="detail-value">${submissionTypeLabel}</span>
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">Players Parsed:</span>
-              <span class="detail-value">${players.length}</span>
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">Detected Seasons:</span>
-              <span class="detail-value">${detectedSeasons}</span>
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">Parse Confidence:</span>
-              <span class="detail-value">${parseConfidenceDisplay}</span>
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">Submission Method:</span>
-              <span class="detail-value">${submission.submission_method?.replace("_", " ") || "Manual"} (${sourceType})</span>
-            </div>
-          `
-        : `
-            <div class="detail-row">
-              <span class="detail-label">Sport:</span>
-              <span class="detail-value">${sportLabel}</span>
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">Upload Type:</span>
-              <span class="detail-value">${submissionTypeLabel}</span>
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">Teams:</span>
-              <span class="detail-value">${homeTeam} vs ${awayTeam}</span>
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">Final Score:</span>
-              <span class="detail-value">${finalScore}</span>
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">Location:</span>
-              <span class="detail-value">${submission.location || "N/A"}</span>
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">Submission Method:</span>
-              <span class="detail-value">${submission.submission_method?.replace("_", " ") || "Manual"} (${sourceType})</span>
-            </div>
-          `;
-
-      return `
-        <div class="review-card">
-          <div class="review-header">
-            <div>
-              <div class="review-title">${reviewTitle}</div>
-              <div class="review-meta">
-                <span>Type: ${submissionTypeLabel}</span>
-                <span>Submitter: ${submitter.full_name || "Unknown"} (${submitter.school_name || "Unknown School"})</span>
-                <span>Game Date: ${gameDate}</span>
-                <span>Submitted: ${submittedDate}</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="game-details">${detailRows}</div>
-
-          ${players.length > 0 ? `
-            <div class="players-section">
-              <h4>Player Statistics (${players.length} players)</h4>
-              <div class="player-list">
-                ${previewPlayers.map((p) => `
-                  <div class="player-row">
-                    <span class="player-name">${p.name}</span>
-                    <span class="player-stats">${formatStats(p.stats)}</span>
-                  </div>
-                `).join("")}
-              </div>
-              ${hiddenPlayersCount > 0 ? `<p style="margin-top: 8px; color: #718096; font-size: 12px;">+${hiddenPlayersCount} more player(s) hidden for compact review</p>` : ""}
-            </div>
-          ` : `
-            <p style="color: #a0aec0; font-style: italic;">No player stats included</p>
-          `}
-
-          <div class="action-buttons">
-            <button id="approve-${submission.id}" class="btn btn-approve">
-              Approve and Publish
-            </button>
-            <button id="reject-${submission.id}" class="btn btn-reject">
-              Reject
-            </button>
-          </div>
-        </div>
-      `;
-    }
-
-    function getSubmissionType(scope, submission, game, parseReview = {}) {
-      const normalizedScope = String(scope || "").toLowerCase();
-      const uploadLane = String(parseReview.upload_lane || "").toLowerCase();
-      const sourceType = String(parseReview.source_type || "").toLowerCase();
-
-      if (normalizedScope === "pdf_review" || uploadLane === "pdf_review" || sourceType === "pdf_report") {
-        return "pdf_review";
-      }
-
-      if (normalizedScope === "season_sheet") {
-        return "individual_stats";
-      }
-
-      const homeTeam = getTeamName(game.home_team, submission.home_team_id, "");
-      const awayTeam = getTeamName(game.away_team, submission.away_team_id, "");
-      const hasRealTeams = !isGenericTeamName(homeTeam) && !isGenericTeamName(awayTeam);
-
-      const hasScore =
-        (submission.home_score !== null && submission.home_score !== undefined) ||
-        (submission.away_score !== null && submission.away_score !== undefined) ||
-        (game.home_team?.score !== null && game.home_team?.score !== undefined) ||
-        (game.away_team?.score !== null && game.away_team?.score !== undefined);
-
-      if (!hasRealTeams && !hasScore) {
-        return "individual_stats";
-      }
-
-      return "game_matchup";
-    }
-
-    function formatSubmissionTypeLabel(type) {
-      if (type === "pdf_review") {
-        return "PDF Review Submission";
-      }
-
-      if (type === "individual_stats") {
-        return "Individual Player Stats";
-      }
-
-      return "Home vs Away Game";
-    }
-
-    function formatConfidence(value) {
-      const numeric = Number(value);
-      if (Number.isFinite(numeric)) {
-        return `${numeric}%`;
-      }
-      return "N/A";
-    }
-
-    function getTeamName(teamObj, fallback, defaultValue) {
-      return String(teamObj?.name || fallback || defaultValue || "").trim();
-    }
-
-    function isGenericTeamName(value) {
-      const normalized = String(value || "").trim().toLowerCase();
-      return !normalized || normalized === "home" || normalized === "away" || normalized === "unknown" || normalized === "n/a";
-    }
-    function formatStats(stats) {
-      if (!stats) return 'No stats';
-      return Object.entries(stats)
-        .map(([key, val]) => `${key}: ${val}`)
-        .join(', ');
-    }
-
-    async function handleApprove(submissionId) {
-      if (!confirm('Approve this submission and publish to the public site?')) {
-        return;
-      }
-
-      const btn = document.getElementById(`approve-${submissionId}`);
-      const originalText = btn.textContent;
-      btn.textContent = 'Approving...';
-      btn.disabled = true;
-
-      try {
-        // Call the approval function
-        const { data, error } = await supabase.rpc('approve_game_submission', {
-          submission_id: submissionId
-        });
-
-        if (error) throw error;
-
-        alert('Submission approved and published!');
-        
-        // Reload
-        await loadStats();
-        await loadPendingSubmissions();
-
-      } catch (error) {
-        console.error('Approval error:', error);
-        alert('Error approving submission: ' + error.message);
-        btn.textContent = originalText;
-        btn.disabled = false;
-      }
-    }
-
-    function openRejectModal(submissionId) {
-      currentSubmissionId = submissionId;
-      document.getElementById('rejectModal').classList.add('show');
-      document.getElementById('rejectReason').value = '';
-      document.getElementById('rejectReason').focus();
-    }
-
-    window.closeRejectModal = function() {
-      document.getElementById('rejectModal').classList.remove('show');
-      currentSubmissionId = null;
-    }
-
-    async function handleReject(e) {
-      e.preventDefault();
-      
-      const reason = document.getElementById('rejectReason').value.trim();
-      if (!reason) {
-        alert('Please provide a reason for rejection');
-        return;
-      }
-
-      try {
-        const { error } = await supabase
-          .from('game_submissions')
-          .update({
-            status: 'rejected',
-            rejection_reason: reason,
-            reviewed_by: currentUser.id,
-            reviewed_at: new Date().toISOString()
-          })
-          .eq('id', currentSubmissionId);
-
-        if (error) throw error;
-
-        alert('Submission rejected');
-        closeRejectModal();
-        
-        // Reload
-        await loadStats();
-        await loadPendingSubmissions();
-
-      } catch (error) {
-        console.error('Rejection error:', error);
-        alert('Error rejecting submission: ' + error.message);
-      }
-    }
-  </script>
+  <script type="module" src="./admin-dashboard.js"></script>
 </body>
 </html>

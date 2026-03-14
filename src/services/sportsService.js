@@ -1,432 +1,376 @@
-// sportsService.js
 import { supabase } from "../supabaseClient.js";
 
-let publicSchoolSignalsCache = null;
+const RECORD_SELECT = "id, school_id, school, sport, season, stat_row";
+const DEFAULT_RECORD_LIMIT = 800;
+const MAX_RECORD_LIMIT = 1500;
 
-/* ---------------- Helpers ---------------- */
+let visibleSchoolsCache = null;
+let visibleSportsCache = null;
+let visibleSeasonsCache = null;
 
-function isMissingColumnError(error, columnName) {
-  const message = `${error?.message || ""} ${error?.details || ""}`.toLowerCase();
-  const col = String(columnName || "").toLowerCase();
-  return message.includes(col) &&
-    (message.includes("does not exist") ||
-      message.includes("could not find") ||
-      message.includes("column"));
-}
-
-function isMissingSportVariantColumnError(error) {
-  return isMissingColumnError(error, "sport_variant");
-}
-
-function isMissingIsActiveColumnError(error) {
-  return isMissingColumnError(error, "is_active");
-}
-
-function buildSearchFilter(query) {
-  const escaped = query.replace(/%/g, "\\%").replace(/_/g, "\\_");
-  const like = `%${escaped}%`;
-  return [
-    `school.ilike.${like}`,
-    `sport.ilike.${like}`,
-    `season.ilike.${like}`,
-  ].join(",");
+function normalizeText(value) {
+  return String(value || "").trim();
 }
 
 function normalizeSchoolToken(value) {
-  return String(value || "")
-    .trim()
+  return normalizeText(value)
     .toLowerCase()
     .replace(/[^\w\s]/g, "")
     .replace(/\s+/g, " ");
 }
 
-function tokenizeSchoolToken(value) {
-  const STOP_WORDS = new Set(["school", "for", "the", "of", "deaf", "high", "prep", "academy"]);
-  return normalizeSchoolToken(value)
-    .split(" ")
-    .map((part) => part.trim())
-    .filter((part) => part.length >= 3 && !STOP_WORDS.has(part));
+function isMissingRelationError(error, relationName) {
+  const message = `${error?.message || ""} ${error?.details || ""}`.toLowerCase();
+  const relation = String(relationName || "").toLowerCase();
+
+  return (
+    message.includes(relation) &&
+    (message.includes("does not exist") ||
+      message.includes("could not find") ||
+      message.includes("relation") ||
+      message.includes("column"))
+  );
 }
 
-function hasTokenOverlap(a, b) {
-  if (!a || !b) return false;
-  if (a === b) return true;
+function buildSearchFilter(query) {
+  const escaped = query.replace(/%/g, "\\%").replace(/_/g, "\\_");
+  const like = `%${escaped}%`;
 
-  const left = tokenizeSchoolToken(a);
-  const right = tokenizeSchoolToken(b);
-  if (!left.length || !right.length) return false;
-
-  const rightSet = new Set(right);
-  const overlapCount = left.filter((token) => rightSet.has(token)).length;
-  const minimum = Math.min(left.length, right.length) >= 3 ? 2 : 1;
-
-  return overlapCount >= minimum;
+  return [
+    `school.ilike.${like}`,
+    `sport.ilike.${like}`,
+    `season.ilike.${like}`,
+    `stat_row->>Athlete Name.ilike.${like}`,
+    `stat_row->>athlete_name.ilike.${like}`,
+    `stat_row->>player_name.ilike.${like}`,
+    `stat_row->>player.ilike.${like}`,
+    `stat_row->>name.ilike.${like}`,
+  ].join(",");
 }
 
-/* ---------------- Pagination Helper ---------------- */
+function dedupeVisibleSchools(rows) {
+  const deduped = new Map();
 
-async function fetchPaginatedRows({ pageSize = 1000, maxRows = Number.POSITIVE_INFINITY, fetchPage }) {
-  const allRows = [];
-  let page = 0;
+  (rows || []).forEach((row) => {
+    const id = normalizeText(row?.id);
+    const fullName = normalizeText(row?.full_name);
+    const shortName = normalizeText(row?.short_name);
+    const division = normalizeText(row?.division);
 
-  while (true) {
-    const { data, error } = await fetchPage(page, pageSize);
-
-    if (error) throw new Error(error.message);
-
-    const rows = data || [];
-
-    if (rows.length === 0) break;
-
-    allRows.push(...rows);
-
-    if (rows.length < pageSize) break;
-
-    if (allRows.length >= maxRows) break;
-
-    page++;
-  }
-
-  return allRows.slice(0, maxRows);
-}
-
-/* ---------------- Metadata ---------------- */
-
-export async function fetchSchools() {
-  let request = supabase
-    .from("schools")
-    .select("id, full_name, short_name, division, is_active")
-    .order("full_name", { ascending: true });
-
-  let { data, error } = await request;
-
-  if (error && isMissingIsActiveColumnError(error)) {
-    const fallback = await supabase
-      .from("schools")
-      .select("id, full_name, short_name, division")
-      .order("full_name", { ascending: true });
-
-    data = fallback.data;
-    error = fallback.error;
-  }
-
-  if (error) throw new Error(error.message);
-
-  const schools = data || [];
-  const visibilitySignals = await fetchPublicSchoolSignals();
-  const aliasSignals = await fetchSchoolAliasSignals();
-  const signalTokens = Array.from(visibilitySignals.schoolNames || []);
-  const visibleSchools = [];
-
-  schools.forEach((school) => {
-    const fullNameToken = normalizeSchoolToken(school.full_name);
-    const shortNameToken = normalizeSchoolToken(school.short_name);
-    const aliasTokens = aliasSignals.get(school.id) || [];
-    const candidateTokens = [fullNameToken, shortNameToken, ...aliasTokens].filter(Boolean);
-
-    let hasSignalMatch = false;
-    let matchedToken = "";
-
-    if (visibilitySignals.schoolIds.has(school.id)) {
-      hasSignalMatch = true;
-    } else {
-      for (const token of candidateTokens) {
-        if (visibilitySignals.schoolNames.has(token)) {
-          hasSignalMatch = true;
-          matchedToken = token;
-          break;
-        }
-      }
-
-      if (!hasSignalMatch) {
-        for (const token of candidateTokens) {
-          const overlap = signalTokens.find((signalToken) => hasTokenOverlap(token, signalToken));
-          if (overlap) {
-            hasSignalMatch = true;
-            matchedToken = overlap;
-            break;
-          }
-        }
-      }
-    }
-
-    if (!hasSignalMatch) {
+    if (!id || !fullName) {
       return;
     }
 
-    visibleSchools.push(school);
-  });
-
-  const deduped = new Map();
-  visibleSchools.forEach((school) => {
-    const key = school.id || normalizeSchoolToken(school.full_name);
-    if (!deduped.has(key)) {
-      deduped.set(key, school);
+    if (!deduped.has(id)) {
+      deduped.set(id, { id, full_name: fullName, short_name: shortName, division });
     }
   });
 
-  return Array.from(deduped.values()).sort((a, b) =>
-    String(a.full_name || "").localeCompare(String(b.full_name || ""))
+  return Array.from(deduped.values()).sort((left, right) =>
+    left.full_name.localeCompare(right.full_name)
   );
+}
+
+async function fetchMeaningfulSchoolRowsFallback() {
+  const schoolsResponse = await supabase
+    .from("schools")
+    .select("id, full_name, short_name, division")
+    .order("full_name", { ascending: true });
+
+  if (schoolsResponse.error) {
+    throw new Error(schoolsResponse.error.message);
+  }
+
+  const schools = schoolsResponse.data || [];
+  const visibleRows = [];
+
+  for (const school of schools) {
+    const schoolId = normalizeText(school.id);
+    const fullName = normalizeText(school.full_name);
+    const shortName = normalizeText(school.short_name);
+
+    if (!schoolId) {
+      continue;
+    }
+
+    const probes = [
+      supabase
+        .from("raw_stat_rows")
+        .select("id", { head: true, count: "exact" })
+        .eq("school_id", schoolId)
+        .not("sport", "is", null)
+        .not("season", "is", null)
+        .not("stat_row", "is", null),
+    ];
+
+    if (fullName) {
+      probes.push(
+        supabase
+          .from("raw_stat_rows")
+          .select("id", { head: true, count: "exact" })
+          .ilike("school", fullName)
+          .not("sport", "is", null)
+          .not("season", "is", null)
+          .not("stat_row", "is", null)
+      );
+    }
+
+    if (shortName && shortName !== fullName) {
+      probes.push(
+        supabase
+          .from("raw_stat_rows")
+          .select("id", { head: true, count: "exact" })
+          .ilike("school", shortName)
+          .not("sport", "is", null)
+          .not("season", "is", null)
+          .not("stat_row", "is", null)
+      );
+    }
+
+    const results = await Promise.all(probes);
+    const hasVisibleData = results.some((result) => !result.error && Number(result.count || 0) > 0);
+
+    if (hasVisibleData) {
+      visibleRows.push(school);
+    }
+  }
+
+  return dedupeVisibleSchools(visibleRows);
+}
+
+async function fetchVisibleSchools() {
+  if (visibleSchoolsCache) {
+    return visibleSchoolsCache;
+  }
+
+  const response = await supabase
+    .from("vw_public_visible_schools")
+    .select("id, full_name, short_name, division")
+    .order("full_name", { ascending: true });
+
+  if (!response.error) {
+    visibleSchoolsCache = dedupeVisibleSchools(response.data || []);
+    return visibleSchoolsCache;
+  }
+
+  if (!isMissingRelationError(response.error, "vw_public_visible_schools")) {
+    throw new Error(response.error.message);
+  }
+
+  visibleSchoolsCache = await fetchMeaningfulSchoolRowsFallback();
+  return visibleSchoolsCache;
+}
+
+async function fetchVisibleSports() {
+  if (visibleSportsCache) {
+    return visibleSportsCache;
+  }
+
+  const response = await supabase
+    .from("vw_public_visible_sports")
+    .select("sport")
+    .order("sport", { ascending: true });
+
+  if (!response.error) {
+    visibleSportsCache = Array.from(
+      new Set((response.data || []).map((row) => normalizeText(row.sport)).filter(Boolean))
+    );
+    return visibleSportsCache;
+  }
+
+  if (!isMissingRelationError(response.error, "vw_public_visible_sports")) {
+    throw new Error(response.error.message);
+  }
+
+  const fallback = await supabase.from("vw_sports").select("sport");
+  if (fallback.error) {
+    throw new Error(fallback.error.message);
+  }
+
+  visibleSportsCache = Array.from(
+    new Set((fallback.data || []).map((row) => normalizeText(row.sport)).filter(Boolean))
+  ).sort((left, right) => left.localeCompare(right));
+
+  return visibleSportsCache;
+}
+
+async function fetchVisibleSeasons() {
+  if (visibleSeasonsCache) {
+    return visibleSeasonsCache;
+  }
+
+  const response = await supabase
+    .from("vw_public_visible_seasons")
+    .select("season")
+    .order("season", { ascending: false });
+
+  if (!response.error) {
+    visibleSeasonsCache = Array.from(
+      new Set((response.data || []).map((row) => normalizeText(row.season)).filter(Boolean))
+    );
+    return visibleSeasonsCache;
+  }
+
+  if (!isMissingRelationError(response.error, "vw_public_visible_seasons")) {
+    throw new Error(response.error.message);
+  }
+
+  const fallback = await supabase
+    .from("raw_stat_rows")
+    .select("season")
+    .not("season", "is", null)
+    .order("season", { ascending: false })
+    .limit(500);
+
+  if (fallback.error) {
+    throw new Error(fallback.error.message);
+  }
+
+  visibleSeasonsCache = Array.from(
+    new Set((fallback.data || []).map((row) => normalizeText(row.season)).filter(Boolean))
+  );
+
+  return visibleSeasonsCache;
+}
+
+function filterSchoolsByDivision(schools, division) {
+  const normalizedDivision = normalizeText(division).toLowerCase();
+  if (!normalizedDivision) {
+    return schools;
+  }
+
+  return (schools || []).filter(
+    (school) => normalizeText(school.division).toLowerCase() === normalizedDivision
+  );
+}
+
+export async function fetchSchools() {
+  return fetchVisibleSchools();
 }
 
 export async function fetchPublicSchoolDirectory() {
-  const schools = await fetchSchools();
-  const visibilitySignals = await fetchPublicSchoolSignals();
-  const results = [...schools];
-
-  const knownTokens = new Set();
-  schools.forEach((school) => {
-    const fullNameToken = normalizeSchoolToken(school.full_name);
-    const shortNameToken = normalizeSchoolToken(school.short_name);
-    if (fullNameToken) knownTokens.add(fullNameToken);
-    if (shortNameToken) knownTokens.add(shortNameToken);
-  });
-
-  Array.from(visibilitySignals.schoolNames || []).forEach((signalToken) => {
-    const alreadyKnown = Array.from(knownTokens).some((token) =>
-      token === signalToken || hasTokenOverlap(token, signalToken)
-    );
-
-    if (alreadyKnown) {
-      return;
-    }
-
-    const displayName = visibilitySignals.schoolNameDisplay.get(signalToken) || signalToken;
-    results.push({
-      id: `signal:${signalToken}`,
-      full_name: displayName,
-      short_name: "",
-      division: "",
-      is_signal_only: true,
-    });
-    knownTokens.add(signalToken);
-  });
-
-  const deduped = new Map();
-  results.forEach((school) => {
-    const key = normalizeSchoolToken(school.full_name) || school.id;
-    if (!deduped.has(key)) {
-      deduped.set(key, school);
-    }
-  });
-
-  return Array.from(deduped.values()).sort((a, b) =>
-    String(a.full_name || "").localeCompare(String(b.full_name || ""))
-  );
+  return fetchVisibleSchools();
 }
-
-async function fetchPublicSchoolSignals() {
-  if (publicSchoolSignalsCache) {
-    return publicSchoolSignalsCache;
-  }
-
-  const rows = await fetchPaginatedRows({
-    pageSize: 5000,
-    fetchPage: (page, pageSize) => supabase
-      .from("raw_stat_rows")
-      .select("school_id, school")
-      .order("id", { ascending: true })
-      .range(page * pageSize, (page + 1) * pageSize - 1),
-  });
-
-  const schoolIds = new Set();
-  const schoolNames = new Set();
-  const schoolNameDisplay = new Map();
-
-  (rows || []).forEach((row) => {
-    if (row.school_id) {
-      schoolIds.add(row.school_id);
-    }
-
-    const displayName = String(row.school || "").trim();
-    const token = normalizeSchoolToken(displayName);
-    if (token) {
-      schoolNames.add(token);
-      if (!schoolNameDisplay.has(token)) {
-        schoolNameDisplay.set(token, displayName);
-      }
-    }
-  });
-
-  publicSchoolSignalsCache = { schoolIds, schoolNames, schoolNameDisplay };
-  return publicSchoolSignalsCache;
-}
-
-async function fetchSchoolAliasSignals() {
-  const aliasMap = new Map();
-
-  const { data, error } = await supabase
-    .from("school_aliases")
-    .select("*");
-
-  if (error) {
-    return aliasMap;
-  }
-
-  (data || []).forEach((row) => {
-    const schoolId = row.school_id || row.schoolId || "";
-    if (!schoolId) return;
-
-    const aliasValue =
-      row.alias ||
-      row.alias_name ||
-      row.alias_value ||
-      row.name ||
-      "";
-
-    const token = normalizeSchoolToken(aliasValue);
-    if (!token) return;
-
-    const list = aliasMap.get(schoolId) || [];
-    list.push(token);
-    aliasMap.set(schoolId, list);
-  });
-
-  return aliasMap;
-}
-
-async function getFullNameBySchoolId(schoolId) {
-  if (!schoolId) return null;
-
-  const { data, error } = await supabase
-    .from("schools")
-    .select("full_name")
-    .eq("id", schoolId)
-    .limit(1);
-
-  if (error) throw new Error(error.message);
-  return data?.[0]?.full_name || null;
-}
-
-async function getDivisionFullNameList(division) {
-  if (!division) return null;
-
-  let request = supabase
-    .from("schools")
-    .select("full_name")
-    .eq("division", division)
-    .eq("is_active", true);
-
-  let { data, error } = await request;
-
-  if (error && isMissingIsActiveColumnError(error)) {
-    const fallback = await supabase
-      .from("schools")
-      .select("full_name")
-      .eq("division", division);
-
-    data = fallback.data;
-    error = fallback.error;
-  }
-
-  if (error) throw new Error(error.message);
-
-  return (data || []).map((r) => r.full_name);
-}
-
-/* ---------------- Main API ---------------- */
 
 export async function fetchSportsRecords(query = "", filters = {}) {
+  const normalizedQuery = normalizeText(query);
+  const normalizedSchoolId = normalizeText(filters.schoolId);
+  const normalizedSport = normalizeText(filters.sport);
+  const normalizedSeason = normalizeText(filters.season);
+  const normalizedDivision = normalizeText(filters.division);
+  const normalizedFootballVariant = normalizeText(filters.footballVariant);
   const hasFilters = Boolean(
-    query ||
-      filters.schoolId ||
-      filters.sport ||
-      filters.division ||
-      filters.season ||
-      filters.footballVariant
+    normalizedQuery ||
+      normalizedSchoolId ||
+      normalizedSport ||
+      normalizedSeason ||
+      normalizedDivision ||
+      normalizedFootballVariant
   );
 
   if (!hasFilters) {
     return [];
   }
 
-  let divisionFullNames = null;
-  if (filters.division) {
-    divisionFullNames = await getDivisionFullNameList(filters.division);
+  let request = supabase
+    .from("raw_stat_rows")
+    .select(RECORD_SELECT)
+    .order("season", { ascending: false })
+    .limit(Math.min(Number(filters.maxRows) || DEFAULT_RECORD_LIMIT, MAX_RECORD_LIMIT));
+
+  if (normalizedQuery) {
+    request = request.or(buildSearchFilter(normalizedQuery));
   }
 
-  let selectedSchoolFullName = null;
-  if (filters.schoolId && filters.schoolId !== "all") {
-    selectedSchoolFullName = await getFullNameBySchoolId(filters.schoolId);
+  if (normalizedSchoolId) {
+    request = request.eq("school_id", normalizedSchoolId);
   }
 
-  const allData = await fetchPaginatedRows({
-    pageSize: 1000,
-    maxRows: Number(filters.maxRows || 3000),
-    fetchPage: (page, pageSize) => {
-      const escapedQuery = query.replace(/%/g, "\\%").replace(/_/g, "\\_");
-      const like = `%${escapedQuery}%`;
+  if (normalizedDivision) {
+    const visibleSchools = await fetchVisibleSchools();
+    const schoolsInDivision = filterSchoolsByDivision(visibleSchools, normalizedDivision);
+    const schoolIds = schoolsInDivision.map((school) => school.id).filter(Boolean);
+    const schoolNames = schoolsInDivision.map((school) => school.full_name).filter(Boolean);
 
-      let request = supabase
+    if (!schoolIds.length && !schoolNames.length) {
+      return [];
+    }
+
+    if (schoolIds.length) {
+      request = request.in("school_id", schoolIds);
+    } else {
+      request = request.in("school", schoolNames);
+    }
+  }
+
+  if (normalizedSport) {
+    request = request.eq("sport", normalizedSport);
+  }
+
+  if (normalizedSeason) {
+    request = request.eq("season", normalizedSeason);
+  }
+
+  if (normalizedFootballVariant) {
+    request = request.eq("sport_variant", normalizedFootballVariant);
+  }
+
+  const { data, error } = await request;
+  if (error) {
+    if (
+      normalizedFootballVariant &&
+      isMissingRelationError(error, "sport_variant")
+    ) {
+      const retryRequest = supabase
         .from("raw_stat_rows")
-        .select("*")
-        .order("season", { ascending: true })
-        .range(page * pageSize, (page + 1) * pageSize - 1);
+        .select(RECORD_SELECT)
+        .order("season", { ascending: false })
+        .limit(Math.min(Number(filters.maxRows) || DEFAULT_RECORD_LIMIT, MAX_RECORD_LIMIT));
 
-      if (query) {
-        request = request.or([
-          buildSearchFilter(query),
-          `stat_row->>Athlete Name.ilike.${like}`,
-          `stat_row->>athlete_name.ilike.${like}`,
-          `stat_row->>name.ilike.${like}`,
-        ].join(","));
+      let retry = retryRequest;
+      if (normalizedQuery) {
+        retry = retry.or(buildSearchFilter(normalizedQuery));
+      }
+      if (normalizedSchoolId) {
+        retry = retry.eq("school_id", normalizedSchoolId);
+      }
+      if (normalizedDivision) {
+        const visibleSchools = await fetchVisibleSchools();
+        const schoolsInDivision = filterSchoolsByDivision(visibleSchools, normalizedDivision);
+        const schoolIds = schoolsInDivision.map((school) => school.id).filter(Boolean);
+        if (!schoolIds.length) {
+          return [];
+        }
+        retry = retry.in("school_id", schoolIds);
+      }
+      if (normalizedSport) {
+        retry = retry.eq("sport", normalizedSport);
+      }
+      if (normalizedSeason) {
+        retry = retry.eq("season", normalizedSeason);
       }
 
-      if (divisionFullNames?.length) {
-        request = request.in("school", divisionFullNames);
+      const retryResponse = await retry;
+      if (retryResponse.error) {
+        throw new Error(retryResponse.error.message);
       }
+      return retryResponse.data || [];
+    }
 
-      if (filters.schoolId && filters.schoolId !== "all") {
-        request = selectedSchoolFullName
-          ? request.eq("school", selectedSchoolFullName)
-          : request.eq("school_id", filters.schoolId);
-      }
+    throw new Error(error.message);
+  }
 
-      if (filters.sport && filters.sport !== "all") {
-        request = request.eq("sport", filters.sport);
-      }
-
-      if (filters.season && filters.season !== "all") {
-        request = request.eq("season", filters.season);
-      }
-
-      return request;
-    },
-  });
-
-  return allData || [];
+  return data || [];
 }
 
-/* ---------------- Dropdown APIs ---------------- */
-
 export async function fetchSportsList() {
-  const { data, error } = await supabase
-    .from("vw_sports")
-    .select("sport");
-
-  if (error) throw new Error(error.message);
-
-  return (data || []).map(r => r.sport);
+  return fetchVisibleSports();
 }
 
 export async function fetchSeasonsList() {
-  const rows = await fetchPaginatedRows({
-    pageSize: 1500,
-    maxRows: 12000,
-    fetchPage: (page, pageSize) =>
-      supabase
-        .from("raw_stat_rows")
-        .select("season")
-        .order("season", { ascending: false })
-        .range(page * pageSize, (page + 1) * pageSize - 1),
-  });
+  return fetchVisibleSeasons();
+}
 
-  return Array.from(
-    new Set(
-      (rows || [])
-        .map((row) => String(row.season || "").trim())
-        .filter(Boolean)
-    )
-  ).sort((a, b) => (a < b ? 1 : -1));
+export function normalizePublicSchoolToken(value) {
+  return normalizeSchoolToken(value);
 }
