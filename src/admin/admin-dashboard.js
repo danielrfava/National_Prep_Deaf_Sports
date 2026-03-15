@@ -4,6 +4,7 @@ import {
   fetchCurrentSessionProfile,
   isAdminProfile,
   normalizeRole,
+  normalizeStatus,
   roleLabel,
 } from "../portal/schoolAccess.js";
 
