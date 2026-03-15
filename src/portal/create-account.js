@@ -1,13 +1,8 @@
 import { mountPublicTopNav } from "../components/publicTopNav.js";
 import { supabase } from "../supabaseClient.js";
 import {
-  buildActivationHref,
   CREATE_ACCOUNT_ROLE_OPTIONS,
-  fetchCurrentSessionProfile,
-  isAdminProfile,
-  isApprovedSchoolProfile,
   loadSchoolOptions,
-  needsActivationProfile,
   requiresAthleticDirectorReference,
 } from "./schoolAccess.js";
 
@@ -38,41 +33,12 @@ let activeSchoolIndex = -1;
 window.addEventListener("DOMContentLoaded", init);
 
 async function init() {
-  await routeExistingSession();
   populateRoleOptions();
   await populateSchoolOptions();
   syncConditionalFields();
   roleSelect?.addEventListener("change", syncConditionalFields);
   bindSchoolCombobox();
   form?.addEventListener("submit", handleSubmit);
-}
-
-async function routeExistingSession() {
-  try {
-    const { session, profile } = await fetchCurrentSessionProfile();
-    if (!session?.user?.id || !profile) {
-      return;
-    }
-
-    if (isAdminProfile(profile)) {
-      window.location.href = "../admin/admin-dashboard.html";
-      return;
-    }
-
-    if (isApprovedSchoolProfile(profile)) {
-      window.location.href = "dashboard.html";
-      return;
-    }
-
-    if (needsActivationProfile(profile)) {
-      window.location.href = buildActivationHref();
-      return;
-    }
-
-    window.location.href = "dashboard.html";
-  } catch (error) {
-    console.error("Session check failed:", error);
-  }
 }
 
 function populateRoleOptions() {
