@@ -152,6 +152,7 @@ check (
 create or replace function public.sync_school_access_request_state()
 returns trigger
 language plpgsql
+security definer
 set search_path = public
 as $$
 declare
@@ -237,13 +238,14 @@ begin
     raise exception 'Non-Athletic Director requests require Athletic Director name and email.';
   end if;
 
-  if exists (
-    select 1
-    from public.user_profiles existing_profile
-    where lower(existing_profile.email) = new.email
-      and existing_profile.role <> 'admin'
-      and existing_profile.status in ('invited', 'approved')
-  ) then
+  if tg_op = 'INSERT'
+     and exists (
+       select 1
+       from public.user_profiles existing_profile
+       where lower(existing_profile.email) = new.email
+         and existing_profile.role <> 'admin'
+         and existing_profile.status in ('invited', 'approved')
+     ) then
     raise exception 'A school access account already exists for this email.';
   end if;
 
@@ -266,6 +268,9 @@ begin
   return new;
 end;
 $$;
+
+comment on function public.sync_school_access_request_state() is
+  'SECURITY DEFINER is required because public school access request inserts pass through this trigger and it validates existing user_profiles rows.';
 
 drop trigger if exists trg_sync_school_access_requests on public.school_access_requests;
 

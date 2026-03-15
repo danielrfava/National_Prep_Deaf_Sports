@@ -132,7 +132,11 @@ async function loadStats() {
     approvedTodayResult,
     totalSubmissionsResult,
   ] = await Promise.all([
-    supabase.from("school_access_requests").select("*", { count: "exact", head: true }).eq("status", "pending"),
+    supabase
+      .from("school_access_requests")
+      .select("*", { count: "exact", head: true })
+      .in("status", ["pending", "approved"])
+      .is("activated_at", null),
     supabase.from("game_submissions").select("*", { count: "exact", head: true }).eq("status", "pending"),
     supabase
       .from("game_submissions")
@@ -167,16 +171,17 @@ async function fetchPendingUsers() {
   const { data, error } = await supabase
     .from("school_access_requests")
     .select(
-      "id, created_at, email, full_name, school_id, school_name, role, approved_role, status, job_title, reference_ad_name, reference_ad_email, verification_notes, rejection_reason, reviewed_at, approved_at, activation_email_sent_at"
+      "id, created_at, email, full_name, school_id, school_name, role, approved_role, status, job_title, reference_ad_name, reference_ad_email, verification_notes, rejection_reason, reviewed_at, approved_at, activation_email_sent_at, activated_at"
     )
-    .eq("status", "pending")
+    .in("status", ["pending", "approved"])
+    .is("activated_at", null)
     .order("created_at", { ascending: true });
 
   if (error) {
     throw error;
   }
 
-  return data || [];
+  return sortSchoolAccessQueue(data || []);
 }
 
 async function fetchPendingSubmissions() {
@@ -195,10 +200,25 @@ async function fetchPendingSubmissions() {
   return data || [];
 }
 
+function sortSchoolAccessQueue(rows) {
+  return [...(rows || [])].sort((left, right) => {
+    const leftStatus = normalizeStatus(left?.status);
+    const rightStatus = normalizeStatus(right?.status);
+    const leftPriority = leftStatus === "pending" ? 0 : leftStatus === "approved" ? 1 : 2;
+    const rightPriority = rightStatus === "pending" ? 0 : rightStatus === "approved" ? 1 : 2;
+
+    if (leftPriority !== rightPriority) {
+      return leftPriority - rightPriority;
+    }
+
+    return new Date(left?.created_at || 0).getTime() - new Date(right?.created_at || 0).getTime();
+  });
+}
+
 function renderPendingUsers() {
   if (!pendingUsers.length) {
     elements.pendingUsersContainer.innerHTML =
-      '<div class="empty-state">No pending school access requests right now.</div>';
+      '<div class="empty-state">No school access requests are waiting on approval or activation right now.</div>';
     return;
   }
 
@@ -214,22 +234,18 @@ function renderPendingUserCard(user) {
         <h3 class="review-title">${escapeHtml(user.full_name || "Unnamed Request")}</h3>
         <p class="review-subline">${escapeHtml(user.email || "No email on file")}</p>
       </div>
-      <span class="status-chip ${model.canApprove ? "pending" : "danger"}">${model.canApprove ? "Ready" : "Blocked"}</span>
+      <span class="status-chip ${model.statusTone}">${model.statusLabel}</span>
     </div>
     <div class="pill-row">
       <span class="meta-pill">${escapeHtml(user.school_name || user.school_id || "No school selected")}</span>
-      <span class="meta-pill">Requested Role: ${escapeHtml(roleLabel(user.role))}</span>
-      <span class="meta-pill">Submitted ${escapeHtml(displayDate(user.created_at, true))}</span>
+      <span class="meta-pill">${escapeHtml(model.rolePillLabel)}: ${escapeHtml(roleLabel(model.roleValue))}</span>
+      <span class="meta-pill">${escapeHtml(model.statusMetaLabel)}</span>
     </div>
 
     <div class="issue-stack">
       ${renderIssueBox("Approval blocked", model.blockingReasons, "danger")}
       ${renderIssueBox("Review notes", model.reviewNotes, "warn")}
-      ${renderIssueBox(
-        "Ready to invite",
-        model.canApprove ? ["This request is complete enough to approve and send activation."] : [],
-        "ok"
-      )}
+      ${renderIssueBox(model.actionBoxTitle, model.actionBoxItems, "ok")}
     </div>
 
     <div class="detail-grid">
@@ -240,69 +256,116 @@ function renderPendingUserCard(user) {
       )}
       ${renderDetailCard("School ID", user.school_id || "Not set")}
       ${renderDetailCard("Verification Notes", user.verification_notes || "None provided")}
+      ${renderDetailCard("Approved At", user.approved_at ? displayDate(user.approved_at, true) : "Not approved yet")}
+      ${renderDetailCard(
+        "Activation Email",
+        user.activation_email_sent_at ? displayDate(user.activation_email_sent_at, true) : "Not sent yet"
+      )}
     </div>
-    <label class="review-subline" for="role-${escapeHtmlAttr(user.id)}">Approve as role</label>
+    ${
+      model.canApprove
+        ? `<label class="review-subline" for="role-${escapeHtmlAttr(user.id)}">Approve as role</label>
     <select id="role-${escapeHtmlAttr(user.id)}" class="request-role-select" data-role-select>
       ${STAFF_ROLE_OPTIONS.map(
         (option) => `<option value="${escapeHtmlAttr(option.value)}" ${
           normalizeRole(user.role) === option.value ? "selected" : ""
         }>${escapeHtml(option.label)}</option>`
       ).join("")}
-    </select>
+    </select>`
+        : ""
+    }
     <div class="action-buttons">
-      <button class="btn btn-approve" type="button" data-action="approve-user">
+      ${
+        model.canResendActivation
+          ? `<button class="btn btn-approve" type="button" data-action="resend-user-activation">
+        Resend Activation Email
+      </button>`
+          : `<button class="btn btn-approve" type="button" data-action="approve-user">
         Approve and Send Activation
       </button>
-      <button class="btn btn-reject" type="button" data-action="reject-user">Reject Request</button>
+      <button class="btn btn-reject" type="button" data-action="reject-user">Reject Request</button>`
+      }
     </div>
   </article>`;
 }
 
 function buildPendingUserReviewModel(user, roleOverride = "") {
-  const requestedRole = normalizeRole(roleOverride || user?.role) || "school_staff";
+  const status = normalizeStatus(user?.status);
+  const requestedRole = normalizeRole(roleOverride || user?.approved_role || user?.role) || "school_staff";
   const blockingReasons = [];
   const reviewNotes = [];
+  const canApprove = status === "pending";
+  const canResendActivation = status === "approved" && !user?.activated_at;
 
-  if (!String(user?.full_name || "").trim()) {
-    blockingReasons.push("Requester name is missing.");
-  }
-
-  if (!String(user?.email || "").trim()) {
-    blockingReasons.push("Email is missing.");
-  }
-
-  if (!String(user?.school_id || "").trim()) {
-    blockingReasons.push("School selection is missing.");
-  }
-
-  if (!requestedRole) {
-    blockingReasons.push("Requested role is missing.");
-  }
-
-  if (!String(user?.job_title || "").trim()) {
-    blockingReasons.push("Job title is missing.");
-  }
-
-  if (requestedRole !== "athletic_director") {
-    if (!String(user?.reference_ad_name || "").trim()) {
-      blockingReasons.push("Athletic Director reference name is missing.");
+  if (canApprove) {
+    if (!String(user?.full_name || "").trim()) {
+      blockingReasons.push("Requester name is missing.");
     }
 
-    if (!String(user?.reference_ad_email || "").trim()) {
-      blockingReasons.push("Athletic Director reference email is missing.");
+    if (!String(user?.email || "").trim()) {
+      blockingReasons.push("Email is missing.");
     }
-  } else {
-    reviewNotes.push("Athletic Director requests can be approved without a reference contact.");
+
+    if (!String(user?.school_id || "").trim()) {
+      blockingReasons.push("School selection is missing.");
+    }
+
+    if (!requestedRole) {
+      blockingReasons.push("Requested role is missing.");
+    }
+
+    if (!String(user?.job_title || "").trim()) {
+      blockingReasons.push("Job title is missing.");
+    }
+
+    if (requestedRole !== "athletic_director") {
+      if (!String(user?.reference_ad_name || "").trim()) {
+        blockingReasons.push("Athletic Director reference name is missing.");
+      }
+
+      if (!String(user?.reference_ad_email || "").trim()) {
+        blockingReasons.push("Athletic Director reference email is missing.");
+      }
+    } else {
+      reviewNotes.push("Athletic Director requests can be approved without a reference contact.");
+    }
   }
 
   if (String(user?.verification_notes || "").trim()) {
     reviewNotes.push("Verification notes are attached to this request.");
   }
 
+  if (canResendActivation) {
+    reviewNotes.push(
+      user.activation_email_sent_at
+        ? `Activation email last sent ${displayDate(user.activation_email_sent_at, true)}.`
+        : "This request is approved but no activation email timestamp is recorded yet."
+    );
+    reviewNotes.push("Use resend activation only if the requester still needs the NPDS activation email.");
+  }
+
   return {
     blockingReasons: dedupeStrings(blockingReasons),
-    canApprove: blockingReasons.length === 0,
+    canApprove: canApprove && blockingReasons.length === 0,
+    canResendActivation,
     reviewNotes: dedupeStrings(reviewNotes),
+    actionBoxItems: canResendActivation
+      ? [
+          user.activation_email_sent_at
+            ? "Approved request is waiting on activation. Resend only if the requester did not receive the last email."
+            : "Approved request is waiting on activation and still needs the first activation email.",
+        ]
+      : canApprove && blockingReasons.length === 0
+      ? ["This request is complete enough to approve and send activation."]
+      : [],
+    actionBoxTitle: canResendActivation ? "Activation follow-up" : "Ready to invite",
+    rolePillLabel: canResendActivation ? "Approved Role" : "Requested Role",
+    roleValue: canResendActivation ? user?.approved_role || requestedRole : requestedRole,
+    statusLabel: canResendActivation ? "Approved" : canApprove && blockingReasons.length === 0 ? "Ready" : "Blocked",
+    statusMetaLabel: canResendActivation
+      ? `Approved ${displayDate(user?.approved_at, true)}`
+      : `Submitted ${displayDate(user?.created_at, true)}`,
+    statusTone: canResendActivation || (canApprove && blockingReasons.length === 0) ? "pending" : "danger",
   };
 }
 
@@ -1174,6 +1237,11 @@ async function handlePendingUsersClick(event) {
     return;
   }
 
+  if (button.dataset.action === "resend-user-activation") {
+    await resendUserActivation(userId, button);
+    return;
+  }
+
   if (button.dataset.action === "reject-user") {
     openRejectModal({
       id: userId,
@@ -1233,7 +1301,7 @@ async function approvePendingUser(userId, requestedRole, button) {
     return;
   }
 
-  if (!confirm("Approve this school access request?")) {
+  if (!confirm("Approve this school access request and send the NPDS activation email?")) {
     return;
   }
 
@@ -1265,6 +1333,13 @@ async function approvePendingUser(userId, requestedRole, button) {
 
     const result = await response.json().catch(() => ({}));
     if (!response.ok) {
+      if (result?.requestApproved) {
+        await loadDashboard();
+        throw new Error(
+          `${result?.error || "Request approved, but the activation email could not be sent."} Use resend activation.`
+        );
+      }
+
       const blockerText = Array.isArray(result?.blockers) ? ` ${result.blockers.join(" | ")}` : "";
       throw new Error(`${result?.error || "Could not approve school access."}${blockerText}`.trim());
     }
@@ -1273,6 +1348,52 @@ async function approvePendingUser(userId, requestedRole, button) {
   } catch (error) {
     console.error("User approval failed:", error);
     alert(`Could not approve school access: ${error.message}`);
+  } finally {
+    button.disabled = false;
+    button.textContent = originalLabel;
+  }
+}
+
+async function resendUserActivation(userId, button) {
+  if (!confirm("Resend the NPDS activation email for this approved school access request?")) {
+    return;
+  }
+
+  const originalLabel = button.textContent;
+  button.disabled = true;
+  button.textContent = "Resending...";
+
+  try {
+    const {
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession();
+
+    if (sessionError || !session?.access_token) {
+      throw sessionError || new Error("Admin session could not be verified.");
+    }
+
+    const response = await fetch("/.netlify/functions/resend-school-access-activation", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({
+        requestId: userId,
+      }),
+    });
+
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(result?.error || "Could not resend activation email.");
+    }
+
+    await loadDashboard();
+    alert("Activation email sent.");
+  } catch (error) {
+    console.error("Activation resend failed:", error);
+    alert(`Could not resend activation email: ${error.message}`);
   } finally {
     button.disabled = false;
     button.textContent = originalLabel;

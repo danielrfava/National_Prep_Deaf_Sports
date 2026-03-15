@@ -3,11 +3,13 @@ const {
   getUserFromAccessToken,
   getUserProfile,
   respond,
-  sendInviteEmail,
-  sendRecoveryEmail,
   updateLegacyProfilesByEmail,
   updateSchoolAccessRequest,
 } = require("./_supabase");
+const {
+  buildActivationRedirectUrl,
+  sendActivationEmail,
+} = require("./_school-access-activation");
 
 const APPROVED_ROLE_VALUES = new Set([
   "athletic_director",
@@ -81,67 +83,6 @@ function extractBearerToken(headers = {}) {
   return rawHeader.slice(7).trim();
 }
 
-function detectOrigin(event) {
-  const forwardedProto =
-    event.headers["x-forwarded-proto"] ||
-    event.headers["X-Forwarded-Proto"] ||
-    "https";
-  const host =
-    event.headers["x-forwarded-host"] ||
-    event.headers["X-Forwarded-Host"] ||
-    event.headers.host ||
-    event.headers.Host ||
-    "";
-
-  if (host) {
-    return `${forwardedProto}://${host}`;
-  }
-
-  return process.env.URL || process.env.DEPLOY_PRIME_URL || process.env.SITE_URL || "";
-}
-
-async function sendActivationEmail(request, approvedRole, redirectTo) {
-  const metadata = {
-    school_access_request_id: request.id,
-    full_name: request.full_name,
-    school_id: request.school_id,
-    school_name: request.school_name,
-    role: approvedRole,
-    requested_role: request.role,
-    job_title: request.job_title,
-    reference_ad_name: request.reference_ad_name,
-    reference_ad_email: request.reference_ad_email,
-    verification_notes: request.verification_notes,
-  };
-
-  try {
-    await sendInviteEmail({
-      email: request.email,
-      redirectTo,
-      data: metadata,
-    });
-
-    return "invite";
-  } catch (error) {
-    const message = String(error.message || "").toLowerCase();
-    const alreadyExists =
-      message.includes("already been registered") ||
-      message.includes("user already registered") ||
-      message.includes("already exists");
-
-    if (!alreadyExists) {
-      throw error;
-    }
-
-    await sendRecoveryEmail({
-      email: request.email,
-      redirectTo,
-    });
-
-    return "recovery";
-  }
-}
-
 exports.handler = async (event) => {
   if (event.httpMethod === "OPTIONS") {
     return respond(204, {});
@@ -178,19 +119,15 @@ exports.handler = async (event) => {
       });
     }
 
-    const origin = detectOrigin(event);
-    const redirectTo = `${origin}/portal/activate-account.html?request=${encodeURIComponent(requestId)}`;
-    const activationMode = await sendActivationEmail(request, approvedRole, redirectTo);
     const approvalStamp = new Date().toISOString();
 
-    const updatedRequest = await updateSchoolAccessRequest(requestId, {
+    const approvedRequest = await updateSchoolAccessRequest(requestId, {
       status: "approved",
       approved_role: approvedRole,
       approved_by: adminProfile.id,
       approved_at: approvalStamp,
       reviewed_by: adminProfile.id,
       reviewed_at: approvalStamp,
-      activation_email_sent_at: approvalStamp,
       rejection_reason: null,
     });
 
@@ -210,11 +147,29 @@ exports.handler = async (event) => {
       updated_at: approvalStamp,
     }).catch(() => []);
 
-    return respond(200, {
-      ok: true,
-      activationMode,
-      request: updatedRequest,
-    });
+    try {
+      const redirectTo = buildActivationRedirectUrl(event, requestId);
+      const activationMode = await sendActivationEmail(approvedRequest || request, approvedRole, redirectTo);
+      const updatedRequest = await updateSchoolAccessRequest(requestId, {
+        activation_email_sent_at: approvalStamp,
+        updated_at: approvalStamp,
+      });
+
+      return respond(200, {
+        ok: true,
+        activationMode,
+        request: updatedRequest || approvedRequest,
+      });
+    } catch (activationError) {
+      console.error("school access approved but activation email failed:", activationError);
+      return respond(502, {
+        error: `Request approved, but the activation email could not be sent. ${activationError.message || ""}`.trim(),
+        requestApproved: true,
+        resendAvailable: true,
+        request: approvedRequest,
+      });
+    }
+
   } catch (error) {
     console.error("approve-school-access-request failed:", error);
     return respond(error.statusCode || 500, {
