@@ -1,4 +1,5 @@
 import { footballFormatLabel, isFootballSportValue } from "../footballFormat.js";
+import { normalizePublicRecordRows } from "../publicRecordNormalizer.js";
 import { buildSportContextKey, normalizeRecordSportContext, resolveSportContext } from "../sportContext.js";
 
 let currentSort = { column: null, ascending: true };
@@ -835,12 +836,7 @@ records.forEach(record => {
 }
 
 function buildPreparedRecords(records, statsView = 'season') {
-  let displayRecords = [...(records || [])]
-    .filter((record) => {
-      const context = resolveSportContext(record?.sport, record?.gender);
-      return !(context.isBasketball && !context.isVarsity);
-    })
-    .map((record) => normalizeRecordSportContext(record));
+  let displayRecords = normalizePublicRecordRows(records || []);
   displayRecords = consolidateSeasonRows(displayRecords);
 
   if (statsView === 'career-standard') {
@@ -895,7 +891,7 @@ export function renderRecords(container, statsView = 'season', filters = {}, rec
   }
 
 if (Array.isArray(records)) {
-  rawRecords = records.map((record) => normalizeRecordSportContext(record));
+  rawRecords = normalizePublicRecordRows(records);
   currentPage = 1;
 }
 

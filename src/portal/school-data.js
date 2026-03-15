@@ -21,7 +21,8 @@ import {
   parseSchoolYearLabel,
   SCHOOL_YEAR_CAREER_WINDOW_YEARS,
 } from "./schoolYear.js";
-import { normalizeRecordSportContext, normalizeSportKey, resolveSportContext } from "../sportContext.js";
+import { normalizePublicRecordRows } from "../publicRecordNormalizer.js";
+import { normalizeSportKey, resolveSportContext } from "../sportContext.js";
 
 const TRACKED_SPORTS = ["basketball", "football", "volleyball", "soccer", "baseball", "softball"];
 const SCHOOL_DISPLAY_NAME_KEYS = [
@@ -286,16 +287,7 @@ async function fetchSchoolRows() {
     start += pageSize;
   }
 
-  return rows
-    .map((row) => {
-      const context = resolveSportContext(row?.sport, row?.gender);
-      if (context.isBasketball && !context.isVarsity) {
-        return null;
-      }
-
-      return normalizeRecordSportContext(row);
-    })
-    .filter(Boolean);
+  return normalizePublicRecordRows(rows);
 }
 
 async function fetchSchoolSubmissions() {

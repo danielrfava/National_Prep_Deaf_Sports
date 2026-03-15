@@ -1,6 +1,7 @@
 import { supabase } from "../supabaseClient.js";
 import { normalizeFootballFormat } from "../footballFormat.js";
-import { normalizeRecordSportContext, normalizeSportKey, resolveSportContext } from "../sportContext.js";
+import { normalizePublicRecordRows } from "../publicRecordNormalizer.js";
+import { normalizeSportKey } from "../sportContext.js";
 
 const RECORD_SELECT_BASE = "id, school_id, school, sport, season, stat_row";
 const RECORD_SELECT = "id, school_id, school, sport, sport_variant, season, stat_row";
@@ -58,19 +59,6 @@ function applySportFilter(request, sportKey) {
   }
 
   return request.ilike("sport", `%${normalizedSport}%`);
-}
-
-function normalizePublicRecordRows(rows) {
-  return (rows || [])
-    .map((row) => {
-      const context = resolveSportContext(row?.sport, row?.gender);
-      if (context.isBasketball && !context.isVarsity) {
-        return null;
-      }
-
-      return normalizeRecordSportContext(row);
-    })
-    .filter(Boolean);
 }
 
 function dedupeVisibleSchools(rows) {
