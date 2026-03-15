@@ -104,28 +104,64 @@ async function loadDashboard() {
   renderLoadingState();
 
   try {
-    const [stats, users, submissions] = await Promise.all([
+    const [statsResult, usersResult, submissionsResult] = await Promise.allSettled([
       loadStats(),
       fetchPendingUsers(),
       fetchPendingSubmissions(),
     ]);
 
-    pendingUsers = users;
-    pendingSubmissions = submissions;
+    if (usersResult.status === "fulfilled") {
+      pendingUsers = usersResult.value;
+      renderPendingUsers();
+    } else {
+      pendingUsers = [];
+      console.error("Pending school access load failed:", usersResult.reason);
+      renderPanelError(
+        elements.pendingUsersContainer,
+        "school access requests",
+        usersResult.reason
+      );
+    }
 
-    renderStats(stats);
-    renderPendingUsers();
-    renderPendingSubmissions();
-  } catch (error) {
-    console.error("Admin dashboard load failed:", error);
-    elements.pendingUsersContainer.innerHTML =
-      '<div class="empty-state">Could not load school access requests right now.</div>';
-    elements.submissionsContainer.innerHTML =
-      '<div class="empty-state">Could not load submissions right now.</div>';
+    if (submissionsResult.status === "fulfilled") {
+      pendingSubmissions = submissionsResult.value;
+      renderPendingSubmissions();
+    } else {
+      pendingSubmissions = [];
+      console.error("Pending submissions load failed:", submissionsResult.reason);
+      renderPanelError(
+        elements.submissionsContainer,
+        "submissions",
+        submissionsResult.reason
+      );
+    }
+
+    if (statsResult.status === "fulfilled") {
+      renderStats(statsResult.value);
+    } else {
+      console.error("Admin stats load failed:", statsResult.reason);
+      renderStats({
+        approvedTodayCount: 0,
+        pendingSubmissionsCount: pendingSubmissions.length,
+        pendingUsersCount: pendingUsers.length,
+        totalSubmissionsCount: 0,
+      });
+    }
   } finally {
     isDashboardLoading = false;
     setDashboardRefreshState(false);
   }
+}
+
+function renderPanelError(target, label, error) {
+  if (!target) {
+    return;
+  }
+
+  const details = formatPanelError(error);
+  target.innerHTML = `<div class="empty-state">Could not load ${escapeHtml(label)} right now.${
+    details ? `<br><br>${escapeHtml(details)}` : ""
+  }</div>`;
 }
 
 function setDashboardRefreshState(isLoading) {
@@ -142,6 +178,18 @@ function renderLoadingState() {
     '<div class="empty-state">Loading school access requests...</div>';
   elements.submissionsContainer.innerHTML =
     '<div class="empty-state">Loading submissions...</div>';
+}
+
+function formatPanelError(error) {
+  const parts = [error?.message, error?.details, error?.hint]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean);
+
+  if (!parts.length) {
+    return "";
+  }
+
+  return dedupeStrings(parts).join(" ");
 }
 
 async function loadStats() {
