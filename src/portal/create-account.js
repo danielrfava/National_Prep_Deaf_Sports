@@ -142,6 +142,28 @@ function bindSchoolCombobox() {
     return;
   }
 
+  schoolSearchInput.addEventListener("focus", () => {
+    if (!schoolSearchInput.value.trim()) {
+      return;
+    }
+
+    filterSchoolOptions(schoolSearchInput.value);
+    if (filteredSchoolOptions.length) {
+      openSchoolOptions();
+    }
+  });
+
+  schoolSearchInput.addEventListener("click", () => {
+    if (!schoolSearchInput.value.trim()) {
+      return;
+    }
+
+    filterSchoolOptions(schoolSearchInput.value);
+    if (filteredSchoolOptions.length) {
+      openSchoolOptions();
+    }
+  });
+
   schoolSearchInput.addEventListener("input", () => {
     schoolValueInput.value = "";
     filterSchoolOptions(schoolSearchInput.value);
@@ -201,7 +223,7 @@ function bindSchoolCombobox() {
     window.setTimeout(() => {
       closeSchoolOptions();
       syncSchoolValidity();
-    }, 120);
+    }, 180);
   });
 }
 
@@ -250,13 +272,39 @@ function renderSchoolOptions() {
     .join("");
 
   schoolOptionsList.querySelectorAll("[data-school-id]").forEach((button) => {
-    button.addEventListener("mousedown", (event) => event.preventDefault());
-    button.addEventListener("click", () => {
-      const option = schoolOptions.find((school) => school.id === button.dataset.schoolId);
-      if (option) {
-        selectSchoolOption(option);
-      }
-    });
+    bindSchoolOptionButton(button);
+  });
+}
+
+function bindSchoolOptionButton(button) {
+  const commitSelection = (event) => {
+    event?.preventDefault?.();
+    const option = schoolOptions.find((school) => school.id === button.dataset.schoolId);
+    if (!option) {
+      return;
+    }
+
+    button.dataset.skipClickSelection = "true";
+    selectSchoolOption(option);
+  };
+
+  if ("PointerEvent" in window) {
+    button.addEventListener("pointerdown", commitSelection);
+  } else {
+    button.addEventListener("mousedown", commitSelection);
+    button.addEventListener("touchstart", commitSelection, { passive: false });
+  }
+
+  button.addEventListener("click", () => {
+    if (button.dataset.skipClickSelection === "true") {
+      button.dataset.skipClickSelection = "false";
+      return;
+    }
+
+    const option = schoolOptions.find((school) => school.id === button.dataset.schoolId);
+    if (option) {
+      selectSchoolOption(option);
+    }
   });
 }
 

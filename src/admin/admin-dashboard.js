@@ -27,6 +27,7 @@ let currentUser = null;
 let pendingUsers = [];
 let pendingSubmissions = [];
 let rejectContext = null;
+let isDashboardLoading = false;
 
 const elements = {
   adminIdentityChip: document.getElementById("adminIdentityChip"),
@@ -37,6 +38,7 @@ const elements = {
   pendingSubmissionsCount: document.getElementById("pendingSubmissionsCount"),
   pendingUsersContainer: document.getElementById("pendingUsersContainer"),
   pendingUsersCount: document.getElementById("pendingUsersCount"),
+  refreshDashboardBtn: document.getElementById("refreshDashboardBtn"),
   rejectForm: document.getElementById("rejectForm"),
   rejectModal: document.getElementById("rejectModal"),
   rejectModalCopy: document.getElementById("rejectModalCopy"),
@@ -73,6 +75,9 @@ async function init() {
 
 function bindEvents() {
   elements.logoutBtn?.addEventListener("click", handleLogout);
+  elements.refreshDashboardBtn?.addEventListener("click", () => {
+    void loadDashboard();
+  });
   elements.pendingUsersContainer?.addEventListener("click", handlePendingUsersClick);
   elements.submissionsContainer?.addEventListener("click", handleSubmissionActionsClick);
   elements.rejectForm?.addEventListener("submit", handleReject);
@@ -90,6 +95,12 @@ async function handleLogout() {
 }
 
 async function loadDashboard() {
+  if (isDashboardLoading) {
+    return;
+  }
+
+  isDashboardLoading = true;
+  setDashboardRefreshState(true);
   renderLoadingState();
 
   try {
@@ -111,7 +122,19 @@ async function loadDashboard() {
       '<div class="empty-state">Could not load school access requests right now.</div>';
     elements.submissionsContainer.innerHTML =
       '<div class="empty-state">Could not load submissions right now.</div>';
+  } finally {
+    isDashboardLoading = false;
+    setDashboardRefreshState(false);
   }
+}
+
+function setDashboardRefreshState(isLoading) {
+  if (!elements.refreshDashboardBtn) {
+    return;
+  }
+
+  elements.refreshDashboardBtn.disabled = isLoading;
+  elements.refreshDashboardBtn.textContent = isLoading ? "Refreshing..." : "Refresh Queue";
 }
 
 function renderLoadingState() {
