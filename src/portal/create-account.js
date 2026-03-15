@@ -1,10 +1,13 @@
 import { mountPublicTopNav } from "../components/publicTopNav.js";
-import { supabase } from "../supabaseClient.js";
 import {
   CREATE_ACCOUNT_ROLE_OPTIONS,
-  loadSchoolOptions,
   requiresAthleticDirectorReference,
-} from "./schoolAccess.js";
+} from "./schoolAccessShared.js";
+import {
+  describeRequestAccessError,
+  loadRequestSchoolOptions,
+  submitSchoolAccessRequest,
+} from "./requestSchoolAccess.js";
 
 mountPublicTopNav({ active: "login", basePath: "../" });
 
@@ -34,7 +37,15 @@ window.addEventListener("DOMContentLoaded", init);
 
 async function init() {
   populateRoleOptions();
-  await populateSchoolOptions();
+  try {
+    await populateSchoolOptions();
+  } catch (error) {
+    const { userMessage } = describeRequestAccessError(error);
+    showAlert(userMessage);
+    setRequestFormAvailability(false);
+    return;
+  }
+
   syncConditionalFields();
   roleSelect?.addEventListener("change", syncConditionalFields);
   bindSchoolCombobox();
@@ -60,10 +71,14 @@ async function populateSchoolOptions() {
     return;
   }
 
-  schoolOptions = await loadSchoolOptions();
+  schoolOptions = await loadRequestSchoolOptions();
   filteredSchoolOptions = [];
   closeSchoolOptions();
   syncSchoolValidity();
+
+  if (!schoolOptions.length) {
+    throw new Error("Could not load the school list. Step: school lookup.");
+  }
 }
 
 function syncConditionalFields() {
@@ -101,6 +116,20 @@ function hideAlert() {
   }
 
   alertBox.hidden = true;
+}
+
+function setRequestFormAvailability(enabled) {
+  if (!form) {
+    return;
+  }
+
+  form.querySelectorAll("input, select, textarea, button").forEach((field) => {
+    field.disabled = !enabled;
+  });
+
+  if (submitBtn) {
+    submitBtn.textContent = enabled ? "Submit Request" : "Request Unavailable";
+  }
 }
 
 function findSelectedSchool() {
@@ -314,30 +343,14 @@ async function handleSubmit(event) {
       verification_notes: verificationNotesInput?.value?.trim() || "",
     };
 
-    const { error } = await supabase.from("school_access_requests").insert(payload);
-
-    if (error) {
-      throw error;
-    }
+    await submitSchoolAccessRequest(payload);
 
     form.hidden = true;
     successState.hidden = false;
     showAlert(SUCCESS_MESSAGE, "success");
   } catch (error) {
-    console.error("Create account error:", error);
-    const message = String(error?.message || "");
-    const normalizedMessage = message.toLowerCase();
-    if (normalizedMessage.includes("duplicate key")) {
-      showAlert("A school access request is already in review for this email.");
-      return;
-    }
-
-    if (normalizedMessage.includes("already exists")) {
-      showAlert("A school access account already exists for this email.");
-      return;
-    }
-
-    showAlert(message || "Could not submit your school access request.");
+    const { userMessage } = describeRequestAccessError(error);
+    showAlert(userMessage);
   } finally {
     submitBtn.disabled = false;
     submitBtn.textContent = "Submit Request";
