@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>NPDS - Create School Account</title>
+    <title>NPDS - Request School Access</title>
     <link rel="stylesheet" href="../styles.css" />
   </head>
   <body class="public-page portal-auth-page">
@@ -31,9 +31,9 @@
       <div class="portal-auth-stack">
         <section class="portal-login-card portal-login-card-wide">
           <p class="public-kicker">School Dashboard Access</p>
-          <h1 class="portal-login-title">Create School Account</h1>
+          <h1 class="portal-login-title">Request School Access</h1>
           <p class="portal-login-subline">
-            Request access to your school dashboard. All school accounts are reviewed before approval.
+            School access requests are reviewed before activation. You will set your password after approval.
           </p>
 
           <div id="alert" class="portal-alert" hidden></div>
@@ -48,17 +48,6 @@
               <div class="portal-field">
                 <label class="portal-label" for="email">Email</label>
                 <input id="email" name="email" type="email" autocomplete="email" required />
-              </div>
-
-              <div class="portal-field">
-                <label class="portal-label" for="password">Password</label>
-                <input id="password" name="password" type="password" autocomplete="new-password" minlength="8" required />
-                <p class="portal-field-help">Use at least 8 characters so you can sign in after approval.</p>
-              </div>
-
-              <div class="portal-field">
-                <label class="portal-label" for="confirmPassword">Confirm Password</label>
-                <input id="confirmPassword" name="confirmPassword" type="password" autocomplete="new-password" minlength="8" required />
               </div>
 
               <div class="portal-field">
@@ -145,7 +134,7 @@
 
           <div id="successState" hidden>
             <p class="portal-card-note">
-              Your request has been submitted for review. Access will be granted after approval.
+              Your request is in the review queue. After approval, NPDS will email you an activation link so you can set your password.
             </p>
             <div class="portal-auth-actions">
               <a class="portal-secondary-action" href="login.html">Return to Login</a>

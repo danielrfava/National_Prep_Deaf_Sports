@@ -132,7 +132,7 @@ async function loadStats() {
     approvedTodayResult,
     totalSubmissionsResult,
   ] = await Promise.all([
-    supabase.from("user_profiles").select("*", { count: "exact", head: true }).eq("status", "pending"),
+    supabase.from("school_access_requests").select("*", { count: "exact", head: true }).eq("status", "pending"),
     supabase.from("game_submissions").select("*", { count: "exact", head: true }).eq("status", "pending"),
     supabase
       .from("game_submissions")
@@ -165,9 +165,9 @@ function renderStats(stats) {
 
 async function fetchPendingUsers() {
   const { data, error } = await supabase
-    .from("user_profiles")
+    .from("school_access_requests")
     .select(
-      "id, created_at, email, full_name, school_id, school_name, role, status, job_title, reference_ad_name, reference_ad_email, verification_notes"
+      "id, created_at, email, full_name, school_id, school_name, role, approved_role, status, job_title, reference_ad_name, reference_ad_email, verification_notes, rejection_reason, reviewed_at, approved_at, activation_email_sent_at"
     )
     .eq("status", "pending")
     .order("created_at", { ascending: true });
@@ -206,10 +206,7 @@ function renderPendingUsers() {
 }
 
 function renderPendingUserCard(user) {
-  const missingReference =
-    normalizeRole(user.role) !== "athletic_director" &&
-    !String(user.reference_ad_name || "").trim() &&
-    !String(user.reference_ad_email || "").trim();
+  const model = buildPendingUserReviewModel(user);
 
   return `<article class="review-card" data-user-id="${escapeHtmlAttr(user.id)}">
     <div class="review-header">
@@ -217,14 +214,24 @@ function renderPendingUserCard(user) {
         <h3 class="review-title">${escapeHtml(user.full_name || "Unnamed Request")}</h3>
         <p class="review-subline">${escapeHtml(user.email || "No email on file")}</p>
       </div>
-      <span class="status-chip warn">Pending</span>
+      <span class="status-chip ${model.canApprove ? "pending" : "danger"}">${model.canApprove ? "Ready" : "Blocked"}</span>
     </div>
     <div class="pill-row">
       <span class="meta-pill">${escapeHtml(user.school_name || user.school_id || "No school selected")}</span>
       <span class="meta-pill">Requested Role: ${escapeHtml(roleLabel(user.role))}</span>
       <span class="meta-pill">Submitted ${escapeHtml(displayDate(user.created_at, true))}</span>
     </div>
-    ${missingReference ? '<div class="alert-note">Non-Athletic Director request is missing AD reference information. Do not approve until that is verified.</div>' : ""}
+
+    <div class="issue-stack">
+      ${renderIssueBox("Approval blocked", model.blockingReasons, "danger")}
+      ${renderIssueBox("Review notes", model.reviewNotes, "warn")}
+      ${renderIssueBox(
+        "Ready to invite",
+        model.canApprove ? ["This request is complete enough to approve and send activation."] : [],
+        "ok"
+      )}
+    </div>
+
     <div class="detail-grid">
       ${renderDetailCard("Job Title", user.job_title || "Not provided")}
       ${renderDetailCard(
@@ -243,10 +250,60 @@ function renderPendingUserCard(user) {
       ).join("")}
     </select>
     <div class="action-buttons">
-      <button class="btn btn-approve" type="button" data-action="approve-user">Approve School Access</button>
+      <button class="btn btn-approve" type="button" data-action="approve-user">
+        Approve and Send Activation
+      </button>
       <button class="btn btn-reject" type="button" data-action="reject-user">Reject Request</button>
     </div>
   </article>`;
+}
+
+function buildPendingUserReviewModel(user, roleOverride = "") {
+  const requestedRole = normalizeRole(roleOverride || user?.role) || "school_staff";
+  const blockingReasons = [];
+  const reviewNotes = [];
+
+  if (!String(user?.full_name || "").trim()) {
+    blockingReasons.push("Requester name is missing.");
+  }
+
+  if (!String(user?.email || "").trim()) {
+    blockingReasons.push("Email is missing.");
+  }
+
+  if (!String(user?.school_id || "").trim()) {
+    blockingReasons.push("School selection is missing.");
+  }
+
+  if (!requestedRole) {
+    blockingReasons.push("Requested role is missing.");
+  }
+
+  if (!String(user?.job_title || "").trim()) {
+    blockingReasons.push("Job title is missing.");
+  }
+
+  if (requestedRole !== "athletic_director") {
+    if (!String(user?.reference_ad_name || "").trim()) {
+      blockingReasons.push("Athletic Director reference name is missing.");
+    }
+
+    if (!String(user?.reference_ad_email || "").trim()) {
+      blockingReasons.push("Athletic Director reference email is missing.");
+    }
+  } else {
+    reviewNotes.push("Athletic Director requests can be approved without a reference contact.");
+  }
+
+  if (String(user?.verification_notes || "").trim()) {
+    reviewNotes.push("Verification notes are attached to this request.");
+  }
+
+  return {
+    blockingReasons: dedupeStrings(blockingReasons),
+    canApprove: blockingReasons.length === 0,
+    reviewNotes: dedupeStrings(reviewNotes),
+  };
 }
 
 function renderPendingSubmissions() {
@@ -463,15 +520,21 @@ function buildSubmissionReviewModel(submission) {
   const missingRequiredFields = collectMissingRequiredFields(parseReview);
   const scope = String(gameData.submission_scope || parseReview.upload_lane || "game_submission").toLowerCase();
   const uploadLane = String(parseReview.upload_lane || "").toLowerCase();
-  const seasons = collectDetectedSeasons(players, parseReview);
+  const gameSeasonHints = extractSubmissionGameSeasonHints(gameData);
+  const seasons = collectDetectedSeasons(players, parseReview, gameSeasonHints);
   const games = buildGamePreviewRows(submission, gameData, seasons);
   const type = determineSubmissionType(scope, uploadLane, parseReview, players, games);
   const sportLabel = buildSportLabel(submission.sport || game.sport, submission.gender || game.gender);
   const firstGame = games[0] || {};
-  const hasMatchup = games.some((item) => !isGenericTeamName(item.homeTeam) && !isGenericTeamName(item.awayTeam));
-  const hasGameScore = games.some((item) => item.homeScore !== null && item.awayScore !== null);
+  const hasMatchup = games.some(hasGameMatchup);
+  const hasGameScore = games.some(hasGameScoreValues);
+  const publishableGames = games.filter(isPublishableGameRow);
   const recognizedStatColumns = collectRecognizedStatColumns(players, mappedHeaders);
-  const writesGame = hasMatchup && hasGameScore && type !== "pdf_review";
+  const publishBlockedReason =
+    type === "schedule_results" && games.length > 1
+      ? "This schedule/results submission contains multiple game rows, but the current approval pipeline can only publish one game at a time."
+      : "";
+  const writesGame = !publishBlockedReason && type !== "pdf_review" && publishableGames.length > 0;
   const writesRawRows = players.length > 0;
   const writesPlayerStats = writesGame && players.length > 0;
   const schoolLabel = submitter.school_name || submission.submitter_school_id || "Unknown school";
@@ -499,6 +562,8 @@ function buildSubmissionReviewModel(submission) {
   const publishOutput = buildPublishOutputModel({
     games,
     players,
+    publishBlockedReason,
+    publishableGameCount: publishableGames.length,
     schoolLabel,
     seasons,
     sportLabel,
@@ -514,6 +579,7 @@ function buildSubmissionReviewModel(submission) {
     hasMatchup,
     missingRequiredFields,
     players,
+    publishBlockedReason,
     publishOutput,
     recognizedStatColumns,
     routeLabel,
@@ -755,6 +821,7 @@ function buildSubmissionBlockingReasons({
   hasMatchup,
   missingRequiredFields,
   players,
+  publishBlockedReason,
   publishOutput,
   recognizedStatColumns,
   routeLabel,
@@ -776,6 +843,10 @@ function buildSubmissionBlockingReasons({
 
   if (missingRequiredFields.length) {
     reasons.push(`Missing required fields: ${summarizeList(missingRequiredFields, 4)}.`);
+  }
+
+  if (publishBlockedReason) {
+    reasons.push(publishBlockedReason);
   }
 
   if (type === "pdf_review") {
@@ -833,7 +904,7 @@ function buildSubmissionBlockingReasons({
     }
   }
 
-  if (publishOutput.totalWriteRows === 0 && type !== "pdf_review") {
+  if (!publishBlockedReason && publishOutput.totalWriteRows === 0 && type !== "pdf_review") {
     reasons.push("Suspicious empty publish output. No live rows would be written.");
   }
 
@@ -843,6 +914,8 @@ function buildSubmissionBlockingReasons({
 function buildPublishOutputModel({
   games,
   players,
+  publishBlockedReason,
+  publishableGameCount,
   schoolLabel,
   seasons,
   sportLabel,
@@ -851,12 +924,23 @@ function buildPublishOutputModel({
   writesPlayerStats,
   writesRawRows,
 }) {
+  if (publishBlockedReason) {
+    return {
+      destinationSummary: "No live publish destination",
+      destinations: [],
+      mergeNote: publishBlockedReason,
+      scopeLabel: `${schoolLabel} | ${sportLabel} | ${seasons.length ? seasons.join(", ") : "Season not detected"}`,
+      totalWriteRows: 0,
+      writeMode: "Review only",
+    };
+  }
+
   const destinations = [];
 
   if (writesGame) {
     destinations.push({
       table: "games",
-      rowCount: games.length || 1,
+      rowCount: publishableGameCount || 1,
       detail: "Insert new game result rows for the approved matchup.",
     });
   }
@@ -953,6 +1037,7 @@ function normalizeGamePreviewRow(game, submission, seasonValue) {
   const homeScore = parseScoreValue(firstDefined(game?.home_team?.score, game.homeScore, submission.home_score));
   const awayScore = parseScoreValue(firstDefined(game?.away_team?.score, game.awayScore, submission.away_score));
   const rawDate = firstDefined(game.date, submission.game_date);
+  const gameSeason = getGameSeasonValue(game, seasonValue);
 
   return {
     awayScore,
@@ -962,8 +1047,35 @@ function normalizeGamePreviewRow(game, submission, seasonValue) {
     homeTeam: homeTeam || "Unknown",
     location: firstDefined(game.location, submission.location) || "Not detected",
     scoreLabel: homeScore !== null && awayScore !== null ? `${homeScore} - ${awayScore}` : "Not detected",
-    season: seasonValue || "Not detected",
+    season: gameSeason || "Not detected",
   };
+}
+
+function extractSubmissionGameSeasonHints(gameData) {
+  const explicitGames = Array.isArray(gameData?.games) ? gameData.games : [];
+  const explicitSeasons = explicitGames.map((game) => getGameSeasonValue(game)).filter(Boolean);
+  const singleGameSeason = getGameSeasonValue(gameData?.game || {});
+  return dedupeStrings([...explicitSeasons, singleGameSeason]);
+}
+
+function getGameSeasonValue(game, fallbackSeason = "") {
+  return String(firstDefined(game?.season, game?.season_hint, game?.meta?.season, fallbackSeason) || "").trim();
+}
+
+function hasGameMatchup(game) {
+  return !isGenericTeamName(game?.homeTeam) && !isGenericTeamName(game?.awayTeam);
+}
+
+function hasGameScoreValues(game) {
+  const homeScore = game?.homeScore;
+  const awayScore = game?.awayScore;
+  const hasHomeScore = homeScore !== null && homeScore !== undefined && homeScore !== "" && Number.isFinite(Number(homeScore));
+  const hasAwayScore = awayScore !== null && awayScore !== undefined && awayScore !== "" && Number.isFinite(Number(awayScore));
+  return hasHomeScore && hasAwayScore;
+}
+
+function isPublishableGameRow(game) {
+  return hasGameMatchup(game) && hasGameScoreValues(game);
 }
 
 function collectRecognizedStatColumns(players, mappedHeaders) {
@@ -1051,6 +1163,13 @@ async function handlePendingUsersClick(event) {
   if (button.dataset.action === "approve-user") {
     const select = card.querySelector("[data-role-select]");
     const requestedRole = String(select?.value || "school_staff").trim();
+    const request = pendingUsers.find((item) => item.id === userId);
+    const model = request ? buildPendingUserReviewModel(request, requestedRole) : null;
+    if (model && !model.canApprove) {
+      alert(`Approval is blocked: ${model.blockingReasons.join(" | ")}`);
+      return;
+    }
+
     await approvePendingUser(userId, requestedRole, button);
     return;
   }
@@ -1103,9 +1222,16 @@ async function handleSubmissionActionsClick(event) {
 }
 
 async function approvePendingUser(userId, requestedRole, button) {
+  const request = pendingUsers.find((item) => item.id === userId);
+  const reviewModel = request ? buildPendingUserReviewModel(request, requestedRole) : null;
   const safeRole = STAFF_ROLE_OPTIONS.some((option) => option.value === requestedRole)
     ? requestedRole
     : "school_staff";
+
+  if (reviewModel && !reviewModel.canApprove) {
+    alert(`Approval is blocked: ${reviewModel.blockingReasons.join(" | ")}`);
+    return;
+  }
 
   if (!confirm("Approve this school access request?")) {
     return;
@@ -1116,20 +1242,31 @@ async function approvePendingUser(userId, requestedRole, button) {
   button.textContent = "Approving...";
 
   try {
-    const { error } = await supabase
-      .from("user_profiles")
-      .update({
-        approved_at: new Date().toISOString(),
-        approved_by: currentUser.id,
-        archived_at: null,
-        role: safeRole,
-        status: "approved",
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", userId);
+    const {
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession();
 
-    if (error) {
-      throw error;
+    if (sessionError || !session?.access_token) {
+      throw sessionError || new Error("Admin session could not be verified.");
+    }
+
+    const response = await fetch("/.netlify/functions/approve-school-access-request", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({
+        requestId: userId,
+        approvedRole: safeRole,
+      }),
+    });
+
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const blockerText = Array.isArray(result?.blockers) ? ` ${result.blockers.join(" | ")}` : "";
+      throw new Error(`${result?.error || "Could not approve school access."}${blockerText}`.trim());
     }
 
     await loadDashboard();
@@ -1242,18 +1379,38 @@ async function rejectSubmission(submissionId, reason) {
 async function rejectUserRequest(userId, reason) {
   const existing = pendingUsers.find((user) => user.id === userId);
   const note = appendAdminReviewNote(existing?.verification_notes, reason);
+  const timestamp = new Date().toISOString();
 
   const { error } = await supabase
-    .from("user_profiles")
+    .from("school_access_requests")
     .update({
+      rejection_reason: reason,
+      reviewed_at: timestamp,
+      reviewed_by: currentUser.id,
       status: "rejected",
-      updated_at: new Date().toISOString(),
+      updated_at: timestamp,
       verification_notes: note,
     })
     .eq("id", userId);
 
   if (error) {
     throw error;
+  }
+
+  if (existing?.email) {
+    const { error: profileError } = await supabase
+      .from("user_profiles")
+      .update({
+        status: "rejected",
+        updated_at: timestamp,
+        verification_notes: note,
+      })
+      .eq("email", existing.email)
+      .neq("role", "admin");
+
+    if (profileError) {
+      throw profileError;
+    }
   }
 }
 
@@ -1270,20 +1427,16 @@ function renderDetailCard(label, value) {
   </div>`;
 }
 
-function collectDetectedSeasons(players, parseReview) {
+function collectDetectedSeasons(players, parseReview, gameSeasonHints = []) {
   const playerSeasons = players
     .map((player) => String(player?.meta?.season || "").trim())
     .filter(Boolean);
-
-  if (playerSeasons.length) {
-    return [...new Set(playerSeasons)];
-  }
 
   const reviewSeasons = Array.isArray(parseReview?.detected_seasons)
     ? parseReview.detected_seasons.map((value) => String(value || "").trim()).filter(Boolean)
     : [];
 
-  return [...new Set(reviewSeasons)];
+  return dedupeStrings([...playerSeasons, ...reviewSeasons, ...(gameSeasonHints || [])]);
 }
 
 function collectStatColumns(players) {

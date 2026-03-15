@@ -1,10 +1,12 @@
 import { supabase } from "../supabaseClient.js";
 import {
+  buildActivationHref,
   STAFF_ROLE_OPTIONS,
   fetchCurrentSessionProfile,
   getBlockedAccessMessage,
   isAdminProfile,
   isApprovedSchoolProfile,
+  needsActivationProfile,
   normalizeRole,
   normalizeStatus,
   roleLabel,
@@ -91,6 +93,11 @@ async function init() {
     return;
   }
 
+  if (needsActivationProfile(profile)) {
+    window.location.href = buildActivationHref();
+    return;
+  }
+
   currentUser = profile;
   elements.schoolChip.textContent = profile.school_name || profile.school_id || "Your School";
   if (elements.schoolDataLink) {
@@ -142,8 +149,11 @@ function buildSchoolDataHref() {
 function renderLimitedDashboard(profile) {
   const status = normalizeStatus(profile?.status);
   const isPending = status === "pending";
+  const isInvited = status === "invited";
   const message = isPending
     ? "Account received / pending review. You can sign in, but submission tools stay locked until approval."
+    : isInvited
+    ? "Your access request was approved. Finish activation from the email link before using the school dashboard."
     : getBlockedAccessMessage(profile);
 
   toggleApprovedDashboard(false);
@@ -153,7 +163,8 @@ function renderLimitedDashboard(profile) {
 
   elements.readinessChip.classList.remove("ok", "warn");
   elements.readinessChip.classList.add("warn");
-  elements.readinessChip.textContent = isPending ? "Status: pending review" : `Status: ${staffStatusLabel(status)}`;
+  elements.readinessChip.textContent =
+    isPending ? "Status: pending review" : isInvited ? "Status: activation required" : `Status: ${staffStatusLabel(status)}`;
 
   if (elements.limitedDashboardPanel) {
     elements.limitedDashboardPanel.hidden = false;

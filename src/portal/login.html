@@ -68,11 +68,11 @@
 
         <section class="portal-secondary-card" aria-labelledby="createAccountTitle">
           <p class="portal-secondary-kicker">Need school access to submit stats?</p>
-          <h2 id="createAccountTitle" class="portal-secondary-title">Create your school access request</h2>
+          <h2 id="createAccountTitle" class="portal-secondary-title">Request school dashboard access</h2>
           <p class="portal-secondary-copy">
-            New school accounts are reviewed before dashboard access is approved.
+            School access is reviewed before activation, and you will set your password after approval.
           </p>
-          <a class="portal-secondary-action" href="create-account.html">Create School Account</a>
+          <a class="portal-secondary-action" href="create-account.html">Request School Access</a>
         </section>
       </div>
     </main>
@@ -82,10 +82,12 @@
       import { supabase } from "../supabaseClient.js";
       import { mountPublicTopNav } from "../components/publicTopNav.js";
       import {
+        buildActivationHref,
         consumePortalFlash,
         getBlockedAccessMessage,
         isAdminProfile,
         isApprovedSchoolProfile,
+        needsActivationProfile,
         setPortalFlash,
       } from "./schoolAccess.js";
 
@@ -113,13 +115,14 @@
       }
 
       async function routeByRole(userId) {
-        const { data: profile, error: profileError } = await supabase
+        const { data: profileRows, error: profileError } = await supabase
           .from("user_profiles")
           .select("*")
           .eq("id", userId)
-          .single();
+          .limit(1);
 
         if (profileError) throw profileError;
+        const profile = Array.isArray(profileRows) ? profileRows[0] || null : null;
 
         if (isAdminProfile(profile)) {
           window.location.href = "../admin/admin-dashboard.html";
@@ -128,6 +131,11 @@
 
         if (isApprovedSchoolProfile(profile)) {
           window.location.href = "dashboard.html";
+          return;
+        }
+
+        if (needsActivationProfile(profile)) {
+          window.location.href = buildActivationHref();
           return;
         }
 

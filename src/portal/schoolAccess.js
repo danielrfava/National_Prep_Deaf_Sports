@@ -35,6 +35,7 @@ export const ROLE_LABELS = Object.freeze({
 export const STAFF_STATUS_LABELS = Object.freeze({
   approved: "Active",
   archived: "Archived",
+  invited: "Invited",
   pending: "Pending",
   rejected: "Rejected",
 });
@@ -80,9 +81,20 @@ export function isApprovedSchoolProfile(profile) {
   return status === "approved" && Boolean(schoolId) && SCHOOL_DASHBOARD_ROLES.has(role);
 }
 
+export function needsActivationProfile(profile) {
+  const role = normalizeRole(profile?.role);
+  const status = normalizeStatus(profile?.status);
+  const schoolId = cleanValue(profile?.school_id);
+  return status === "invited" && Boolean(schoolId) && SCHOOL_DASHBOARD_ROLES.has(role);
+}
+
 export function getBlockedAccessMessage(profile) {
   const status = normalizeStatus(profile?.status);
   const role = normalizeRole(profile?.role);
+
+  if (status === "invited") {
+    return "Your request was approved. Check your email for the activation link so you can set your password.";
+  }
 
   if (status === "pending") {
     return "Your school account is pending approval. You cannot submit stats yet.";
@@ -105,6 +117,14 @@ export function getBlockedAccessMessage(profile) {
   }
 
   return "You do not have access to this portal.";
+}
+
+export function buildActivationHref(requestId = "") {
+  const url = new URL("activate-account.html", window.location.href);
+  if (cleanValue(requestId)) {
+    url.searchParams.set("request", cleanValue(requestId));
+  }
+  return url.toString();
 }
 
 export function setPortalFlash(message, type = "error") {
@@ -148,13 +168,13 @@ export async function fetchCurrentSessionProfile() {
     return { session: null, profile: null, profileError: null };
   }
 
-  const { data: profile, error: profileError } = await supabase
+  const { data: profileRows, error: profileError } = await supabase
     .from("user_profiles")
     .select("*")
     .eq("id", session.user.id)
-    .single();
+    .limit(1);
 
-  return { session, profile, profileError };
+  return { session, profile: Array.isArray(profileRows) ? profileRows[0] || null : null, profileError };
 }
 
 export function mapSubmissionMethod(value) {

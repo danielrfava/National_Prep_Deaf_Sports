@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>NPDS - Activate School Account</title>
+    <link rel="stylesheet" href="../styles.css" />
+  </head>
+  <body class="public-page portal-auth-page">
+    <header data-public-nav class="topbar public-topbar">
+      <div class="topbar-container">
+        <a class="brand" href="../index.html" aria-label="National Prep Deaf Sports home">
+          <div class="logo">NP</div>
+          <div class="brand-text">
+            <div class="brand-title">National Prep Deaf Sports</div>
+            <div class="brand-tag">Deaf High School Athletics</div>
+          </div>
+        </a>
+
+        <nav class="nav public-nav" aria-label="Primary">
+          <a class="nav-link" href="../search.html">Search</a>
+          <a class="nav-link" href="../schools.html">Schools</a>
+          <a class="nav-link" href="../stats.html">Research</a>
+          <a class="nav-link" href="../about.html">About</a>
+          <a class="nav-link nav-link-active" href="login.html" aria-current="page">Log In</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="portal-auth-main">
+      <div class="portal-auth-stack">
+        <section class="portal-login-card portal-login-card-wide">
+          <p class="public-kicker">School Dashboard Access</p>
+          <h1 class="portal-login-title">Activate School Account</h1>
+          <p class="portal-login-subline">
+            Your request was approved. Set your password to activate dashboard access.
+          </p>
+
+          <div id="alert" class="portal-alert" hidden></div>
+
+          <div id="activationSummary" class="portal-card-note">
+            Waiting for an approved activation link...
+          </div>
+
+          <form id="activationForm" class="portal-login-form" novalidate hidden>
+            <label class="portal-label" for="password">Create Password</label>
+            <input
+              id="password"
+              name="password"
+              type="password"
+              autocomplete="new-password"
+              minlength="8"
+              required
+            />
+            <p class="portal-field-help">Use at least 8 characters.</p>
+
+            <label class="portal-label" for="confirmPassword">Confirm Password</label>
+            <input
+              id="confirmPassword"
+              name="confirmPassword"
+              type="password"
+              autocomplete="new-password"
+              minlength="8"
+              required
+            />
+
+            <div class="portal-auth-actions">
+              <button type="submit" class="portal-login-btn" id="submitBtn">Activate Account</button>
+              <a class="portal-secondary-action" href="login.html">Back to Login</a>
+            </div>
+          </form>
+
+          <div id="activationDone" hidden>
+            <p class="portal-card-note">
+              Your school account is active. You can sign in and use the school dashboard now.
+            </p>
+            <div class="portal-auth-actions">
+              <a class="portal-secondary-action" href="dashboard.html">Open School Dashboard</a>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <script src="../env.js"></script>
+    <script type="module" src="./activate-account.js"></script>
+  </body>
+</html>

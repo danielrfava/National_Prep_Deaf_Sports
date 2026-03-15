@@ -147,7 +147,12 @@ function renderBlockedState(profile) {
   showStateNotice({
     variant: "locked",
     kicker: `Private school page | ${status}`,
-    title: status === "pending" ? "School Data unlocks after account approval" : "School Data is currently unavailable for this account",
+    title:
+      status === "pending"
+        ? "School Data unlocks after account approval"
+        : status === "invited"
+        ? "Finish activation to unlock School Data"
+        : "School Data is currently unavailable for this account",
     copy: message,
     items: [
       {
@@ -156,9 +161,12 @@ function renderBlockedState(profile) {
       },
       {
         title: "What to do next",
-        meta: status === "pending"
-          ? "Wait for admin review and keep your school/helper information accurate."
-          : "Contact your Athletic Director or platform admin if this account should be active again.",
+        meta:
+          status === "pending"
+            ? "Wait for admin review and keep your school/helper information accurate."
+            : status === "invited"
+            ? "Open the activation email, set your password, and then return to this private school page."
+            : "Contact your Athletic Director or platform admin if this account should be active again.",
       },
       {
         title: "Current school scope",

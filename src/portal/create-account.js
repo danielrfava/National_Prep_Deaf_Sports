@@ -1,18 +1,20 @@
 import { mountPublicTopNav } from "../components/publicTopNav.js";
 import { supabase } from "../supabaseClient.js";
 import {
+  buildActivationHref,
   CREATE_ACCOUNT_ROLE_OPTIONS,
   fetchCurrentSessionProfile,
   isAdminProfile,
   isApprovedSchoolProfile,
   loadSchoolOptions,
+  needsActivationProfile,
   requiresAthleticDirectorReference,
 } from "./schoolAccess.js";
 
 mountPublicTopNav({ active: "login", basePath: "../" });
 
 const SUCCESS_MESSAGE =
-  "Your request has been submitted for review. Access will be granted after approval.";
+  "Your request is in the review queue. After approval, NPDS will email you an activation link to set your password.";
 
 const form = document.getElementById("requestForm");
 const alertBox = document.getElementById("alert");
@@ -22,8 +24,6 @@ const schoolSearchInput = document.getElementById("schoolSearch");
 const schoolValueInput = document.getElementById("school");
 const schoolOptionsList = document.getElementById("schoolOptionsList");
 const roleSelect = document.getElementById("role");
-const passwordInput = document.getElementById("password");
-const confirmPasswordInput = document.getElementById("confirmPassword");
 const referenceAdNameInput = document.getElementById("referenceAdName");
 const referenceAdEmailInput = document.getElementById("referenceAdEmail");
 const verificationNotesInput = document.getElementById("verificationNotes");
@@ -61,6 +61,11 @@ async function routeExistingSession() {
 
     if (isApprovedSchoolProfile(profile)) {
       window.location.href = "dashboard.html";
+      return;
+    }
+
+    if (needsActivationProfile(profile)) {
+      window.location.href = buildActivationHref();
       return;
     }
 
@@ -320,18 +325,6 @@ async function handleSubmit(event) {
     return;
   }
 
-  const password = passwordInput?.value || "";
-  const confirmPassword = confirmPasswordInput?.value || "";
-  if (password !== confirmPassword) {
-    showAlert("Passwords do not match.");
-    return;
-  }
-
-  if (password.length < 8) {
-    showAlert("Password must be at least 8 characters.");
-    return;
-  }
-
   const selectedSchool = findSelectedSchool();
   if (!selectedSchool) {
     showAlert("Select your school before submitting.");
@@ -342,7 +335,9 @@ async function handleSubmit(event) {
   submitBtn.textContent = "Submitting...";
 
   try {
+    const email = document.getElementById("email")?.value?.trim().toLowerCase() || "";
     const payload = {
+      email,
       full_name: document.getElementById("fullName")?.value?.trim() || "",
       school_id: selectedSchool.id,
       school_name: selectedSchool.full_name,
@@ -353,32 +348,30 @@ async function handleSubmit(event) {
       verification_notes: verificationNotesInput?.value?.trim() || "",
     };
 
-    const email = document.getElementById("email")?.value?.trim() || "";
-
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: payload,
-      },
-    });
+    const { error } = await supabase.from("school_access_requests").insert(payload);
 
     if (error) {
       throw error;
     }
-
-    if (!data?.user?.id) {
-      throw new Error("Account request could not be created. Please try again.");
-    }
-
-    await supabase.auth.signOut();
 
     form.hidden = true;
     successState.hidden = false;
     showAlert(SUCCESS_MESSAGE, "success");
   } catch (error) {
     console.error("Create account error:", error);
-    showAlert(error.message || "Could not submit your school access request.");
+    const message = String(error?.message || "");
+    const normalizedMessage = message.toLowerCase();
+    if (normalizedMessage.includes("duplicate key")) {
+      showAlert("A school access request is already in review for this email.");
+      return;
+    }
+
+    if (normalizedMessage.includes("already exists")) {
+      showAlert("A school access account already exists for this email.");
+      return;
+    }
+
+    showAlert(message || "Could not submit your school access request.");
   } finally {
     submitBtn.disabled = false;
     submitBtn.textContent = "Submit Request";

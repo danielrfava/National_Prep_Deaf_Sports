@@ -1,6 +1,10 @@
 [build]
+  base = "."
   publish = "src"
   command = "node scripts/build-env.js"
+
+[functions]
+  directory = "netlify/functions"
 
 [dev]
   publish = "src"
