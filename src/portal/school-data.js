@@ -1,7 +1,7 @@
 import { supabase } from "../supabaseClient.js";
 import {
-  chooseAthleteDisplayName,
   cleanAthleteDisplayName,
+  extractAthleteClassTag,
   extractAthleteNameCandidates,
   normalizeAthleteIdentity,
 } from "../services/publicEntityService.js";
@@ -12,8 +12,62 @@ import {
   getBlockedAccessMessage,
   normalizeStatus,
 } from "./schoolAccess.js";
+import {
+  compareSchoolYearsDesc,
+  getCurrentSchoolYear,
+  isSameSchoolYear,
+  isSchoolYearWithinWindow,
+  normalizeSchoolYearLabel,
+  parseSchoolYearLabel,
+  SCHOOL_YEAR_CAREER_WINDOW_YEARS,
+} from "./schoolYear.js";
 
 const TRACKED_SPORTS = ["basketball", "football", "volleyball", "soccer", "baseball", "softball"];
+const SCHOOL_DISPLAY_NAME_KEYS = [
+  "Athlete Full Name",
+  "athlete_full_name",
+  "Full Name",
+  "full_name",
+  "Player Name",
+  "player_name",
+  "Player",
+  "player",
+  "Athlete",
+  "athlete",
+  "Athlete Name",
+  "athlete_name",
+  "Name",
+  "name",
+];
+const SCHOOL_FIRST_NAME_KEYS = [
+  "First Name",
+  "first_name",
+  "Athlete First Name",
+  "athlete_first_name",
+  "Player First Name",
+  "player_first_name",
+  "First",
+  "first",
+];
+const SCHOOL_LAST_NAME_KEYS = [
+  "Last Name",
+  "last_name",
+  "Athlete Last Name",
+  "athlete_last_name",
+  "Player Last Name",
+  "player_last_name",
+  "Last",
+  "last",
+];
+// TODO: Replace this manual override with a real school sport-offering source once the data model exists.
+const SCHOOL_NOT_OFFERED_SPORTS = {
+  // example_school_id: ["soccer"],
+};
+const CLASS_PROGRESSION = {
+  Fr: "So",
+  So: "Jr",
+  Jr: "Sr",
+};
 const SPORT_LABELS = {
   baseball: "Baseball",
   basketball: "Basketball",
@@ -125,6 +179,7 @@ function renderBlockedState(profile) {
   const schoolName = profile?.school_name || profile?.school_id || "School";
   const message = getBlockedAccessMessage(profile);
   const status = normalizeStatus(profile?.status) || "pending";
+  const offeredTrackedSports = getTrackedSportsForSchool(profile?.school_id);
 
   if (elements.publicSchoolLink) {
     elements.publicSchoolLink.href = profile?.school_id
@@ -141,7 +196,7 @@ function renderBlockedState(profile) {
   elements.kpiRecords.textContent = "0";
   elements.kpiPending.textContent = "0";
   elements.kpiSports.textContent = "0";
-  elements.kpiMissingSports.textContent = String(TRACKED_SPORTS.length);
+  elements.kpiMissingSports.textContent = String(offeredTrackedSports.length);
   elements.kpiLatestSeason.textContent = "-";
   elements.kpiStaff.textContent = "0";
   showStateNotice({
@@ -268,7 +323,8 @@ function renderOverview() {
   const seasons = getSeasons(schoolRows);
   const latestSeason = seasons[0] || "N/A";
   const pendingCount = schoolSubmissions.filter((submission) => normalizeStatus(submission.status) === "pending").length;
-  const missingSports = TRACKED_SPORTS.filter((sport) => !sports.includes(sport));
+  const trackedSports = getTrackedSportsForSchool();
+  const missingSports = trackedSports.filter((sport) => !sports.includes(sport));
   const publicVisible = schoolRows.length > 0;
 
   elements.schoolDataTitle.textContent = `${schoolName} School Data`;
@@ -328,26 +384,67 @@ function renderOverview() {
 function renderCoverageSnapshot() {
   const sports = getAvailableSports();
   const seasons = getSeasons(schoolRows);
-  const missingSports = TRACKED_SPORTS.filter((sport) => !sports.includes(sport)).map((sport) => SPORT_LABELS[sport]);
-  const pendingCount = schoolSubmissions.filter((submission) => normalizeStatus(submission.status) === "pending").length;
-  const approvedCount = schoolSubmissions.filter((submission) => normalizeStatus(submission.status) === "approved").length;
+  const currentSchoolYear = getCurrentSchoolYear();
+  const trackedSports = getTrackedSportsForSchool();
+  const notOfferedSports = getNotOfferedSportLabels();
+  const missingSports = trackedSports.filter((sport) => !sports.includes(sport)).map((sport) => SPORT_LABELS[sport]);
+  const missingSeasons = findMissingSeasons(seasons);
+  const currentYearSports = new Set(
+    schoolRows
+      .filter((row) => isSameSchoolYear(row.season, currentSchoolYear))
+      .map((row) => normalizeSport(row.sport))
+      .filter(Boolean)
+  );
+  const missingCurrentYearSports = trackedSports.filter((sport) => !currentYearSports.has(sport)).map(
+    (sport) => SPORT_LABELS[sport]
+  );
+  const thinSeasons = buildThinSeasonCoverageItems(schoolRows);
   const items = [
-    `${schoolRows.length} approved raw stat row${schoolRows.length === 1 ? "" : "s"} are currently tied to this school.`,
-    seasons.length
-      ? `${seasons.length} season${seasons.length === 1 ? "" : "s"} are represented in approved records.`
-      : "No approved seasons are published yet.",
-    pendingCount
-      ? `${pendingCount} submission${pendingCount === 1 ? "" : "s"} are still pending admin review.`
-      : "No pending submissions are waiting right now.",
-    approvedCount
-      ? `${approvedCount} submission${approvedCount === 1 ? "" : "s"} have already been approved.`
-      : "No approved submissions have been logged yet.",
+    notOfferedSports.length
+      ? {
+          title: "Sports marked not offered",
+          meta: notOfferedSports.join(", "),
+        }
+      : null,
     missingSports.length
-      ? `Missing sports coverage: ${missingSports.join(", ")}.`
-      : "All tracked sports currently have approved data.",
-  ];
+      ? {
+          title: "Missing sports in the approved archive",
+          meta: missingSports.join(", "),
+        }
+      : {
+          title: "Tracked offered sports are represented",
+          meta: "Every sport currently treated as offered has at least some approved historical coverage.",
+        },
+    missingCurrentYearSports.length
+      ? {
+          title: `${currentSchoolYear} still has coverage gaps`,
+          meta: `No approved ${currentSchoolYear} data yet for ${missingCurrentYearSports.join(", ")}.`,
+        }
+      : {
+          title: `${currentSchoolYear} is represented in approved data`,
+          meta: "Current-year participation exists across the sports currently in school coverage.",
+        },
+    missingSeasons.length
+      ? {
+          title: "Missing interior school years",
+          meta: summarizeList(missingSeasons, 5),
+        }
+      : {
+          title: "No interior school-year gaps detected",
+          meta: "Approved archive seasons appear continuous across the years currently represented.",
+        },
+    thinSeasons.length
+      ? {
+          title: "Thin archive seasons",
+          meta: thinSeasons.join(", "),
+        }
+      : {
+          title: "No thin seasons detected",
+          meta: "No approved school year is currently flagged as unusually sparse.",
+        },
+  ].filter(Boolean);
 
-  elements.coverageList.innerHTML = items.map((item) => renderListItem(item)).join("");
+  elements.coverageList.innerHTML = items.map((item) => renderListItem(item.title, item.meta)).join("");
 }
 
 function renderRecentApprovals() {
@@ -410,19 +507,27 @@ function renderSportPanel() {
     return;
   }
 
-  const latestSeason = getSeasons(sportRows)[0] || "";
+  const currentSchoolYear = getCurrentSchoolYear();
   const allTimeLeaders = buildCareerLeaders(sportRows, activeSport).slice(0, 10);
-  const seasonLeaders = buildSeasonLeaders(sportRows, activeSport, latestSeason).slice(0, 10);
-  const coverageGaps = buildCoverageGapItems(sportRows);
-  const summaryItems = buildSportSummaryItems(sportRows, activeSport, latestSeason, allTimeLeaders, seasonLeaders);
+  const seasonLeaders = buildSeasonLeaders(sportRows, activeSport, currentSchoolYear).slice(0, 10);
+  const coverageGaps = buildCoverageGapItems(sportRows, currentSchoolYear);
+  const summaryItems = buildSportSummaryItems(
+    sportRows,
+    activeSport,
+    currentSchoolYear,
+    allTimeLeaders,
+    seasonLeaders
+  );
 
   elements.allTimeList.innerHTML = allTimeLeaders.length
-    ? allTimeLeaders.map((leader, index) => renderLeaderItem(index + 1, leader, activeSport)).join("")
+    ? allTimeLeaders.map((leader) => renderLeaderItem(leader, activeSport)).join("")
     : '<li class="empty">No all-time leaders could be calculated from the current data.</li>';
 
   elements.seasonLeaderList.innerHTML = seasonLeaders.length
-    ? seasonLeaders.map((leader, index) => renderLeaderItem(index + 1, leader, activeSport, latestSeason)).join("")
-    : '<li class="empty">No current season leaders could be calculated from the current data.</li>';
+    ? seasonLeaders
+        .map((leader) => renderLeaderItem(leader, activeSport, currentSchoolYear))
+        .join("")
+    : `<li class="empty">No current season leaders could be calculated for ${escapeHtml(currentSchoolYear)}.</li>`;
 
   elements.sportGapList.innerHTML = coverageGaps.length
     ? coverageGaps.map((item) => renderListItem(item.title, item.meta)).join("")
@@ -433,11 +538,12 @@ function renderSportPanel() {
 
 function renderMilestones() {
   const sportRows = getRowsForSport(activeSport);
-  const milestoneItems = activeSport ? buildMilestoneItems(sportRows, activeSport) : [];
+  const currentSchoolYear = getCurrentSchoolYear();
+  const milestoneItems = activeSport ? buildMilestoneItems(sportRows, activeSport, currentSchoolYear) : [];
 
   elements.milestoneList.innerHTML = milestoneItems.length
     ? milestoneItems.map((item) => renderListItem(item.title, item.meta)).join("")
-    : '<li class="empty">No near-term individual milestone alerts were found for this sport yet.</li>';
+    : `<li class="empty">No active-athlete milestone alerts were found for ${escapeHtml(currentSchoolYear)}.</li>`;
 }
 
 function showStateNotice({ variant = "empty", kicker = "", title = "", copy = "", items = [] } = {}) {
@@ -483,20 +589,25 @@ function consolidateSportRows(rows) {
   const grouped = new Map();
 
   rows.forEach((row) => {
-    const athleteCandidates = extractAthleteNameCandidates(row.stat_row);
-    const athleteName = chooseAthleteDisplayName(athleteCandidates) || cleanAthleteDisplayName(row.stat_row?.["Athlete Name"] || "");
+    const athleteCandidates = extractSchoolAthleteNameCandidates(row.stat_row);
+    const athleteName =
+      chooseSchoolAthleteDisplayName(row.stat_row, athleteCandidates) ||
+      cleanAthleteDisplayName(row.stat_row?.["Athlete Name"] || "");
     const athleteKey = normalizeAthleteIdentity(athleteName);
+    const seasonLabel = normalizeSchoolYearLabel(row.season);
+    const classTag = extractAthleteClassTag(row.stat_row, athleteName);
     if (!athleteKey) {
       return;
     }
 
-    const key = `${athleteKey}::${row.season || ""}`;
+    const key = `${athleteKey}::${seasonLabel || ""}`;
     if (!grouped.has(key)) {
       grouped.set(key, {
         athlete: athleteName,
         athleteCandidates: [...athleteCandidates],
         athleteKey,
-        season: row.season || "",
+        classTag,
+        season: seasonLabel || "",
         sport: row.sport || "",
         stat_row: { ...(row.stat_row || {}) },
       });
@@ -505,6 +616,9 @@ function consolidateSportRows(rows) {
 
     const existing = grouped.get(key);
     existing.athleteCandidates.push(...athleteCandidates);
+    if (!existing.classTag && classTag) {
+      existing.classTag = classTag;
+    }
     Object.entries(row.stat_row || {}).forEach(([statKey, value]) => {
       if (value !== null && value !== undefined && value !== "") {
         existing.stat_row[statKey] = value;
@@ -514,7 +628,8 @@ function consolidateSportRows(rows) {
 
   return Array.from(grouped.values()).map((row) => ({
     ...row,
-    athlete: chooseAthleteDisplayName(row.athleteCandidates) || row.athlete || "Unknown Athlete",
+    athlete: chooseSchoolAthleteDisplayName(row.stat_row, row.athleteCandidates) || row.athlete || "Unknown Athlete",
+    classTag: row.classTag || extractAthleteClassTag(row.stat_row, row.athlete),
   }));
 }
 
@@ -564,24 +679,84 @@ function buildSeasonLeaders(rows, sport, latestSeason) {
   }
 
   return consolidateSportRows(rows)
-    .filter((row) => row.season === latestSeason)
+    .filter((row) => isSameSchoolYear(row.season, latestSeason))
     .map((row) => ({
       athlete: row.athlete,
       metricLabel: config.label,
       total: Math.round(getMetricValue(row.stat_row, config) * 10) / 10,
-      seasons: [latestSeason],
+      seasons: [normalizeSchoolYearLabel(latestSeason)],
     }))
     .filter((row) => row.total > 0)
     .sort((left, right) => right.total - left.total);
 }
 
-function buildMilestoneItems(rows, sport) {
+function buildEligibleMilestoneLeaders(rows, sport, currentSchoolYear) {
   const config = SPORT_METRIC_CONFIG[sport];
   if (!config) {
     return [];
   }
 
-  return buildCareerLeaders(rows, sport)
+  const eligibilityContext = getMilestoneEligibilityContext(rows, currentSchoolYear);
+  const leaders = new Map();
+
+  consolidateSportRows(rows).forEach((row) => {
+    if (!isSchoolYearWithinWindow(row.season, currentSchoolYear, SCHOOL_YEAR_CAREER_WINDOW_YEARS)) {
+      return;
+    }
+
+    const metricValue = getMetricValue(row.stat_row, config);
+    if (metricValue <= 0) {
+      return;
+    }
+
+    if (!leaders.has(row.athleteKey)) {
+      leaders.set(row.athleteKey, {
+        athlete: row.athlete,
+        athleteKey: row.athleteKey,
+        hasCurrentSeason: false,
+        latestClassTag: "",
+        latestSeason: "",
+        seasons: new Set(),
+        total: 0,
+      });
+    }
+
+    const leader = leaders.get(row.athleteKey);
+    leader.total += metricValue;
+    leader.seasons.add(row.season);
+    if (isMoreRecentSchoolYear(row.season, leader.latestSeason)) {
+      leader.latestSeason = row.season;
+      leader.latestClassTag = row.classTag || "";
+    } else if (isSameSchoolYear(row.season, leader.latestSeason) && !leader.latestClassTag && row.classTag) {
+      leader.latestClassTag = row.classTag;
+    }
+    if (isSameSchoolYear(row.season, currentSchoolYear)) {
+      leader.hasCurrentSeason = true;
+    }
+  });
+
+  return Array.from(leaders.values())
+    .filter((leader) => isMilestoneEligibleLeader(leader, eligibilityContext))
+    .map((leader) => ({
+      athlete: leader.athlete,
+      eligibilityMode: eligibilityContext.mode,
+      fallbackSeason: eligibilityContext.fallbackSeason,
+      latestClassTag: leader.latestClassTag,
+      nextClassTag: getNextClassTag(leader.latestClassTag),
+      metricLabel: config.label,
+      total: Math.round(leader.total * 10) / 10,
+      seasons: Array.from(leader.seasons).sort(compareSeasonDesc),
+    }))
+    .sort((left, right) => right.total - left.total);
+}
+
+function buildMilestoneItems(rows, sport, currentSchoolYear) {
+  const config = SPORT_METRIC_CONFIG[sport];
+  if (!config) {
+    return [];
+  }
+
+  return buildEligibleMilestoneLeaders(rows, sport, currentSchoolYear)
     .map((leader) => {
       const nextThreshold = config.thresholds.find((threshold) => leader.total < threshold && threshold - leader.total <= config.nearDelta);
       if (!nextThreshold) {
@@ -589,9 +764,17 @@ function buildMilestoneItems(rows, sport) {
       }
 
       const away = Math.max(0, nextThreshold - leader.total);
+      const participationMeta =
+        leader.eligibilityMode === "fallback"
+          ? `Current-season rows are not approved yet, so this is temporarily inferred from ${leader.fallbackSeason}${
+              leader.latestClassTag && leader.nextClassTag
+                ? ` (${leader.latestClassTag} to likely ${leader.nextClassTag})`
+                : ""
+            }.`
+          : `${currentSchoolYear} participation confirmed.`;
       return {
         title: `${leader.athlete} is ${formatMetric(away)} away from ${formatMetric(nextThreshold)} ${config.label.toLowerCase()}.`,
-        meta: `${formatMetric(leader.total)} current ${config.label.toLowerCase()} | ${leader.seasons.length} season${leader.seasons.length === 1 ? "" : "s"}`,
+        meta: `${formatMetric(leader.total)} career ${config.label.toLowerCase()} across the last ${SCHOOL_YEAR_CAREER_WINDOW_YEARS} school years. ${participationMeta}`,
         away,
       };
     })
@@ -600,15 +783,27 @@ function buildMilestoneItems(rows, sport) {
     .slice(0, 8);
 }
 
-function buildCoverageGapItems(rows) {
+function buildCoverageGapItems(rows, currentSchoolYear) {
   const seasons = getSeasons(rows);
   if (!seasons.length) {
     return [];
   }
 
   const missing = findMissingSeasons(seasons);
-  const latestSeason = seasons[0];
   const items = [];
+  const hasCurrentSchoolYear = seasons.some((season) => isSameSchoolYear(season, currentSchoolYear));
+
+  items.push(
+    hasCurrentSchoolYear
+      ? {
+          title: `${currentSchoolYear} is represented in approved rows.`,
+          meta: "Current Season Leaders and Milestone Watch use this school year as the active eligibility gate.",
+        }
+      : {
+          title: `${currentSchoolYear} is missing for this sport.`,
+          meta: "Current-athlete sections stay empty until an approved row lands in the current school year.",
+        }
+  );
 
   if (missing.length) {
     items.push({
@@ -616,11 +811,6 @@ function buildCoverageGapItems(rows) {
       meta: "These gaps likely need historical backfill.",
     });
   }
-
-  items.push({
-    title: `Latest approved season is ${latestSeason}.`,
-    meta: `${seasons.length} distinct season${seasons.length === 1 ? "" : "s"} detected for this sport.`,
-  });
 
   const seasonRows = consolidateSportRows(rows);
   const bySeason = new Map();
@@ -639,16 +829,19 @@ function buildCoverageGapItems(rows) {
   return items;
 }
 
-function buildSportSummaryItems(rows, sport, latestSeason, allTimeLeaders, seasonLeaders) {
+function buildSportSummaryItems(rows, sport, currentSchoolYear, allTimeLeaders, seasonLeaders) {
   const config = SPORT_METRIC_CONFIG[sport];
   const seasons = getSeasons(rows);
   const latestLeader = seasonLeaders[0];
   const careerLeader = allTimeLeaders[0];
+  const hasCurrentSchoolYear = seasons.some((season) => isSameSchoolYear(season, currentSchoolYear));
 
   return [
     {
-      title: `${rows.length} approved raw row${rows.length === 1 ? "" : "s"} currently support ${SPORT_LABELS[sport] || titleCase(sport)}.`,
-      meta: `${seasons.length} season${seasons.length === 1 ? "" : "s"} | Latest season ${latestSeason || "N/A"}`,
+      title: `${SPORT_LABELS[sport] || titleCase(sport)} spans ${seasons[seasons.length - 1] || "N/A"} to ${seasons[0] || "N/A"} in approved records.`,
+      meta: hasCurrentSchoolYear
+        ? `${currentSchoolYear} is represented in approved rows for this sport.`
+        : `${currentSchoolYear} is not represented yet, so active-athlete sections stay empty.`,
     },
     {
       title: careerLeader
@@ -658,9 +851,11 @@ function buildSportSummaryItems(rows, sport, latestSeason, allTimeLeaders, seaso
     },
     {
       title: latestLeader
-        ? `${latestLeader.athlete} leads the latest season in ${config.label.toLowerCase()}.`
-        : "No latest season leader could be calculated yet.",
-      meta: latestLeader ? `${formatMetric(latestLeader.total)} ${config.label.toLowerCase()} in ${latestSeason}` : "This usually means the latest season is still missing usable stat totals.",
+        ? `${latestLeader.athlete} leads the current school year in ${config.label.toLowerCase()}.`
+        : `No ${currentSchoolYear} leader could be calculated yet.`,
+      meta: latestLeader
+        ? `${formatMetric(latestLeader.total)} ${config.label.toLowerCase()} in ${currentSchoolYear}`
+        : `Only athletes with approved ${currentSchoolYear} rows appear in current-year leader and milestone sections.`,
     },
   ];
 }
@@ -730,28 +925,25 @@ function normalizeSport(value) {
 }
 
 function getSeasons(rows) {
-  return Array.from(new Set((rows || []).map((row) => String(row.season || "").trim()).filter(Boolean))).sort(compareSeasonDesc);
+  return Array.from(
+    new Set((rows || []).map((row) => normalizeSchoolYearLabel(row.season)).filter(Boolean))
+  ).sort(compareSeasonDesc);
 }
 
 function compareSeasonDesc(left, right) {
-  return seasonSortValue(right) - seasonSortValue(left);
+  return compareSchoolYearsDesc(left, right);
 }
 
 function seasonSortValue(season) {
-  const match = String(season || "").match(/(19|20)?(\d{2})/);
-  if (!match) {
-    return 0;
-  }
-
-  const firstYear = Number(match[1] || `20${match[2]}`);
-  return Number.isNaN(firstYear) ? 0 : firstYear;
+  const parsed = parseSchoolYearLabel(season);
+  return parsed?.startYear || 0;
 }
 
 function findMissingSeasons(seasons) {
   const startYears = seasons
-    .map((season) => String(season || "").match(/(\d{2})-(\d{2})/))
+    .map((season) => parseSchoolYearLabel(season))
     .filter(Boolean)
-    .map((match) => Number(match[1]));
+    .map((season) => season.startYear);
 
   if (!startYears.length) {
     return [];
@@ -764,20 +956,184 @@ function findMissingSeasons(seasons) {
 
   for (let year = min; year <= max; year += 1) {
     if (!existing.has(year)) {
-      const next = String((year + 1) % 100).padStart(2, "0");
-      missing.push(`${String(year).padStart(2, "0")}-${next}`);
+      missing.push(normalizeSchoolYearLabel(`${year}-${year + 1}`));
     }
   }
 
   return missing;
 }
 
-function renderLeaderItem(rank, leader, sport, season = "") {
+function buildThinSeasonCoverageItems(rows, threshold = 2) {
+  const bySeason = new Map();
+
+  consolidateSportRows(rows).forEach((row) => {
+    if (!row.season) {
+      return;
+    }
+
+    bySeason.set(row.season, (bySeason.get(row.season) || 0) + 1);
+  });
+
+  return Array.from(bySeason.entries())
+    .filter(([, count]) => count <= threshold)
+    .sort((left, right) => compareSeasonDesc(left[0], right[0]))
+    .slice(0, 4)
+    .map(([season, count]) => `${season} (${count} athlete row${count === 1 ? "" : "s"})`);
+}
+
+function renderLeaderItem(leader, sport, season = "") {
   const seasonText = season || (leader.seasons.length ? `${leader.seasons[leader.seasons.length - 1]} to ${leader.seasons[0]}` : "Season range unavailable");
   return renderListItem(
-    `#${rank} ${leader.athlete} - ${formatMetric(leader.total)} ${leader.metricLabel.toLowerCase()}`,
+    `${leader.athlete} - ${formatMetric(leader.total)} ${leader.metricLabel.toLowerCase()}`,
     `${SPORT_LABELS[sport] || titleCase(sport)} | ${seasonText}`
   );
+}
+
+function getTrackedSportsForSchool(schoolId = currentUser?.school_id) {
+  const excluded = new Set(getNotOfferedSportsForSchool(schoolId));
+  return TRACKED_SPORTS.filter((sport) => !excluded.has(sport));
+}
+
+function getNotOfferedSportsForSchool(schoolId = currentUser?.school_id) {
+  return Array.from(
+    new Set((SCHOOL_NOT_OFFERED_SPORTS[schoolId] || []).map((sport) => normalizeSport(sport)).filter(Boolean))
+  );
+}
+
+function getNotOfferedSportLabels(schoolId = currentUser?.school_id) {
+  return getNotOfferedSportsForSchool(schoolId).map((sport) => SPORT_LABELS[sport] || titleCase(sport));
+}
+
+function normalizeText(value) {
+  return String(value || "").trim().replace(/\s+/g, " ");
+}
+
+function uniqueStrings(values) {
+  return Array.from(new Set((values || []).map((value) => normalizeText(value)).filter(Boolean)));
+}
+
+function firstPresentValue(source, keys) {
+  if (!source || typeof source !== "object") {
+    return "";
+  }
+
+  for (const key of keys) {
+    const value = normalizeText(source[key]);
+    if (value) {
+      return value;
+    }
+  }
+
+  return "";
+}
+
+function isInitialToken(value) {
+  return normalizeText(value).replace(/[^A-Za-z]/g, "").length === 1;
+}
+
+function extractSchoolAthleteNameCandidates(statRow) {
+  const candidates = [...extractAthleteNameCandidates(statRow)];
+  const displayName = firstPresentValue(statRow, SCHOOL_DISPLAY_NAME_KEYS);
+  const firstName = firstPresentValue(statRow, SCHOOL_FIRST_NAME_KEYS);
+  const lastName = firstPresentValue(statRow, SCHOOL_LAST_NAME_KEYS);
+
+  if (displayName) {
+    candidates.push(displayName);
+  }
+  if (firstName && lastName) {
+    candidates.push(`${firstName} ${lastName}`);
+  }
+
+  return uniqueStrings(candidates).map(cleanAthleteDisplayName).filter(Boolean);
+}
+
+function chooseSchoolAthleteDisplayName(statRow, seedNames = []) {
+  const candidates = extractSchoolAthleteNameCandidates(statRow).concat(seedNames || []);
+  let bestName = "";
+  let bestScore = -1;
+
+  uniqueStrings(candidates).forEach((name) => {
+    const cleaned = cleanAthleteDisplayName(name);
+    if (!cleaned) {
+      return;
+    }
+
+    const tokens = cleaned.split(" ").filter(Boolean);
+    const firstToken = tokens[0] || "";
+    const lastToken = tokens[tokens.length - 1] || "";
+    let score = cleaned.length;
+
+    if (tokens.length >= 2) {
+      score += 14;
+    }
+    if (firstToken && !isInitialToken(firstToken)) {
+      score += 18;
+    } else if (firstToken) {
+      score -= 8;
+    }
+    if (lastToken && !isInitialToken(lastToken)) {
+      score += 6;
+    }
+    if (/\./.test(firstToken)) {
+      score -= 4;
+    }
+
+    if (score > bestScore) {
+      bestName = cleaned;
+      bestScore = score;
+    }
+  });
+
+  return bestName;
+}
+
+function getMilestoneEligibilityContext(rows, currentSchoolYear) {
+  const seasons = getSeasons(rows);
+  if (seasons.some((season) => isSameSchoolYear(season, currentSchoolYear))) {
+    return { mode: "current", fallbackSeason: "" };
+  }
+
+  const latestSeason = seasons[0] || "";
+  return isImmediatePreviousSchoolYear(latestSeason, currentSchoolYear)
+    ? { mode: "fallback", fallbackSeason: latestSeason }
+    : { mode: "none", fallbackSeason: "" };
+}
+
+function isMilestoneEligibleLeader(leader, eligibilityContext) {
+  if (eligibilityContext.mode === "current") {
+    return leader.hasCurrentSeason;
+  }
+
+  if (eligibilityContext.mode === "fallback") {
+    // Temporary school-dashboard fallback until real current-season uploads exist.
+    return (
+      isSameSchoolYear(leader.latestSeason, eligibilityContext.fallbackSeason) &&
+      Boolean(getNextClassTag(leader.latestClassTag))
+    );
+  }
+
+  return false;
+}
+
+function getNextClassTag(classTag) {
+  return CLASS_PROGRESSION[normalizeText(classTag)] || "";
+}
+
+function isImmediatePreviousSchoolYear(previousSeason, currentSchoolYear) {
+  const previous = parseSchoolYearLabel(previousSeason);
+  const current = parseSchoolYearLabel(currentSchoolYear);
+
+  if (!previous || !current) {
+    return false;
+  }
+
+  return previous.startYear === current.startYear - 1;
+}
+
+function isMoreRecentSchoolYear(left, right) {
+  const leftYear = parseSchoolYearLabel(left)?.startYear || 0;
+  const rightYear = parseSchoolYearLabel(right)?.startYear || 0;
+  return leftYear > rightYear;
 }
 
 function renderListItem(title, meta = "") {

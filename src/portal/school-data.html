@@ -111,11 +111,6 @@
     <div class="grid">
       <div class="stack">
         <section class="panel">
-          <div class="head"><h2>Coverage Snapshot</h2><p>What your school already has and what is still missing.</p></div>
-          <div class="body"><ul id="coverageList" class="list"><li class="empty">Loading coverage...</li></ul></div>
-        </section>
-
-        <section class="panel">
           <div class="head"><h2>Milestone Watch</h2><p>Closest individual thresholds based on your current approved data.</p></div>
           <div class="body"><ul id="milestoneList" class="list"><li class="empty">Loading milestones...</li></ul></div>
         </section>
@@ -124,12 +119,17 @@
           <div class="head"><h2>Recently Approved</h2><p>Latest school submissions that cleared review.</p></div>
           <div class="body"><ul id="recentList" class="list"><li class="empty">Loading recent approvals...</li></ul></div>
         </section>
+
+        <section class="panel">
+          <div class="head"><h2>Coverage Snapshot</h2><p>Missing sports, thin school years, and archive gaps that still need backfill.</p></div>
+          <div class="body"><ul id="coverageList" class="list"><li class="empty">Loading coverage gaps...</li></ul></div>
+        </section>
       </div>
 
       <section class="panel">
         <div class="head">
           <h2>Sport Intelligence</h2>
-          <p>School-only leaders, current season snapshots, and missing-year checks.</p>
+          <p>School-only leaders, current-school-year snapshots, and sport-specific gap checks.</p>
         </div>
         <div class="body stack">
           <div id="sportTabs" class="tabs" aria-label="Sports"></div>
