@@ -1,6 +1,7 @@
 import { supabase } from "../supabaseClient.js";
 
-const SEARCH_ROW_SELECT = "id, school_id, school, sport, season, stat_row";
+const SEARCH_ROW_SELECT_BASE = "id, school_id, school, sport, season, stat_row";
+const SEARCH_ROW_SELECT = "id, school_id, school, sport, sport_variant, season, stat_row";
 const CLASS_SUFFIX_PATTERN = /\s*\((fr|so|jr|sr)\)\s*$/i;
 const DISPLAY_NAME_KEYS = [
   "Athlete Full Name",
@@ -37,6 +38,40 @@ const LAST_NAME_KEYS = [
 
 function escapeLike(value) {
   return String(value || "").replace(/%/g, "\\%").replace(/_/g, "\\_");
+}
+
+function isMissingRelationError(error, relationName) {
+  const message = `${error?.message || ""} ${error?.details || ""}`.toLowerCase();
+  const relation = String(relationName || "").toLowerCase();
+
+  return (
+    message.includes(relation) &&
+    (message.includes("does not exist") ||
+      message.includes("could not find") ||
+      message.includes("relation") ||
+      message.includes("column"))
+  );
+}
+
+async function runSearchRowsQuery(queryFactory) {
+  const primaryResponse = await queryFactory(SEARCH_ROW_SELECT);
+  if (!primaryResponse.error) {
+    return primaryResponse.data || [];
+  }
+
+  if (!isMissingRelationError(primaryResponse.error, "sport_variant")) {
+    throw primaryResponse.error;
+  }
+
+  const fallbackResponse = await queryFactory(SEARCH_ROW_SELECT_BASE);
+  if (fallbackResponse.error) {
+    throw fallbackResponse.error;
+  }
+
+  return (fallbackResponse.data || []).map((row) => ({
+    ...row,
+    sport_variant: null,
+  }));
 }
 
 function normalizeText(value) {
@@ -499,26 +534,21 @@ export async function fetchPublicSearchRows(query, { limit = 90 } = {}) {
     return [];
   }
 
-  const baseQuery = supabase
-    .from("raw_stat_rows")
-    .select(SEARCH_ROW_SELECT)
-    .order("season", { ascending: false })
-    .limit(limit);
-
-  const { data, error } = await baseQuery.or(
-    [
-      `school.ilike.%${escapeLike(normalizedQuery)}%`,
-      `sport.ilike.%${escapeLike(normalizedQuery)}%`,
-      `season.ilike.%${escapeLike(normalizedQuery)}%`,
-      ...buildAthleteLikeFilters(normalizedQuery),
-    ].join(",")
+  return runSearchRowsQuery((selectColumns) =>
+    supabase
+      .from("raw_stat_rows")
+      .select(selectColumns)
+      .order("season", { ascending: false })
+      .limit(limit)
+      .or(
+        [
+          `school.ilike.%${escapeLike(normalizedQuery)}%`,
+          `sport.ilike.%${escapeLike(normalizedQuery)}%`,
+          `season.ilike.%${escapeLike(normalizedQuery)}%`,
+          ...buildAthleteLikeFilters(normalizedQuery),
+        ].join(",")
+      )
   );
-
-  if (error) {
-    throw error;
-  }
-
-  return data || [];
 }
 
 export async function fetchAthleteProfileRows({
@@ -542,27 +572,26 @@ export async function fetchAthleteProfileRows({
     return [];
   }
 
-  let request = supabase
-    .from("raw_stat_rows")
-    .select(SEARCH_ROW_SELECT)
-    .order("season", { ascending: false })
-    .limit(limit);
+  const rows = await runSearchRowsQuery((selectColumns) => {
+    let request = supabase
+      .from("raw_stat_rows")
+      .select(selectColumns)
+      .order("season", { ascending: false })
+      .limit(limit);
 
-  if (normalizedSchoolId) {
-    request = request.eq("school_id", normalizedSchoolId);
-  } else if (normalizedSchoolName) {
-    request = request.ilike("school", normalizedSchoolName);
-  }
+    if (normalizedSchoolId) {
+      request = request.eq("school_id", normalizedSchoolId);
+    } else if (normalizedSchoolName) {
+      request = request.ilike("school", normalizedSchoolName);
+    }
 
-  const searchTerms = broadTerms.length ? broadTerms : uniqueStrings([displayName, normalizedIdentity]);
-  if (searchTerms.length) {
-    request = request.or(searchTerms.flatMap((term) => buildAthleteLikeFilters(term)).join(","));
-  }
+    const searchTerms = broadTerms.length ? broadTerms : uniqueStrings([displayName, normalizedIdentity]);
+    if (searchTerms.length) {
+      request = request.or(searchTerms.flatMap((term) => buildAthleteLikeFilters(term)).join(","));
+    }
 
-  const { data, error } = await request;
-  if (error) {
-    throw error;
-  }
+    return request;
+  });
 
-  return (data || []).filter((row) => athleteMatchesIdentity(row.stat_row, normalizedIdentity));
+  return rows.filter((row) => athleteMatchesIdentity(row.stat_row, normalizedIdentity));
 }

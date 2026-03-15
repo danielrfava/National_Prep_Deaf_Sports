@@ -1,6 +1,8 @@
 import { supabase } from "../supabaseClient.js";
+import { normalizeFootballFormat } from "../footballFormat.js";
 
-const RECORD_SELECT = "id, school_id, school, sport, season, stat_row";
+const RECORD_SELECT_BASE = "id, school_id, school, sport, season, stat_row";
+const RECORD_SELECT = "id, school_id, school, sport, sport_variant, season, stat_row";
 const DEFAULT_RECORD_LIMIT = 800;
 const MAX_RECORD_LIMIT = 1500;
 
@@ -258,7 +260,10 @@ export async function fetchSportsRecords(query = "", filters = {}) {
   const normalizedSport = normalizeText(filters.sport);
   const normalizedSeason = normalizeText(filters.season);
   const normalizedDivision = normalizeText(filters.division);
-  const normalizedFootballVariant = normalizeText(filters.footballVariant);
+  const normalizedFootballVariant = normalizeFootballFormat(
+    filters.footballFormat || filters.footballVariant,
+    { allowBlank: true }
+  );
   const hasFilters = Boolean(
     normalizedQuery ||
       normalizedSchoolId ||
@@ -272,89 +277,81 @@ export async function fetchSportsRecords(query = "", filters = {}) {
     return [];
   }
 
-  let request = supabase
-    .from("raw_stat_rows")
-    .select(RECORD_SELECT)
-    .order("season", { ascending: false })
-    .limit(Math.min(Number(filters.maxRows) || DEFAULT_RECORD_LIMIT, MAX_RECORD_LIMIT));
+  async function buildRecordsRequest(selectColumns, { includeFootballVariant = true } = {}) {
+    let request = supabase
+      .from("raw_stat_rows")
+      .select(selectColumns)
+      .order("season", { ascending: false })
+      .limit(Math.min(Number(filters.maxRows) || DEFAULT_RECORD_LIMIT, MAX_RECORD_LIMIT));
 
-  if (normalizedQuery) {
-    request = request.or(buildSearchFilter(normalizedQuery));
-  }
-
-  if (normalizedSchoolId) {
-    request = request.eq("school_id", normalizedSchoolId);
-  }
-
-  if (normalizedDivision) {
-    const visibleSchools = await fetchVisibleSchools();
-    const schoolsInDivision = filterSchoolsByDivision(visibleSchools, normalizedDivision);
-    const schoolIds = schoolsInDivision.map((school) => school.id).filter(Boolean);
-    const schoolNames = schoolsInDivision.map((school) => school.full_name).filter(Boolean);
-
-    if (!schoolIds.length && !schoolNames.length) {
-      return [];
+    if (normalizedQuery) {
+      request = request.or(buildSearchFilter(normalizedQuery));
     }
 
-    if (schoolIds.length) {
-      request = request.in("school_id", schoolIds);
-    } else {
-      request = request.in("school", schoolNames);
+    if (normalizedSchoolId) {
+      request = request.eq("school_id", normalizedSchoolId);
     }
+
+    if (normalizedDivision) {
+      const visibleSchools = await fetchVisibleSchools();
+      const schoolsInDivision = filterSchoolsByDivision(visibleSchools, normalizedDivision);
+      const schoolIds = schoolsInDivision.map((school) => school.id).filter(Boolean);
+      const schoolNames = schoolsInDivision.map((school) => school.full_name).filter(Boolean);
+
+      if (!schoolIds.length && !schoolNames.length) {
+        return null;
+      }
+
+      if (schoolIds.length) {
+        request = request.in("school_id", schoolIds);
+      } else {
+        request = request.in("school", schoolNames);
+      }
+    }
+
+    if (normalizedSport) {
+      request = request.eq("sport", normalizedSport);
+    }
+
+    if (normalizedSeason) {
+      request = request.eq("season", normalizedSeason);
+    }
+
+    if (normalizedFootballVariant && includeFootballVariant) {
+      request = request.eq("sport_variant", normalizedFootballVariant);
+    }
+
+    return request;
   }
 
-  if (normalizedSport) {
-    request = request.eq("sport", normalizedSport);
+  const primaryRequest = await buildRecordsRequest(RECORD_SELECT);
+  if (!primaryRequest) {
+    return [];
   }
 
-  if (normalizedSeason) {
-    request = request.eq("season", normalizedSeason);
-  }
-
-  if (normalizedFootballVariant) {
-    request = request.eq("sport_variant", normalizedFootballVariant);
-  }
-
-  const { data, error } = await request;
+  const { data, error } = await primaryRequest;
   if (error) {
-    if (
-      normalizedFootballVariant &&
-      isMissingRelationError(error, "sport_variant")
-    ) {
-      const retryRequest = supabase
-        .from("raw_stat_rows")
-        .select(RECORD_SELECT)
-        .order("season", { ascending: false })
-        .limit(Math.min(Number(filters.maxRows) || DEFAULT_RECORD_LIMIT, MAX_RECORD_LIMIT));
-
-      let retry = retryRequest;
-      if (normalizedQuery) {
-        retry = retry.or(buildSearchFilter(normalizedQuery));
-      }
-      if (normalizedSchoolId) {
-        retry = retry.eq("school_id", normalizedSchoolId);
-      }
-      if (normalizedDivision) {
-        const visibleSchools = await fetchVisibleSchools();
-        const schoolsInDivision = filterSchoolsByDivision(visibleSchools, normalizedDivision);
-        const schoolIds = schoolsInDivision.map((school) => school.id).filter(Boolean);
-        if (!schoolIds.length) {
-          return [];
-        }
-        retry = retry.in("school_id", schoolIds);
-      }
-      if (normalizedSport) {
-        retry = retry.eq("sport", normalizedSport);
-      }
-      if (normalizedSeason) {
-        retry = retry.eq("season", normalizedSeason);
+    if (isMissingRelationError(error, "sport_variant")) {
+      if (normalizedFootballVariant) {
+        throw new Error("Football format filtering requires the latest football format storage migration.");
       }
 
-      const retryResponse = await retry;
-      if (retryResponse.error) {
-        throw new Error(retryResponse.error.message);
+      const fallbackRequest = await buildRecordsRequest(RECORD_SELECT_BASE, {
+        includeFootballVariant: false,
+      });
+      if (!fallbackRequest) {
+        return [];
       }
-      return retryResponse.data || [];
+
+      const fallbackResponse = await fallbackRequest;
+      if (fallbackResponse.error) {
+        throw new Error(fallbackResponse.error.message);
+      }
+
+      return (fallbackResponse.data || []).map((row) => ({
+        ...row,
+        sport_variant: null,
+      }));
     }
 
     throw new Error(error.message);

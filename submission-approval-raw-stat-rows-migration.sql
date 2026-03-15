@@ -37,6 +37,7 @@ declare
   has_raw_school_id boolean;
   has_raw_source_url boolean;
   has_raw_history_url boolean;
+  has_raw_sport_variant boolean;
   insert_columns text[];
   insert_values text[];
   insert_sql text;
@@ -126,7 +127,21 @@ begin
   )
   into has_raw_history_url;
 
-  sport_variant_value := nullif(submission_json ->> 'sport_variant', '');
+  select exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'raw_stat_rows'
+      and column_name = 'sport_variant'
+  )
+  into has_raw_sport_variant;
+
+  sport_variant_value := coalesce(
+    nullif(submission_json ->> 'sport_variant', ''),
+    nullif(submission_record.game_data ->> 'football_format', ''),
+    nullif(game_payload ->> 'football_format', ''),
+    nullif(parse_review ->> 'football_format', '')
+  );
 
   if has_real_matchup and has_game_score then
     if has_games_sport_variant then
@@ -226,6 +241,10 @@ begin
       raw_row := raw_row || jsonb_build_object('School', school_name_value);
     end if;
 
+    if sport_variant_value is not null and sport_variant_value <> '' then
+      raw_row := raw_row || jsonb_build_object('Football Format', sport_variant_value);
+    end if;
+
     insert_columns := array['school', 'sport', 'season', 'stat_row'];
     insert_values := array[
       format('%L', school_name_value),
@@ -247,6 +266,11 @@ begin
     if has_raw_history_url then
       insert_columns := array_append(insert_columns, 'history_url');
       insert_values := array_append(insert_values, 'null');
+    end if;
+
+    if has_raw_sport_variant then
+      insert_columns := array_append(insert_columns, 'sport_variant');
+      insert_values := array_append(insert_values, format('%L', sport_variant_value));
     end if;
 
     insert_sql := format(

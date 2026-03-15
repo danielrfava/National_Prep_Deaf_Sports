@@ -1,21 +1,21 @@
 -- ============================================
 -- MIGRATION: Add sport_variant field
 -- ============================================
--- Run this in your Supabase SQL Editor to add support for 8-man vs 11-man football
+-- Run this in your Supabase SQL Editor to add support for football format variants
 
 -- Add sport_variant to game_submissions table
 ALTER TABLE public.game_submissions 
 ADD COLUMN IF NOT EXISTS sport_variant text;
 
 -- Add comment to document the field
-COMMENT ON COLUMN public.game_submissions.sport_variant IS 'For football: 8-man or 11-man; For other sports: NULL';
+COMMENT ON COLUMN public.game_submissions.sport_variant IS 'For football: 11-man, 8-man, 6-man, or unknown; For other sports: NULL';
 
 -- Add sport_variant to games table
 ALTER TABLE public.games 
 ADD COLUMN IF NOT EXISTS sport_variant text;
 
 -- Add comment to document the field
-COMMENT ON COLUMN public.games.sport_variant IS 'For football: 8-man or 11-man; For other sports: NULL';
+COMMENT ON COLUMN public.games.sport_variant IS 'For football: 11-man, 8-man, 6-man, or unknown; For other sports: NULL';
 
 -- Create indexes for better query performance
 CREATE INDEX IF NOT EXISTS idx_game_submissions_sport_variant ON public.game_submissions(sport_variant) WHERE sport_variant IS NOT NULL;
@@ -111,4 +111,4 @@ $$;
 -- MIGRATION COMPLETE!
 -- ============================================
 -- The sport_variant field is now available in both tables
--- You can now track 8-man vs 11-man football games
+-- You can now track football format variants without splitting football into separate sports

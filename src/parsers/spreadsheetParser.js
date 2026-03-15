@@ -1,3 +1,5 @@
+import { resolveFootballFormatForSport } from "../footballFormat.js";
+
 const SPORT_SCHEMAS = {
   basketball: {
     playerMeta: {
@@ -420,6 +422,7 @@ function sanitizeNumber(value) {
 }
 
 export function finalizeSpreadsheetParse(inspection, mappingSelections, context = {}) {
+  const footballFormat = resolveFootballFormatForSport(context.sport, context.footballFormat);
   const finalMappings = inspection.mappings.map((m) => {
     const selected = mappingSelections[m.originalHeader];
     const mappedTo =
@@ -466,6 +469,7 @@ export function finalizeSpreadsheetParse(inspection, mappingSelections, context 
         stats,
         meta: {
           season: seasonColumn ? String(row[seasonColumn] ?? "").trim() || null : context.seasonHint || null,
+          football_format: footballFormat,
         },
       };
     })
@@ -480,9 +484,11 @@ export function finalizeSpreadsheetParse(inspection, mappingSelections, context 
     : [];
 
   return {
+    football_format: footballFormat,
     game: {
       sport: context.sport,
       gender: context.gender || null,
+      football_format: footballFormat,
       date: new Date().toISOString().split("T")[0],
       homeTeam: null,
       awayTeam: null,
@@ -500,6 +506,7 @@ export function finalizeSpreadsheetParse(inspection, mappingSelections, context 
       file_type: inspection.fileType,
       selected_sport_value: inspection.selectedSportValue,
       schema_key: inspection.schemaKey,
+      football_format: footballFormat,
       confidence: inspection.confidence,
       original_headers: inspection.rawHeaders,
       mapped_headers: Object.fromEntries(

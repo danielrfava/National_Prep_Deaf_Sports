@@ -1,9 +1,12 @@
-export function parseBoxScoreText(text, selectedSportValue = "") {
+import { resolveFootballFormatForSport } from "../footballFormat.js";
+
+export function parseBoxScoreText(text, selectedSportValue = "", options = {}) {
   const cleanedText = String(text || "").trim();
 
-  const sportMeta = resolveSportSelection(selectedSportValue);
+  const sportMeta = resolveSportSelection(selectedSportValue, options.footballFormat);
 
   const result = {
+    football_format: sportMeta.footballFormat,
     game: {
       date: extractDate(cleanedText),
       sport: sportMeta.sport || "basketball",
@@ -13,6 +16,7 @@ export function parseBoxScoreText(text, selectedSportValue = "") {
       homeScore: null,
       awayScore: null,
       location: extractLocation(cleanedText),
+      football_format: sportMeta.footballFormat,
     },
     players: [],
     confidence: 20,
@@ -22,6 +26,7 @@ export function parseBoxScoreText(text, selectedSportValue = "") {
     parse_review: {
       source_type: "text_box_score",
       selected_sport_value: selectedSportValue,
+      football_format: sportMeta.footballFormat,
       confidence: 20,
       warnings: [],
       preview_rows: [],
@@ -73,26 +78,30 @@ export function parseBoxScoreText(text, selectedSportValue = "") {
   return result;
 }
 
-function resolveSportSelection(value) {
+function resolveSportSelection(value, footballFormatValue = "") {
   switch (value) {
     case "boys_basketball":
-      return { sport: "basketball", gender: "boys" };
+      return { sport: "basketball", gender: "boys", footballFormat: null };
     case "girls_basketball":
-      return { sport: "basketball", gender: "girls" };
+      return { sport: "basketball", gender: "girls", footballFormat: null };
     case "girls_volleyball":
-      return { sport: "volleyball", gender: "girls" };
+      return { sport: "volleyball", gender: "girls", footballFormat: null };
     case "boys_soccer":
-      return { sport: "soccer", gender: "boys" };
+      return { sport: "soccer", gender: "boys", footballFormat: null };
     case "girls_soccer":
-      return { sport: "soccer", gender: "girls" };
+      return { sport: "soccer", gender: "girls", footballFormat: null };
     case "football":
-      return { sport: "football", gender: null };
+      return {
+        sport: "football",
+        gender: null,
+        footballFormat: resolveFootballFormatForSport("football", footballFormatValue),
+      };
     case "baseball":
-      return { sport: "baseball", gender: null };
+      return { sport: "baseball", gender: null, footballFormat: null };
     case "softball":
-      return { sport: "softball", gender: null };
+      return { sport: "softball", gender: null, footballFormat: null };
     default:
-      return { sport: null, gender: null };
+      return { sport: null, gender: null, footballFormat: null };
   }
 }
 

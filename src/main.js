@@ -1,6 +1,7 @@
 import { fetchSchools, fetchSportsList, fetchSportsRecords, fetchSeasonsList } from "./services/sportsService.js";
 import { renderRecords } from "./components/renderRecords.js";
 import { mountPublicTopNav } from "./components/publicTopNav.js";
+import { isFootballSportValue, populateFootballFormatSelect } from "./footballFormat.js";
 
 const filterInput = document.querySelector("#athleteFilter");
 const status = document.querySelector("#status");
@@ -9,8 +10,8 @@ const schoolFilter = document.querySelector("#schoolFilter");
 const divisionFilter = document.querySelector("#divisionFilter");
 const sportFilter = document.querySelector("#sportFilter");
 const seasonFilter = document.querySelector("#seasonFilter");
-const footballVariantFilter = document.querySelector("#footballVariantFilter");
-const footballVariantFilterField = document.querySelector("#footballVariantFilterField");
+const footballFormatFilter = document.querySelector("#footballFormatFilter");
+const footballFormatFilterField = document.querySelector("#footballFormatFilterField");
 const statsViewFilter = document.querySelector("#statsViewFilter");
 const applyFiltersBtn = document.querySelector("#applyFiltersBtn");
 
@@ -34,7 +35,7 @@ function buildFilters() {
     sport: sportFilter?.value || "",
     division: divisionFilter?.value || "",
     season: seasonFilter?.value || "",
-    footballVariant: footballVariantFilter?.value || "",
+    footballFormat: footballFormatFilter?.value || "",
     maxRows: 3000,
   };
 }
@@ -46,7 +47,7 @@ function hasMeaningfulFilters(query, filters) {
       filters.sport ||
       filters.division ||
       filters.season ||
-      filters.footballVariant
+      filters.footballFormat
   );
 }
 
@@ -60,16 +61,16 @@ function renderResearchEmptyState(message = "Select filters, then click Explore 
   `;
 }
 
-function toggleFootballVariantFilter() {
-  if (!footballVariantFilterField || !sportFilter) return;
+function toggleFootballFormatFilter() {
+  if (!footballFormatFilterField || !sportFilter) return;
 
-  const selectedSport = String(sportFilter.value || "").toLowerCase();
-  const isFootball = selectedSport.includes("football");
+  const selectedSport = String(sportFilter.value || "");
+  const isFootball = isFootballSportValue(selectedSport);
 
-  footballVariantFilterField.style.display = isFootball ? "flex" : "none";
+  footballFormatFilterField.style.display = isFootball ? "flex" : "none";
 
-  if (!isFootball && footballVariantFilter) {
-    footballVariantFilter.value = "";
+  if (!isFootball && footballFormatFilter) {
+    footballFormatFilter.value = "";
   }
 }
 
@@ -170,6 +171,8 @@ function applyInitialParams() {
   const initialSchool = (params.get("school") || "").trim();
   const initialSport = (params.get("sport") || "").trim();
   const initialSeason = (params.get("season") || "").trim();
+  const initialFootballFormat =
+    (params.get("football_format") || params.get("footballFormat") || params.get("footballVariant") || "").trim();
 
   if (initialQuery && filterInput) {
     filterInput.value = initialQuery;
@@ -181,11 +184,15 @@ function applyInitialParams() {
 
   if (initialSport && sportFilter) {
     sportFilter.value = initialSport;
-    toggleFootballVariantFilter();
+    toggleFootballFormatFilter();
   }
 
   if (initialSeason && seasonFilter) {
     seasonFilter.value = initialSeason;
+  }
+
+  if (initialFootballFormat && footballFormatFilter) {
+    footballFormatFilter.value = initialFootballFormat;
   }
 
 }
@@ -205,8 +212,14 @@ async function init() {
 
     populateSimpleSelect(sportFilter, sports || [], "All sports");
     populateSimpleSelect(seasonFilter, seasons || [], "All seasons");
+    populateFootballFormatSelect(footballFormatFilter, {
+      includeBlank: false,
+      includeAll: true,
+      allLabel: "All Football Formats",
+    });
 
     applyInitialParams();
+    toggleFootballFormatFilter();
 
     hasAppliedFilters = false;
     updateStatus("Select filters, then click Explore Records.");
@@ -234,7 +247,7 @@ if (schoolFilter) {
 
 if (sportFilter) {
   sportFilter.addEventListener("change", () => {
-    toggleFootballVariantFilter();
+    toggleFootballFormatFilter();
     onFiltersChanged();
   });
 }
@@ -250,8 +263,8 @@ if (divisionFilter) {
   });
 }
 
-if (footballVariantFilter) {
-  footballVariantFilter.addEventListener("change", onFiltersChanged);
+if (footballFormatFilter) {
+  footballFormatFilter.addEventListener("change", onFiltersChanged);
 }
 
 if (statsViewFilter) {

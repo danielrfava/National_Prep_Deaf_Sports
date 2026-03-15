@@ -1,3 +1,5 @@
+import { footballFormatLabel, isFootballSportValue } from "../footballFormat.js";
+
 let currentSort = { column: null, ascending: true };
 let currentRecords = [];
 let rawRecords = [];
@@ -859,6 +861,17 @@ if (Array.isArray(records)) {
   currentPage = 1;
 }
 
+function buildSportDisplayLabel(record) {
+  const sport = record?.sport || "";
+  const sportVariant = record?.sport_variant || "";
+
+  if (isFootballSportValue(sport) && sportVariant) {
+    return `Football (${footballFormatLabel(sportVariant)})`;
+  }
+
+  return sport;
+}
+
 let displayRecords = [...rawRecords];
 
 // 🔥 Consolidate multiple stat rows per season first
@@ -1155,7 +1168,7 @@ const isExtended =
   currentStatsView === 'career-extended' &&
   athleteName.endsWith('*');
       const school = getSchoolAbbrev(record.school);
-      const sport = record.sport || "";
+      const sport = buildSportDisplayLabel(record);
       const season = record.season || "";
       
       // Generate dynamic stat cells based on sport columns

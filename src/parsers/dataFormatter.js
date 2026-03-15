@@ -1,11 +1,21 @@
 import { supabase } from "../supabaseClient.js";
 import { mapSubmissionMethod } from "../portal/schoolAccess.js";
+import { resolveFootballFormatForSport } from "../footballFormat.js";
 
 export async function formatForSupabase(parsedData, metadata) {
   console.log("Converting to Supabase JSON format...");
 
   const parsedSport = parsedData?.game?.sport || metadata?.sport || "basketball";
+  const normalizedSport = normalizeSport(parsedSport);
   const parsedGender = parsedData?.game?.gender ?? metadata?.gender ?? null;
+  const footballFormat = resolveFootballFormatForSport(
+    normalizedSport,
+    parsedData?.game?.football_format ||
+      parsedData?.football_format ||
+      parsedData?.parse_review?.football_format ||
+      metadata?.footballFormat ||
+      metadata?.sportVariant
+  );
   const submittedBy = String(metadata?.userId || "").trim();
   const submitterSchoolId = String(
     metadata?.schoolId || metadata?.defaultSchoolId || ""
@@ -24,8 +34,9 @@ export async function formatForSupabase(parsedData, metadata) {
 
   const supabaseJSON = {
     game_date: formatDate(parsedData?.game?.date),
-    sport: normalizeSport(parsedSport),
+    sport: normalizedSport,
     gender: parsedGender,
+    sport_variant: footballFormat,
 
     home_team_id: homeSchoolId,
     away_team_id: awaySchoolId,
@@ -38,11 +49,13 @@ export async function formatForSupabase(parsedData, metadata) {
       parsed_at: new Date().toISOString(),
       source: metadata?.source || "unknown",
       submission_scope: parsedData?.submission_scope || "game_submission",
+      football_format: footballFormat,
 
       game: {
         date: formatDate(parsedData?.game?.date),
-        sport: normalizeSport(parsedSport),
+        sport: normalizedSport,
         gender: parsedGender,
+        football_format: footballFormat,
         location: parsedData?.game?.location || null,
         home_team: {
           id: homeSchoolId,
@@ -56,9 +69,16 @@ export async function formatForSupabase(parsedData, metadata) {
         },
       },
 
-      players: formatPlayers(parsedData?.players || [], homeSchoolId, awaySchoolId, metadata),
+      players: formatPlayers(parsedData?.players || [], homeSchoolId, awaySchoolId, metadata, footballFormat),
 
-      parse_review: parsedData?.parse_review || null,
+      parse_review: parsedData?.parse_review
+        ? {
+            ...parsedData.parse_review,
+            football_format: footballFormat,
+          }
+        : footballFormat
+        ? { football_format: footballFormat }
+        : null,
       warnings: parsedData?.warnings || [],
     },
 
@@ -71,7 +91,7 @@ export async function formatForSupabase(parsedData, metadata) {
   return supabaseJSON;
 }
 
-function formatPlayers(players, homeSchoolId, awaySchoolId, metadata = {}) {
+function formatPlayers(players, homeSchoolId, awaySchoolId, metadata = {}, footballFormat = null) {
   return (players || []).map((player) => {
     const inferredSchoolId =
       player.school_id ||
@@ -81,12 +101,31 @@ function formatPlayers(players, homeSchoolId, awaySchoolId, metadata = {}) {
       awaySchoolId ||
       null;
 
+    const meta = {
+      ...(player.meta || {}),
+    };
+
+    if (footballFormat) {
+      meta.football_format = meta.football_format || footballFormat;
+    } else {
+      delete meta.football_format;
+    }
+
+    const normalizedMeta = Object.entries(meta).reduce((accumulator, [key, value]) => {
+      if (value === null || value === undefined || value === "") {
+        return accumulator;
+      }
+
+      accumulator[key] = value;
+      return accumulator;
+    }, {});
+
     return {
       name: player.name,
       school_id: inferredSchoolId,
       school_name: player.team || metadata.defaultSchoolName || null,
       stats: player.stats || {},
-      meta: player.meta || null,
+      meta: Object.keys(normalizedMeta).length ? normalizedMeta : null,
     };
   });
 }

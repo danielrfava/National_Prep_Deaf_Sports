@@ -15,6 +15,13 @@ import {
   isApprovedSchoolProfile,
   setPortalFlash,
 } from "./schoolAccess.js";
+import {
+  footballFormatLabel,
+  isFootballSportValue,
+  normalizeFootballFormat,
+  populateFootballFormatSelect,
+  resolveFootballFormatForSport,
+} from "../footballFormat.js";
 
 const MODE2_MAPPING_STORAGE_KEY = "npds_mode2_mapping_profiles_v1";
 
@@ -32,6 +39,8 @@ let templateGuideOpen = false;
 let historicalTemplatesOpen = false;
 
 const sportSelection = document.getElementById("sportSelection");
+const footballFormatField = document.getElementById("footballFormatField");
+const footballFormatSelection = document.getElementById("footballFormatSelection");
 const seasonHint = document.getElementById("seasonHint");
 const fileDropzone = document.getElementById("fileDropzone");
 const spreadsheetInput = document.getElementById("spreadsheetInput");
@@ -77,6 +86,8 @@ const headerGuidePanel = document.getElementById("headerGuidePanel");
 const historicalTemplatePanel = document.getElementById("historicalTemplatePanel");
 
 const boxSportSelection = document.getElementById("boxSportSelection");
+const boxFootballFormatField = document.getElementById("boxFootballFormatField");
+const boxFootballFormatSelection = document.getElementById("boxFootballFormatSelection");
 const mode2SourceSelection = document.getElementById("mode2SourceSelection");
 const mode2LaneSelection = document.getElementById("mode2LaneSelection");
 const mode2TextLane = document.getElementById("mode2TextLane");
@@ -95,6 +106,8 @@ const mode2Warnings = document.getElementById("mode2Warnings");
 const mode2Players = document.getElementById("mode2Players");
 const submitMode2Btn = document.getElementById("submitMode2Btn");
 const pdfSportSelection = document.getElementById("pdfSportSelection");
+const pdfFootballFormatField = document.getElementById("pdfFootballFormatField");
+const pdfFootballFormatSelection = document.getElementById("pdfFootballFormatSelection");
 const pdfSeasonHint = document.getElementById("pdfSeasonHint");
 const pdfDropzone = document.getElementById("pdfDropzone");
 const pdfInput = document.getElementById("pdfInput");
@@ -108,6 +121,7 @@ const submitPdfBtn = document.getElementById("submitPdfBtn");
 
 window.addEventListener("DOMContentLoaded", async () => {
   await requireAuth();
+  setupFootballFormatFields();
   setupFileUI();
   setupMode2FileUI();
   setupPdfFileUI();
@@ -148,11 +162,31 @@ async function requireAuth() {
   setStatus(`Signed in as ${profile.full_name} - ${profile.school_name || "School not set"}`);
 }
 
+function setupFootballFormatFields() {
+  populateFootballFormatSelect(footballFormatSelection);
+  populateFootballFormatSelect(boxFootballFormatSelection);
+  populateFootballFormatSelect(pdfFootballFormatSelection);
+
+  syncFootballFormatField(sportSelection, footballFormatField);
+  syncFootballFormatField(boxSportSelection, boxFootballFormatField);
+  syncFootballFormatField(pdfSportSelection, pdfFootballFormatField);
+}
+
+function syncFootballFormatField(sportSelect, formatField) {
+  if (!sportSelect || !formatField) {
+    return;
+  }
+
+  formatField.classList.toggle("hidden", !isFootballSportValue(sportSelect.value));
+}
+
 function setupFileUI() {
   sportSelection.addEventListener("change", () => {
+    syncFootballFormatField(sportSelection, footballFormatField);
     updateInspectState();
     renderTemplateToolkit();
   });
+  footballFormatSelection?.addEventListener("change", updateInspectState);
   spreadsheetInput.addEventListener("change", onFilePicked);
 
   fileDropzone.addEventListener("click", () => spreadsheetInput.click());
@@ -288,7 +322,16 @@ function setupActions() {
   }
 
   if (boxSportSelection) {
-    boxSportSelection.addEventListener("change", renderTemplateToolkit);
+    boxSportSelection.addEventListener("change", () => {
+      syncFootballFormatField(boxSportSelection, boxFootballFormatField);
+      renderTemplateToolkit();
+    });
+  }
+
+  if (pdfSportSelection) {
+    pdfSportSelection.addEventListener("change", () => {
+      syncFootballFormatField(pdfSportSelection, pdfFootballFormatField);
+    });
   }
 
   if (parseBoxScoreBtn) {
@@ -390,7 +433,12 @@ function renderPdfSelectedFile() {
 }
 
 function updateInspectState() {
-  inspectBtn.disabled = !(sportSelection.value && selectedFile);
+  const requiresFootballFormat = isFootballSportValue(sportSelection.value);
+  const hasFootballFormat =
+    !requiresFootballFormat ||
+    Boolean(normalizeFootballFormat(footballFormatSelection?.value, { allowBlank: true }));
+
+  inspectBtn.disabled = !(sportSelection.value && selectedFile && hasFootballFormat);
 }
 
 function setStatus(message) {
@@ -621,32 +669,89 @@ function ensureSchoolConfigured() {
   return false;
 }
 
-function resolveSportSelection(value) {
+function getValidatedFootballFormat(sportValue, formatSelect) {
+  if (!isFootballSportValue(sportValue)) {
+    return null;
+  }
+
+  const selectedValue = normalizeFootballFormat(formatSelect?.value, { allowBlank: true });
+  if (selectedValue) {
+    return selectedValue;
+  }
+
+  alert("Select a football format before continuing. Choose 11-man, 8-man, 6-man, or Unknown / Not Sure.");
+  formatSelect?.focus();
+  return false;
+}
+
+function buildFootballFormatSummaryRow(footballFormat) {
+  if (!footballFormat) {
+    return "";
+  }
+
+  return `
+    <div class="summary-row">
+      <strong>Football Format</strong>
+      <span>${footballFormatLabel(footballFormat)}</span>
+    </div>
+  `;
+}
+
+function formatSportSummaryLabel(sport, gender, footballFormat) {
+  if (!sport) {
+    return "Not detected";
+  }
+
+  const prettySport = String(sport)
+    .split(/[_\s]+/)
+    .filter(Boolean)
+    .map((token) => token.charAt(0).toUpperCase() + token.slice(1))
+    .join(" ");
+  const sportLabel = gender ? `${prettySport} (${gender})` : prettySport;
+  if (!isFootballSportValue(sport) || !footballFormat) {
+    return sportLabel;
+  }
+
+  return `${sportLabel} - ${footballFormatLabel(footballFormat)}`;
+}
+
+function resolveSportSelection(value, footballFormatValue = "") {
   switch (value) {
     case "boys_basketball":
-      return { sport: "basketball", gender: "boys", label: "Boys Basketball" };
+      return { sport: "basketball", gender: "boys", label: "Boys Basketball", footballFormat: null };
     case "girls_basketball":
-      return { sport: "basketball", gender: "girls", label: "Girls Basketball" };
+      return { sport: "basketball", gender: "girls", label: "Girls Basketball", footballFormat: null };
     case "girls_volleyball":
-      return { sport: "volleyball", gender: "girls", label: "Girls Volleyball" };
+      return { sport: "volleyball", gender: "girls", label: "Girls Volleyball", footballFormat: null };
     case "boys_soccer":
-      return { sport: "soccer", gender: "boys", label: "Boys Soccer" };
+      return { sport: "soccer", gender: "boys", label: "Boys Soccer", footballFormat: null };
     case "girls_soccer":
-      return { sport: "soccer", gender: "girls", label: "Girls Soccer" };
+      return { sport: "soccer", gender: "girls", label: "Girls Soccer", footballFormat: null };
     case "football":
-      return { sport: "football", gender: null, label: "Football" };
+      return {
+        sport: "football",
+        gender: null,
+        label: "Football",
+        footballFormat: resolveFootballFormatForSport("football", footballFormatValue, {
+          allowBlank: true,
+        }),
+      };
     case "baseball":
-      return { sport: "baseball", gender: null, label: "Baseball" };
+      return { sport: "baseball", gender: null, label: "Baseball", footballFormat: null };
     case "softball":
-      return { sport: "softball", gender: null, label: "Softball" };
+      return { sport: "softball", gender: null, label: "Softball", footballFormat: null };
     default:
-      return { sport: null, gender: null, label: "" };
+      return { sport: null, gender: null, label: "", footballFormat: null };
   }
 }
 
 async function handleInspect() {
   if (!selectedFile || !sportSelection.value) {
     alert("Choose a sport and file first.");
+    return;
+  }
+
+  if (getValidatedFootballFormat(sportSelection.value, footballFormatSelection) === false) {
     return;
   }
 
@@ -672,7 +777,10 @@ async function handleInspect() {
 }
 
 function renderReview(inspection) {
-  const sportMeta = resolveSportSelection(sportSelection.value);
+  const sportMeta = resolveSportSelection(
+    sportSelection.value,
+    footballFormatSelection?.value || ""
+  );
 
   reviewMetaGrid.innerHTML = `
     <div class="meta-chip">
@@ -691,6 +799,16 @@ function renderReview(inspection) {
       <span class="label">Rows found</span>
       <span class="value">${inspection.dataRows.length}</span>
     </div>
+    ${
+      sportMeta.footballFormat
+        ? `
+    <div class="meta-chip">
+      <span class="label">Football Format</span>
+      <span class="value">${footballFormatLabel(sportMeta.footballFormat)}</span>
+    </div>
+    `
+        : ""
+    }
   `;
 
   confidenceLabel.textContent = `${inspection.confidence}%`;
@@ -801,12 +919,18 @@ function buildFinalPreview() {
     return;
   }
 
-  const sportMeta = resolveSportSelection(sportSelection.value);
+  const footballFormat = getValidatedFootballFormat(sportSelection.value, footballFormatSelection);
+  if (footballFormat === false) {
+    return;
+  }
+
+  const sportMeta = resolveSportSelection(sportSelection.value, footballFormat);
 
   try {
     finalizedData = finalizeSpreadsheetParse(inspectionResult, collectMappingSelections(), {
       sport: sportMeta.sport,
       gender: sportMeta.gender,
+      footballFormat: sportMeta.footballFormat,
       seasonHint: seasonHint.value.trim(),
       defaultSchoolId: currentUser.school_id || null,
       defaultSchoolName: currentUser.school_name || null,
@@ -837,6 +961,8 @@ function buildFinalPreview() {
 }
 
 function renderFinalPreview(data, sportLabel) {
+  const footballFormat = data?.game?.football_format || data?.parse_review?.football_format || null;
+
   finalSummary.innerHTML = `
     <div class="summary-row">
       <strong>Submission type</strong>
@@ -858,6 +984,7 @@ function renderFinalPreview(data, sportLabel) {
       <strong>Sport</strong>
       <span>${sportLabel}</span>
     </div>
+    ${buildFootballFormatSummaryRow(footballFormat)}
     <div class="summary-row">
       <strong>Players parsed</strong>
       <span>${data.players.length}</span>
@@ -914,6 +1041,12 @@ async function submitSpreadsheet() {
       source: "school_dashboard",
       selectedSportValue: sportSelection.value,
       seasonHint: seasonHint.value.trim() || null,
+      footballFormat:
+        finalizedData?.game?.football_format ||
+        resolveFootballFormatForSport(finalizedData?.game?.sport || sportSelection.value, footballFormatSelection?.value || "", {
+          allowBlank: true,
+        }) ||
+        null,
     };
 
     const formatted = await formatForSupabase(finalizedData, metadata);
@@ -940,8 +1073,12 @@ function hardReset() {
   finalizedData = null;
   spreadsheetInput.value = "";
   sportSelection.value = "";
+  if (footballFormatSelection) {
+    footballFormatSelection.value = "";
+  }
   seasonHint.value = "";
   renderSelectedFile();
+  syncFootballFormatField(sportSelection, footballFormatField);
   updateInspectState();
   reviewCard.classList.add("hidden");
   finalPreviewCard.classList.add("hidden");
@@ -1070,12 +1207,20 @@ function handleMode2Parse() {
     return;
   }
 
+  const footballFormat = getValidatedFootballFormat(
+    boxSportSelection.value,
+    boxFootballFormatSelection
+  );
+  if (footballFormat === false) {
+    return;
+  }
+
   parseBoxScoreBtn.disabled = true;
   parseBoxScoreBtn.textContent = "Parsing...";
   boxStatus.textContent = "Parsing game text...";
 
   try {
-    mode2ParsedData = parseBoxScoreText(text, sportValue);
+    mode2ParsedData = parseBoxScoreText(text, sportValue, { footballFormat });
     const confidence = Number(mode2ParsedData.confidence || 0);
     const routeLabel = confidence >= 80 ? "Ready for import" : "Manual review needed";
     mode2ParsedData.parse_review = {
@@ -1083,6 +1228,7 @@ function handleMode2Parse() {
       source_type: "text_box_score",
       upload_lane: "boxscore_text",
       export_source: mode2SourceSelection?.value || "other",
+      football_format: mode2ParsedData?.game?.football_format || footballFormat || null,
       route_label: routeLabel,
       duplicate_risk: mode2ParsedData?.game?.date ? "medium" : "low",
     };
@@ -1113,6 +1259,14 @@ async function handleMode2FileProcess() {
 
   if (!mode2SelectedFile) {
     alert("Upload an export file first.");
+    return;
+  }
+
+  const footballFormat = getValidatedFootballFormat(
+    boxSportSelection.value,
+    boxFootballFormatSelection
+  );
+  if (footballFormat === false) {
     return;
   }
 
@@ -1149,11 +1303,12 @@ async function handleMode2FileProcess() {
       );
     }
 
-    const sportMeta = resolveMode2Sport(boxSportSelection.value);
+    const sportMeta = resolveMode2Sport(boxSportSelection.value, footballFormat);
 
     mode2ParsedData = finalizeSpreadsheetParse(inspection, mappingSelections, {
       sport: sportMeta.sport,
       gender: sportMeta.gender,
+      footballFormat: sportMeta.footballFormat,
       seasonHint: mode2SeasonHint?.value.trim() || "",
       defaultSchoolId: currentUser.school_id || null,
       defaultSchoolName: currentUser.school_name || null,
@@ -1171,6 +1326,7 @@ async function handleMode2FileProcess() {
       upload_lane: "export_file",
       export_source: mode2SourceSelection?.value || "other",
       file_name: mode2SelectedFile.name,
+      football_format: sportMeta.footballFormat,
       saved_mapping_hits: appliedSavedMappings,
       unresolved_headers: unresolvedHeaders,
       route_label: routeLabel,
@@ -1358,6 +1514,7 @@ function renderMode2Preview(data) {
   const game = data.game || {};
   const players = data.players || [];
   const parseReview = data.parse_review || {};
+  const footballFormat = game.football_format || parseReview.football_format || null;
 
   const uploadLane = parseReview.upload_lane || "boxscore_text";
   const sourceValue = parseReview.export_source || mode2SourceSelection?.value || "other";
@@ -1400,8 +1557,9 @@ function renderMode2Preview(data) {
     </div>
     <div class="summary-row">
       <strong>Sport</strong>
-      <span>${game.sport || "Not detected"} ${game.gender ? `(${game.gender})` : ""}</span>
+      <span>${formatSportSummaryLabel(game.sport, game.gender, footballFormat)}</span>
     </div>
+    ${buildFootballFormatSummaryRow(footballFormat)}
     <div class="summary-row">
       <strong>Game</strong>
       <span>${gameLine}</span>
@@ -1469,7 +1627,10 @@ async function submitMode2BoxScore() {
   try {
     const lane = mode2LaneSelection?.value || "boxscore_text";
     const isExportLane = lane === "export_file";
-    const sportMeta = resolveMode2Sport(boxSportSelection.value);
+    const sportMeta = resolveMode2Sport(
+      boxSportSelection.value,
+      boxFootballFormatSelection?.value || ""
+    );
     const sourceValue = mode2SourceSelection?.value || "other";
 
     const metadata = {
@@ -1486,6 +1647,10 @@ async function submitMode2BoxScore() {
       gender: sportMeta.gender,
       selectedSportValue: boxSportSelection.value,
       seasonHint: mode2SeasonHint?.value.trim() || null,
+      footballFormat:
+        mode2ParsedData?.game?.football_format ||
+        sportMeta.footballFormat ||
+        null,
     };
 
     const formatted = await formatForSupabase(mode2ParsedData, metadata);
@@ -1500,6 +1665,9 @@ async function submitMode2BoxScore() {
 
     boxScoreInput.value = "";
     boxSportSelection.value = "";
+    if (boxFootballFormatSelection) {
+      boxFootballFormatSelection.value = "";
+    }
 
     if (mode2SourceSelection) {
       mode2SourceSelection.value = "other";
@@ -1521,6 +1689,7 @@ async function submitMode2BoxScore() {
       mode2LaneSelection.value = "boxscore_text";
     }
 
+    syncFootballFormatField(boxSportSelection, boxFootballFormatField);
     handleMode2LaneChange();
   } catch (error) {
     console.error(error);
@@ -1601,7 +1770,15 @@ async function handlePdfInspect() {
   pdfStatus.textContent = "Inspecting PDF...";
 
   try {
-    const sportMeta = resolveMode2Sport(pdfSportSelection.value);
+    const footballFormat = getValidatedFootballFormat(
+      pdfSportSelection.value,
+      pdfFootballFormatSelection
+    );
+    if (footballFormat === false) {
+      return;
+    }
+
+    const sportMeta = resolveMode2Sport(pdfSportSelection.value, footballFormat);
     const seasonValue = pdfSeasonHint?.value.trim() || "";
     const pdfType = await detectPdfType(pdfSelectedFile);
 
@@ -1635,12 +1812,14 @@ async function handlePdfInspect() {
           date: null,
           sport: sportMeta.sport,
           gender: sportMeta.gender,
+          football_format: sportMeta.footballFormat,
           location: null,
           homeTeam: null,
           awayTeam: null,
           homeScore: null,
           awayScore: null,
         },
+        football_format: sportMeta.footballFormat,
         players: [],
         warnings,
         parse_review: {
@@ -1648,6 +1827,7 @@ async function handlePdfInspect() {
           upload_lane: "pdf_review",
           route_label: routeLabel,
           duplicate_risk: duplicateRisk,
+          football_format: sportMeta.footballFormat,
           pdf_type: pdfType,
           file_name: pdfSelectedFile.name,
           file_size_bytes: pdfSelectedFile.size,
@@ -1661,6 +1841,7 @@ async function handlePdfInspect() {
         source: "school_dashboard_pdf",
         selectedSportValue: pdfSportSelection.value,
         seasonHint: seasonValue || null,
+        footballFormat: sportMeta.footballFormat,
       },
     };
 
@@ -1679,8 +1860,13 @@ async function handlePdfInspect() {
       </div>
       <div class="summary-row">
         <strong>Sport</strong>
-        <span>${sportMeta.sport || "Not selected"} ${sportMeta.gender ? `(${sportMeta.gender})` : ""}</span>
+        <span>${formatSportSummaryLabel(
+          sportMeta.sport,
+          sportMeta.gender,
+          sportMeta.footballFormat
+        )}</span>
       </div>
+      ${buildFootballFormatSummaryRow(sportMeta.footballFormat)}
       <div class="summary-row">
         <strong>Season hint</strong>
         <span>${seasonValue || "Not provided"}</span>
@@ -1730,6 +1916,8 @@ async function submitPdfUpload() {
       renderPdfSelectedFile();
       if (pdfSeasonHint) pdfSeasonHint.value = "";
       if (pdfSportSelection) pdfSportSelection.value = "";
+      if (pdfFootballFormatSelection) pdfFootballFormatSelection.value = "";
+      syncFootballFormatField(pdfSportSelection, pdfFootballFormatField);
     },
   });
 }
@@ -1787,25 +1975,31 @@ async function submitDraftPayload({
   }
 }
 
-function resolveMode2Sport(value) {
+function resolveMode2Sport(value, footballFormatValue = "") {
   switch (value) {
     case "boys_basketball":
-      return { sport: "basketball", gender: "boys" };
+      return { sport: "basketball", gender: "boys", footballFormat: null };
     case "girls_basketball":
-      return { sport: "basketball", gender: "girls" };
+      return { sport: "basketball", gender: "girls", footballFormat: null };
     case "girls_volleyball":
-      return { sport: "volleyball", gender: "girls" };
+      return { sport: "volleyball", gender: "girls", footballFormat: null };
     case "boys_soccer":
-      return { sport: "soccer", gender: "boys" };
+      return { sport: "soccer", gender: "boys", footballFormat: null };
     case "girls_soccer":
-      return { sport: "soccer", gender: "girls" };
+      return { sport: "soccer", gender: "girls", footballFormat: null };
     case "football":
-      return { sport: "football", gender: null };
+      return {
+        sport: "football",
+        gender: null,
+        footballFormat: resolveFootballFormatForSport("football", footballFormatValue, {
+          allowBlank: true,
+        }),
+      };
     case "baseball":
-      return { sport: "baseball", gender: null };
+      return { sport: "baseball", gender: null, footballFormat: null };
     case "softball":
-      return { sport: "softball", gender: null };
+      return { sport: "softball", gender: null, footballFormat: null };
     default:
-      return { sport: null, gender: null };
+      return { sport: null, gender: null, footballFormat: null };
   }
 }
