@@ -112,16 +112,16 @@ const sportColumns = {
     { key: 'slg', label: 'SLG', type: 'number', field: 'SLG' }
   ],
   baseball_pitching: [
-    { key: 'gp', label: 'GP', type: 'number', field: 'GP' },
+    { key: 'app', label: 'APP', type: 'number', field: 'APP' },
     { key: 'w', label: 'W', type: 'number', field: 'W' },
     { key: 'l', label: 'L', type: 'number', field: 'L' },
     { key: 'era', label: 'ERA', type: 'number', field: 'ERA' },
     { key: 'ip', label: 'IP', type: 'number', field: 'IP' },
-    { key: 'h', label: 'H', type: 'number', field: 'H' },
-    { key: 'r', label: 'R', type: 'number', field: 'R' },
+    { key: 'ha', label: 'H', type: 'number', field: 'HA' },
+    { key: 'ra', label: 'R', type: 'number', field: 'RA' },
     { key: 'er', label: 'ER', type: 'number', field: 'ER' },
-    { key: 'bb', label: 'BB', type: 'number', field: 'BB' },
-    { key: 'so', label: 'SO', type: 'number', field: 'SO' },
+    { key: 'bba', label: 'BB', type: 'number', field: 'BBA' },
+    { key: 'sop', label: 'SO', type: 'number', field: 'SOP' },
     { key: 'sv', label: 'SV', type: 'number', field: 'SV' },
     { key: 'whip', label: 'WHIP', type: 'number', field: 'WHIP' }
   ],
@@ -142,16 +142,16 @@ const sportColumns = {
     { key: 'slg', label: 'SLG', type: 'number', field: 'SLG' }
   ],
   softball_pitching: [
-    { key: 'gp', label: 'GP', type: 'number', field: 'GP' },
+    { key: 'app', label: 'APP', type: 'number', field: 'APP' },
     { key: 'w', label: 'W', type: 'number', field: 'W' },
     { key: 'l', label: 'L', type: 'number', field: 'L' },
     { key: 'era', label: 'ERA', type: 'number', field: 'ERA' },
     { key: 'ip', label: 'IP', type: 'number', field: 'IP' },
-    { key: 'h', label: 'H', type: 'number', field: 'H' },
-    { key: 'r', label: 'R', type: 'number', field: 'R' },
+    { key: 'ha', label: 'H', type: 'number', field: 'HA' },
+    { key: 'ra', label: 'R', type: 'number', field: 'RA' },
     { key: 'er', label: 'ER', type: 'number', field: 'ER' },
-    { key: 'bb', label: 'BB', type: 'number', field: 'BB' },
-    { key: 'so', label: 'SO', type: 'number', field: 'SO' },
+    { key: 'bba', label: 'BB', type: 'number', field: 'BBA' },
+    { key: 'sop', label: 'SO', type: 'number', field: 'SOP' },
     { key: 'sv', label: 'SV', type: 'number', field: 'SV' },
     { key: 'whip', label: 'WHIP', type: 'number', field: 'WHIP' }
   ]
@@ -179,7 +179,7 @@ const basketballAdvancedColumns = [
 ];
 
 const baseballSoftballBattingCoreKeys = ['gp', 'avg', 'hr', 'rbi'];
-const baseballSoftballPitchingCoreKeys = ['gp', 'w', 'l', 'era', 'ip', 'h', 'r', 'bb', 'so'];
+const baseballSoftballPitchingCoreKeys = ['app', 'w', 'l', 'era', 'ip', 'ha', 'ra', 'bba', 'sop'];
 const footballCoreKeysByCategory = {
   passing: ['gp', 'comp', 'att', 'yds', 'ypg', 'td', 'int'],
   rushing: ['gp', 'att', 'yds', 'ypg', 'td', 'fum'],
@@ -477,7 +477,9 @@ const statAliases = {
   AVG: ['BA', 'BAVG', 'BATTINGAVERAGE', 'BATTINGAVG'],
   AB: ['ATBAT', 'ATBATS'],
   H: ['HITS'],
+  HA: ['HALLOWED', 'HITSALLOWED'],
   GP: ['GAMESPLAYED'],
+  APP: ['APPEARANCES'],
   PTS: ['POINTS'],
   REB: ['REBOUNDS', 'TRB', 'TOTREB'],
   AST: ['ASSISTS'],
@@ -486,6 +488,9 @@ const statAliases = {
   COMP: ['COMPLETIONS'],
   ATT: ['ATTEMPTS'],
   YDS: ['YARDS'],
+  RA: ['RUNSALLOWED'],
+  BBA: ['WALKSALLOWED', 'BBALLOWED'],
+  SOP: ['STRIKEOUTSPITCHED', 'KP', 'SOALLOWED'],
   REC: ['RECEPTIONS'],
   'Rec YDS': ['RECYDS', 'RECEIVINGYARDS'],
   'Rec YPG': ['RECYPG', 'RECEIVINGYPG'],

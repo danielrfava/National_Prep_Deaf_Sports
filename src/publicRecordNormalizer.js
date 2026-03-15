@@ -1,3 +1,4 @@
+import { normalizeHistoricalDiamondRows } from "./baseballSoftballHistoricalNormalizer.js";
 import { normalizeRecordSportContext, resolveSportContext } from "./sportContext.js";
 import { normalizeHistoricalVolleyballRows } from "./volleyballHistoricalNormalizer.js";
 
@@ -18,6 +19,5 @@ export function normalizePublicRecordRows(rows = []) {
     })
     .filter(Boolean);
 
-  return normalizeHistoricalVolleyballRows(normalizedRows);
+  return normalizeHistoricalDiamondRows(normalizeHistoricalVolleyballRows(normalizedRows));
 }
-

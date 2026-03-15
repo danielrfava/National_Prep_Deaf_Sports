@@ -1,4 +1,5 @@
 import { supabase } from "../supabaseClient.js";
+import { runBaseballSoftballAudit } from "./baseballSoftballAudit.js";
 import { runBasketballAudit } from "./basketballAudit.js";
 import {
   STAFF_ROLE_OPTIONS,
@@ -33,6 +34,8 @@ let isDashboardLoading = false;
 
 const elements = {
   adminIdentityChip: document.getElementById("adminIdentityChip"),
+  baseballSoftballAuditContainer: document.getElementById("baseballSoftballAuditContainer"),
+  baseballSoftballAuditStatus: document.getElementById("baseballSoftballAuditStatus"),
   basketballAuditContainer: document.getElementById("basketballAuditContainer"),
   basketballAuditStatus: document.getElementById("basketballAuditStatus"),
   approvedTodayCount: document.getElementById("approvedTodayCount"),
@@ -108,11 +111,12 @@ async function loadDashboard() {
   renderLoadingState();
 
   try {
-    const [statsResult, usersResult, submissionsResult, basketballAuditResult] = await Promise.allSettled([
+    const [statsResult, usersResult, submissionsResult, basketballAuditResult, baseballSoftballAuditResult] = await Promise.allSettled([
       loadStats(),
       fetchPendingUsers(),
       fetchPendingSubmissions(),
       loadBasketballAuditPanel(),
+      loadBaseballSoftballAuditPanel(),
     ]);
 
     if (usersResult.status === "fulfilled") {
@@ -166,6 +170,20 @@ async function loadDashboard() {
         basketballAuditResult.reason
       );
     }
+
+    if (baseballSoftballAuditResult.status === "fulfilled") {
+      renderBaseballSoftballAudit(baseballSoftballAuditResult.value);
+    } else {
+      console.error("Baseball/softball audit load failed:", baseballSoftballAuditResult.reason);
+      if (elements.baseballSoftballAuditStatus) {
+        elements.baseballSoftballAuditStatus.textContent = "Audit unavailable";
+      }
+      renderPanelError(
+        elements.baseballSoftballAuditContainer,
+        "baseball and softball audit",
+        baseballSoftballAuditResult.reason
+      );
+    }
   } finally {
     isDashboardLoading = false;
     setDashboardRefreshState(false);
@@ -204,10 +222,21 @@ function renderLoadingState() {
   if (elements.basketballAuditStatus) {
     elements.basketballAuditStatus.textContent = "Audit loading";
   }
+  if (elements.baseballSoftballAuditContainer) {
+    elements.baseballSoftballAuditContainer.innerHTML =
+      '<div class="empty-state">Loading baseball and softball audit...</div>';
+  }
+  if (elements.baseballSoftballAuditStatus) {
+    elements.baseballSoftballAuditStatus.textContent = "Audit loading";
+  }
 }
 
 async function loadBasketballAuditPanel() {
   return runBasketballAudit();
+}
+
+async function loadBaseballSoftballAuditPanel() {
+  return runBaseballSoftballAudit();
 }
 
 function renderBasketballAudit(audit) {
@@ -266,6 +295,71 @@ function renderBasketballAudit(audit) {
     </div>
     `
         : '<div class="empty-state" style="margin-top: 16px;">No basketball sport-label drift detected in raw rows.</div>'
+    }
+  `;
+}
+
+function renderBaseballSoftballAudit(audit) {
+  if (!elements.baseballSoftballAuditContainer) {
+    return;
+  }
+
+  if (elements.baseballSoftballAuditStatus) {
+    elements.baseballSoftballAuditStatus.textContent = "Audit loaded";
+  }
+
+  const counts = audit?.counts || {};
+  const issues = audit?.issues || {};
+  const driftExamples = Array.isArray(audit?.driftExamples) ? audit.driftExamples : [];
+
+  elements.baseballSoftballAuditContainer.innerHTML = `
+    <div class="output-grid">
+      ${renderDetailCard("Historical Raw Rows", String(counts.rawHistorical?.total || 0))}
+      ${renderDetailCard("Merged Player-Seasons", String(counts.mergedPlayerSeasons?.total || 0))}
+      ${renderDetailCard("Public Season Rows", String(counts.publicRendered?.total || 0))}
+      ${renderDetailCard("Baseball Historical Rows", String(counts.rawHistorical?.baseball || 0))}
+      ${renderDetailCard("Softball Historical Rows", String(counts.rawHistorical?.softball || 0))}
+      ${renderDetailCard("Visible Raw Rows", String(counts.rawVisible?.total || 0))}
+    </div>
+    <div class="output-grid" style="margin-top: 14px;">
+      ${renderDetailCard("Duplicate Family Payloads", String(issues.duplicateFamilyPayloadGroups || 0))}
+      ${renderDetailCard("Zero-Only Junk Rows", String(issues.zeroOnlyRows || 0))}
+      ${renderDetailCard("Unknown Family Rows", String(issues.unknownFamilyRows || 0))}
+      ${renderDetailCard("Impossible Batting Rows", String(issues.impossibleBattingRows || 0))}
+      ${renderDetailCard("Impossible Pitching Rows", String(issues.impossiblePitchingRows || 0))}
+      ${renderDetailCard("Malformed Payloads", String(issues.malformedRows || 0))}
+    </div>
+    <div class="output-grid" style="margin-top: 14px;">
+      ${renderDetailCard("Blank Athlete Names", String(issues.blankAthleteNames || 0))}
+      ${renderDetailCard("School Mismatches", String(issues.schoolMismatches || 0))}
+      ${renderDetailCard("Sport Drift Rows", String(issues.sportDriftRows || 0))}
+      ${renderDetailCard("Baseball Merged Rows", String(counts.mergedPlayerSeasons?.baseball || 0))}
+      ${renderDetailCard("Softball Merged Rows", String(counts.mergedPlayerSeasons?.softball || 0))}
+      ${renderDetailCard("Baseball Public Rows", String(counts.publicRendered?.baseball || 0))}
+    </div>
+    <div class="output-grid" style="margin-top: 14px;">
+      ${renderDetailCard("Softball Public Rows", String(counts.publicRendered?.softball || 0))}
+      ${renderDetailCard("Baseball Visible Raw", String(counts.rawVisible?.baseball || 0))}
+      ${renderDetailCard("Softball Visible Raw", String(counts.rawVisible?.softball || 0))}
+    </div>
+    ${
+      driftExamples.length
+        ? `
+    <div class="destination-list" style="margin-top: 16px;">
+      ${driftExamples
+        .map(
+          (example) => `<div class="destination-row">
+            <div>
+              <p class="destination-name">${escapeHtml(example.label)}</p>
+              <p class="destination-meta">Non-canonical baseball/softball sport label detected in raw rows.</p>
+            </div>
+            <span class="destination-count">${escapeHtml(String(example.count))}</span>
+          </div>`
+        )
+        .join("")}
+    </div>
+    `
+        : '<div class="empty-state" style="margin-top: 16px;">No baseball or softball sport-label drift detected in raw rows.</div>'
     }
   `;
 }
