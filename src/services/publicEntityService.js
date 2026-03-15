@@ -1,4 +1,5 @@
 import { supabase } from "../supabaseClient.js";
+import { normalizeRecordSportContext, resolveSportContext } from "../sportContext.js";
 
 const SEARCH_ROW_SELECT_BASE = "id, school_id, school, sport, season, stat_row";
 const SEARCH_ROW_SELECT = "id, school_id, school, sport, sport_variant, season, stat_row";
@@ -56,7 +57,7 @@ function isMissingRelationError(error, relationName) {
 async function runSearchRowsQuery(queryFactory) {
   const primaryResponse = await queryFactory(SEARCH_ROW_SELECT);
   if (!primaryResponse.error) {
-    return primaryResponse.data || [];
+    return normalizePublicEntityRows(primaryResponse.data || []);
   }
 
   if (!isMissingRelationError(primaryResponse.error, "sport_variant")) {
@@ -68,10 +69,25 @@ async function runSearchRowsQuery(queryFactory) {
     throw fallbackResponse.error;
   }
 
-  return (fallbackResponse.data || []).map((row) => ({
-    ...row,
-    sport_variant: null,
-  }));
+  return normalizePublicEntityRows(
+    (fallbackResponse.data || []).map((row) => ({
+      ...row,
+      sport_variant: null,
+    }))
+  );
+}
+
+function normalizePublicEntityRows(rows) {
+  return (rows || [])
+    .map((row) => {
+      const context = resolveSportContext(row?.sport, row?.gender);
+      if (context.isBasketball && !context.isVarsity) {
+        return null;
+      }
+
+      return normalizeRecordSportContext(row);
+    })
+    .filter(Boolean);
 }
 
 function normalizeText(value) {

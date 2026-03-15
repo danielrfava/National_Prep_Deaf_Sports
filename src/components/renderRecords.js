@@ -1,4 +1,5 @@
 import { footballFormatLabel, isFootballSportValue } from "../footballFormat.js";
+import { buildSportContextKey, normalizeRecordSportContext, resolveSportContext } from "../sportContext.js";
 
 let currentSort = { column: null, ascending: true };
 let currentRecords = [];
@@ -599,6 +600,7 @@ function aggregateCareerStats(records, maxSeasons = Infinity) {
   const columns = getDisplayColumns(records[0]?.sport || 'basketball', currentStatCategory);
   
   records.forEach(record => {
+    const normalizedRecord = normalizeRecordSportContext(record);
     const rawName = record.stat_row?.["Athlete Name"];
     if (!rawName) return;
     
@@ -606,7 +608,7 @@ function aggregateCareerStats(records, maxSeasons = Infinity) {
     // e.g., "A. Senics(Fr)" -> "A. Senics"
     const cleanName = rawName.replace(/\((Fr|So|Jr|Sr)\)/i, '').trim();
     
-    const key = `${cleanName}|${record.school}|${record.sport}`; // Key by name + school + sport
+    const key = `${cleanName}|${record.school}|${buildSportContextKey(record.sport, record.gender)}`; // Key by name + school + canonical sport context
     if (!playerMap.has(key)) {
       const statTotals = {};
       columns.forEach(col => {
@@ -616,7 +618,9 @@ function aggregateCareerStats(records, maxSeasons = Infinity) {
       playerMap.set(key, {
         name: cleanName,
         school: record.school,
-        sport: record.sport,
+        sport: normalizedRecord.sport,
+        gender: normalizedRecord.gender,
+        sportDisplay: normalizedRecord.sport_display,
         seasons: new Set(),
         seasonData: new Map(), // Track data per season to avoid duplicates
         totalGP: 0,
@@ -790,6 +794,8 @@ columns.forEach(col => {
       stat_row: careerStats,
       school: getSchoolAbbrev(player.school), // Use abbreviation
       sport: player.sport,
+      gender: player.gender,
+      sport_display: player.sportDisplay,
       season: seasonDisplay
     };
   });
@@ -799,10 +805,11 @@ function consolidateSeasonRows(records) {
   const seasonMap = new Map();
 
 records.forEach(record => {
+  const normalizedRecord = normalizeRecordSportContext(record);
   const rawName = record.stat_row?.["Athlete Name"] || "";
   const name = rawName.replace(/\((Fr|So|Jr|Sr)\)/i, '').trim();
   const school = (record.school || "").trim();
-  const sport = (record.sport || "").trim();
+  const sport = buildSportContextKey(record.sport, record.gender);
   const season = (record.season || "").trim();
 
   const key = `${name}|${school}|${sport}|${season}`;
@@ -810,6 +817,7 @@ records.forEach(record => {
   if (!seasonMap.has(key)) {
     seasonMap.set(key, {
       ...record,
+      ...normalizedRecord,
       stat_row: { ...record.stat_row }
     });
   } else {
@@ -824,6 +832,36 @@ records.forEach(record => {
 });
 
   return Array.from(seasonMap.values());
+}
+
+function buildPreparedRecords(records, statsView = 'season') {
+  let displayRecords = [...(records || [])]
+    .filter((record) => {
+      const context = resolveSportContext(record?.sport, record?.gender);
+      return !(context.isBasketball && !context.isVarsity);
+    })
+    .map((record) => normalizeRecordSportContext(record));
+  displayRecords = consolidateSeasonRows(displayRecords);
+
+  if (statsView === 'career-standard') {
+    return aggregateCareerStats(displayRecords, 4);
+  }
+
+  if (statsView === 'career-extended') {
+    return aggregateCareerStats(displayRecords, Infinity);
+  }
+
+  return displayRecords;
+}
+
+export function calculateRenderedRecordSummary(records = [], { statsView = 'season' } = {}) {
+  const sourceRows = Array.isArray(records) ? records : [];
+  const displayRecords = buildPreparedRecords(sourceRows, statsView);
+
+  return {
+    renderedCount: displayRecords.length,
+    sourceCount: sourceRows.length,
+  };
 }
 
 export function setStatsView(view) {
@@ -857,11 +895,12 @@ export function renderRecords(container, statsView = 'season', filters = {}, rec
   }
 
 if (Array.isArray(records)) {
-  rawRecords = records;
+  rawRecords = records.map((record) => normalizeRecordSportContext(record));
   currentPage = 1;
 }
 
 function buildSportDisplayLabel(record) {
+  const context = resolveSportContext(record?.sport, record?.gender);
   const sport = record?.sport || "";
   const sportVariant = record?.sport_variant || "";
 
@@ -869,13 +908,12 @@ function buildSportDisplayLabel(record) {
     return `Football (${footballFormatLabel(sportVariant)})`;
   }
 
-  return sport;
+  return record?.sport_display || context.competitionLabel || sport;
 }
 
-let displayRecords = [...rawRecords];
+let displayRecords = buildPreparedRecords(rawRecords, statsView);
 
 // 🔥 Consolidate multiple stat rows per season first
-displayRecords = consolidateSeasonRows(displayRecords);
 
 // 🔥 Detect latest season in dataset (works for all views)
 const latestSeason = displayRecords
@@ -883,12 +921,6 @@ const latestSeason = displayRecords
   .sort()
   .pop();
 
-if (statsView === 'career-standard') {
-  displayRecords = aggregateCareerStats(displayRecords, 4);
-
-} else if (statsView === 'career-extended') {
-  displayRecords = aggregateCareerStats(displayRecords, Infinity);
-}
 currentRecords = [...displayRecords];
 
 if (!currentRecords.length) {

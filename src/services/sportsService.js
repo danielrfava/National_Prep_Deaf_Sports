@@ -1,5 +1,6 @@
 import { supabase } from "../supabaseClient.js";
 import { normalizeFootballFormat } from "../footballFormat.js";
+import { normalizeRecordSportContext, normalizeSportKey, resolveSportContext } from "../sportContext.js";
 
 const RECORD_SELECT_BASE = "id, school_id, school, sport, season, stat_row";
 const RECORD_SELECT = "id, school_id, school, sport, sport_variant, season, stat_row";
@@ -48,6 +49,28 @@ function buildSearchFilter(query) {
     `stat_row->>player.ilike.${like}`,
     `stat_row->>name.ilike.${like}`,
   ].join(",");
+}
+
+function applySportFilter(request, sportKey) {
+  const normalizedSport = normalizeSportKey(sportKey);
+  if (!normalizedSport) {
+    return request;
+  }
+
+  return request.ilike("sport", `%${normalizedSport}%`);
+}
+
+function normalizePublicRecordRows(rows) {
+  return (rows || [])
+    .map((row) => {
+      const context = resolveSportContext(row?.sport, row?.gender);
+      if (context.isBasketball && !context.isVarsity) {
+        return null;
+      }
+
+      return normalizeRecordSportContext(row);
+    })
+    .filter(Boolean);
 }
 
 function dedupeVisibleSchools(rows) {
@@ -175,7 +198,7 @@ async function fetchVisibleSports() {
 
   if (!response.error) {
     visibleSportsCache = Array.from(
-      new Set((response.data || []).map((row) => normalizeText(row.sport)).filter(Boolean))
+      new Set((response.data || []).map((row) => normalizeSportKey(row.sport)).filter(Boolean))
     );
     return visibleSportsCache;
   }
@@ -190,7 +213,7 @@ async function fetchVisibleSports() {
   }
 
   visibleSportsCache = Array.from(
-    new Set((fallback.data || []).map((row) => normalizeText(row.sport)).filter(Boolean))
+    new Set((fallback.data || []).map((row) => normalizeSportKey(row.sport)).filter(Boolean))
   ).sort((left, right) => left.localeCompare(right));
 
   return visibleSportsCache;
@@ -310,7 +333,7 @@ export async function fetchSportsRecords(query = "", filters = {}) {
     }
 
     if (normalizedSport) {
-      request = request.eq("sport", normalizedSport);
+      request = applySportFilter(request, normalizedSport);
     }
 
     if (normalizedSeason) {
@@ -348,16 +371,18 @@ export async function fetchSportsRecords(query = "", filters = {}) {
         throw new Error(fallbackResponse.error.message);
       }
 
-      return (fallbackResponse.data || []).map((row) => ({
-        ...row,
-        sport_variant: null,
-      }));
+      return normalizePublicRecordRows(
+        (fallbackResponse.data || []).map((row) => ({
+          ...row,
+          sport_variant: null,
+        }))
+      );
     }
 
     throw new Error(error.message);
   }
 
-  return data || [];
+  return normalizePublicRecordRows(data || []);
 }
 
 export async function fetchSportsList() {

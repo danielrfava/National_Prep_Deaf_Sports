@@ -1,4 +1,5 @@
 import { supabase } from "../supabaseClient.js";
+import { runBasketballAudit } from "./basketballAudit.js";
 import {
   STAFF_ROLE_OPTIONS,
   fetchCurrentSessionProfile,
@@ -32,6 +33,8 @@ let isDashboardLoading = false;
 
 const elements = {
   adminIdentityChip: document.getElementById("adminIdentityChip"),
+  basketballAuditContainer: document.getElementById("basketballAuditContainer"),
+  basketballAuditStatus: document.getElementById("basketballAuditStatus"),
   approvedTodayCount: document.getElementById("approvedTodayCount"),
   cancelRejectBtn: document.getElementById("cancelRejectBtn"),
   confirmRejectBtn: document.querySelector('#rejectForm button[type="submit"]'),
@@ -105,10 +108,11 @@ async function loadDashboard() {
   renderLoadingState();
 
   try {
-    const [statsResult, usersResult, submissionsResult] = await Promise.allSettled([
+    const [statsResult, usersResult, submissionsResult, basketballAuditResult] = await Promise.allSettled([
       loadStats(),
       fetchPendingUsers(),
       fetchPendingSubmissions(),
+      loadBasketballAuditPanel(),
     ]);
 
     if (usersResult.status === "fulfilled") {
@@ -148,6 +152,20 @@ async function loadDashboard() {
         totalSubmissionsCount: 0,
       });
     }
+
+    if (basketballAuditResult.status === "fulfilled") {
+      renderBasketballAudit(basketballAuditResult.value);
+    } else {
+      console.error("Basketball audit load failed:", basketballAuditResult.reason);
+      if (elements.basketballAuditStatus) {
+        elements.basketballAuditStatus.textContent = "Audit unavailable";
+      }
+      renderPanelError(
+        elements.basketballAuditContainer,
+        "basketball audit",
+        basketballAuditResult.reason
+      );
+    }
   } finally {
     isDashboardLoading = false;
     setDashboardRefreshState(false);
@@ -179,6 +197,77 @@ function renderLoadingState() {
     '<div class="empty-state">Loading school access requests...</div>';
   elements.submissionsContainer.innerHTML =
     '<div class="empty-state">Loading submissions...</div>';
+  if (elements.basketballAuditContainer) {
+    elements.basketballAuditContainer.innerHTML =
+      '<div class="empty-state">Loading basketball audit...</div>';
+  }
+  if (elements.basketballAuditStatus) {
+    elements.basketballAuditStatus.textContent = "Audit loading";
+  }
+}
+
+async function loadBasketballAuditPanel() {
+  return runBasketballAudit();
+}
+
+function renderBasketballAudit(audit) {
+  if (!elements.basketballAuditContainer) {
+    return;
+  }
+
+  if (elements.basketballAuditStatus) {
+    elements.basketballAuditStatus.textContent = "Audit loaded";
+  }
+
+  const counts = audit?.counts || {};
+  const issues = audit?.issues || {};
+  const driftExamples = Array.isArray(audit?.driftExamples) ? audit.driftExamples : [];
+
+  elements.basketballAuditContainer.innerHTML = `
+    <div class="output-grid">
+      ${renderDetailCard("Raw Rows", String(counts.raw?.total || 0))}
+      ${renderDetailCard("Normalized Player Stats", String(counts.normalized?.playerStatsTotal || 0))}
+      ${renderDetailCard("Public Season Rows", String(counts.publicRendered?.total || 0))}
+      ${renderDetailCard("Sub-Varsity Rows", String(issues.subVarsityRows || 0))}
+      ${renderDetailCard("Boys Raw Rows", String(counts.raw?.boys || 0))}
+      ${renderDetailCard("Girls Raw Rows", String(counts.raw?.girls || 0))}
+    </div>
+    <div class="output-grid" style="margin-top: 14px;">
+      ${renderDetailCard("Duplicate Athlete+School+Season", String(issues.duplicateAthleteSeasonRows || 0))}
+      ${renderDetailCard("Repeated Imports", String(issues.repeatedImportRows || 0))}
+      ${renderDetailCard("Blank Athlete Names", String(issues.blankAthleteNames || 0))}
+      ${renderDetailCard("Zero-Only Junk Rows", String(issues.zeroOnlyRows || 0))}
+      ${renderDetailCard("Malformed Payloads", String(issues.malformedRows || 0))}
+      ${renderDetailCard("School Mismatches", String(issues.schoolMismatches || 0))}
+    </div>
+    <div class="output-grid" style="margin-top: 14px;">
+      ${renderDetailCard("Sport Drift Rows", String(issues.sportDriftRows || 0))}
+      ${renderDetailCard("Boys Player Stats", String(counts.normalized?.boysPlayerStats || 0))}
+      ${renderDetailCard("Girls Player Stats", String(counts.normalized?.girlsPlayerStats || 0))}
+      ${renderDetailCard("Boys Public Rows", String(counts.publicRendered?.boys || 0))}
+      ${renderDetailCard("Girls Public Rows", String(counts.publicRendered?.girls || 0))}
+      ${renderDetailCard("Unknown-Gender Raw Rows", String(counts.raw?.unknown || 0))}
+    </div>
+    ${
+      driftExamples.length
+        ? `
+    <div class="destination-list" style="margin-top: 16px;">
+      ${driftExamples
+        .map(
+          (example) => `<div class="destination-row">
+            <div>
+              <p class="destination-name">${escapeHtml(example.label)}</p>
+              <p class="destination-meta">Non-canonical basketball label detected in raw rows.</p>
+            </div>
+            <span class="destination-count">${escapeHtml(String(example.count))}</span>
+          </div>`
+        )
+        .join("")}
+    </div>
+    `
+        : '<div class="empty-state" style="margin-top: 16px;">No basketball sport-label drift detected in raw rows.</div>'
+    }
+  `;
 }
 
 function formatPanelError(error) {

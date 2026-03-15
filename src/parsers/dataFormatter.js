@@ -1,13 +1,16 @@
 import { supabase } from "../supabaseClient.js";
 import { mapSubmissionMethod } from "../portal/schoolAccess.js";
 import { resolveFootballFormatForSport } from "../footballFormat.js";
+import { normalizeGenderKey, normalizeSportKey, resolveSportContext } from "../sportContext.js";
 
 export async function formatForSupabase(parsedData, metadata) {
   console.log("Converting to Supabase JSON format...");
 
   const parsedSport = parsedData?.game?.sport || metadata?.sport || "basketball";
-  const normalizedSport = normalizeSport(parsedSport);
-  const parsedGender = parsedData?.game?.gender ?? metadata?.gender ?? null;
+  const rawGender = parsedData?.game?.gender ?? metadata?.gender ?? null;
+  const sportContext = resolveSportContext(parsedSport, rawGender);
+  const normalizedSport = sportContext.sportKey || normalizeSportKey(parsedSport) || "basketball";
+  const parsedGender = sportContext.genderKey || normalizeGenderKey(rawGender) || null;
   const footballFormat = resolveFootballFormatForSport(
     normalizedSport,
     parsedData?.game?.football_format ||
@@ -175,23 +178,6 @@ function getSchoolIdFromName(schoolName) {
   }
 
   return null;
-}
-
-function normalizeSport(sport) {
-  if (!sport) return "basketball";
-
-  const sportMap = {
-    basketball: "basketball",
-    bball: "basketball",
-    volleyball: "volleyball",
-    football: "football",
-    soccer: "soccer",
-    baseball: "baseball",
-    softball: "softball",
-  };
-
-  const normalized = String(sport).toLowerCase().trim();
-  return sportMap[normalized] || normalized;
 }
 
 function formatDate(dateStr) {

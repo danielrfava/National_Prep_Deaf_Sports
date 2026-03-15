@@ -13,6 +13,7 @@ import {
   setPortalFlash,
   staffStatusLabel,
 } from "./schoolAccess.js";
+import { normalizeSportKey, resolveSportContext } from "../sportContext.js";
 
 const SPORTS = ["basketball", "football", "volleyball", "soccer", "baseball", "softball"];
 const SPORT_LABELS = {
@@ -277,6 +278,11 @@ async function fetchSportsWithData() {
 
   const rows = await fetchRowsBy("school_id", currentUser.school_id).catch(() => []);
   (rows || []).forEach((row) => {
+    const context = resolveSportContext(row?.sport);
+    if (context.isBasketball && !context.isVarsity) {
+      return;
+    }
+
     const key = normalizeSport(row?.sport);
     if (key) {
       set.add(key);
@@ -660,12 +666,8 @@ function scopeKey(submission) {
 }
 
 function sportLabel(sport, gender) {
-  const normalizedSport = String(sport || "").toLowerCase().trim();
-  const normalizedGender = String(gender || "").toLowerCase().trim();
-  const base = SPORT_LABELS[normalizedSport] || titleCase(normalizedSport || "Unknown sport");
-  return normalizedGender === "boys" || normalizedGender === "girls"
-    ? `${titleCase(normalizedGender)} ${base}`
-    : base;
+  const context = resolveSportContext(sport, gender);
+  return context.competitionLabel || SPORT_LABELS[context.sportKey] || titleCase(context.sportKey || "Unknown sport");
 }
 
 function statusKey(status) {
@@ -677,14 +679,7 @@ function statusKey(status) {
 }
 
 function normalizeSport(value) {
-  const sport = String(value || "").toLowerCase();
-  if (sport.includes("basketball")) return "basketball";
-  if (sport.includes("football")) return "football";
-  if (sport.includes("volleyball")) return "volleyball";
-  if (sport.includes("soccer")) return "soccer";
-  if (sport.includes("baseball")) return "baseball";
-  if (sport.includes("softball")) return "softball";
-  return "";
+  return normalizeSportKey(value);
 }
 
 function displayDate(value) {

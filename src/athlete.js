@@ -7,6 +7,7 @@ import {
   extractAthleteNameCandidates,
   fetchAthleteProfileRows,
 } from "./services/publicEntityService.js";
+import { normalizeSportKey } from "./sportContext.js";
 
 mountPublicTopNav({ active: "search" });
 
@@ -793,14 +794,7 @@ function compareSportsBySchoolYear(left, right) {
 }
 
 function normalizeSport(value) {
-  const text = String(value || "").toLowerCase();
-  if (text.includes("basketball")) return "basketball";
-  if (text.includes("football")) return "football";
-  if (text.includes("volleyball")) return "volleyball";
-  if (text.includes("baseball")) return "baseball";
-  if (text.includes("softball")) return "softball";
-  if (text.includes("soccer")) return "soccer";
-  return text || "sport";
+  return normalizeSportKey(value) || "sport";
 }
 
 function mostFrequentKey(map) {
