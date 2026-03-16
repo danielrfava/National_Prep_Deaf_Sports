@@ -708,6 +708,11 @@ body {
   font-size: 12px;
 }
 
+.soccer-review-legend {
+  margin-top: 10px;
+  color: var(--muted);
+}
+
 /* Numeric columns right-aligned */
 .stats-table th:nth-child(n+6),
 .stats-table td:nth-child(n+6) {

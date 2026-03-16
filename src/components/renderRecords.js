@@ -1,5 +1,11 @@
 import { footballFormatLabel, isFootballSportValue } from "../footballFormat.js";
 import { normalizePublicRecordRows } from "../publicRecordNormalizer.js";
+import {
+  SOCCER_PUBLIC_REVIEW_MARKER,
+  applySoccerPublicReviewFields,
+  getSoccerSourceFlags,
+  isSoccerRowFlaggedForReview,
+} from "../soccerHistoricalNormalizer.js";
 import { buildSportContextKey, normalizeRecordSportContext, resolveSportContext } from "../sportContext.js";
 
 let currentSort = { column: null, ascending: true };
@@ -188,6 +194,43 @@ const footballCoreKeysByCategory = {
 };
 // 🔥 ADD THIS RIGHT HERE
 const volleyballCoreKeys = ['gp', 'k', 'dig', 'ast', 'blk', 'ace'];
+
+function mergeSoccerReviewFlags(...groups) {
+  const merged = new Set();
+
+  groups.forEach((group) => {
+    const flags = Array.isArray(group) ? group : getSoccerSourceFlags(group);
+    flags.forEach((flag) => merged.add(flag));
+  });
+
+  return Array.from(merged).sort();
+}
+
+function getAthleteDisplayLabel(record, athleteName = "Unknown") {
+  const normalizedName = String(athleteName || "Unknown").trim() || "Unknown";
+  if (detectSportType(record?.sport) !== "soccer") {
+    return normalizedName;
+  }
+
+  const flagged = record?.public_source_marker === SOCCER_PUBLIC_REVIEW_MARKER || isSoccerRowFlaggedForReview(record);
+  if (!flagged || normalizedName.endsWith(SOCCER_PUBLIC_REVIEW_MARKER)) {
+    return normalizedName;
+  }
+
+  return `${normalizedName} ${SOCCER_PUBLIC_REVIEW_MARKER}`;
+}
+
+function isSoccerOnlyView(records = [], filters = {}) {
+  if (detectSportType(filters?.sport) === "soccer") {
+    return true;
+  }
+
+  return Array.isArray(records) && records.length > 0 && records.every((record) => detectSportType(record?.sport) === "soccer");
+}
+
+function shouldRenderSoccerReviewLegend(records = [], filters = {}) {
+  return isSoccerOnlyView(records, filters) && records.some((record) => isSoccerRowFlaggedForReview(record));
+}
 
 function splitColumnsByCoreKeys(allColumns, coreKeys) {
   const columnByKey = new Map(allColumns.map(col => [col.key, col]));
@@ -629,6 +672,7 @@ function aggregateCareerStats(records, maxSeasons = Infinity) {
         sportDisplay: normalizedRecord.sport_display,
         seasons: new Set(),
         seasonData: new Map(), // Track data per season to avoid duplicates
+        seasonSourceFlags: new Map(),
         totalGP: 0,
         statTotals
       });
@@ -651,6 +695,7 @@ function aggregateCareerStats(records, maxSeasons = Infinity) {
           gp: gp,
           stat_row: record.stat_row
       });
+      player.seasonSourceFlags.set(season, getSoccerSourceFlags(record));
       
       // Aggregate all stat fields dynamically
       columns.forEach(col => {
@@ -743,6 +788,12 @@ else {
 
   seasonDisplay = `${firstYear}-${lastYear}`;
 }
+
+const effectiveSourceFlags = mergeSoccerReviewFlags(
+  ...(maxSeasons !== Infinity
+    ? effectiveSeasons.map((season) => player.seasonSourceFlags.get(season) || [])
+    : Array.from(player.seasonSourceFlags.values()))
+);
     
       // Build career stat_row
        const careerStats = {
@@ -796,14 +847,15 @@ columns.forEach(col => {
   }
 });
     
-    return {
+    return applySoccerPublicReviewFields({
       stat_row: careerStats,
       school: getSchoolAbbrev(player.school), // Use abbreviation
       sport: player.sport,
       gender: player.gender,
       sport_display: player.sportDisplay,
-      season: seasonDisplay
-    };
+      season: seasonDisplay,
+      source_flags: effectiveSourceFlags
+    });
   });
 }
 
@@ -821,11 +873,11 @@ records.forEach(record => {
   const key = `${name}|${school}|${sport}|${season}`;
 
   if (!seasonMap.has(key)) {
-    seasonMap.set(key, {
+    seasonMap.set(key, applySoccerPublicReviewFields({
       ...record,
       ...normalizedRecord,
       stat_row: { ...record.stat_row }
-    });
+    }));
   } else {
     const existing = seasonMap.get(key);
 
@@ -834,6 +886,9 @@ records.forEach(record => {
         existing.stat_row[k] = v;
       }
     });
+
+    existing.source_flags = mergeSoccerReviewFlags(existing, record);
+    Object.assign(existing, applySoccerPublicReviewFields(existing));
   }
 });
 
@@ -1046,6 +1101,7 @@ if (currentPage > totalPages) {
 const start = (currentPage - 1) * recordsPerPage;
 const end = start + recordsPerPage;
 const pageRecords = currentRecords.slice(start, end);
+const showSoccerReviewLegend = shouldRenderSoccerReviewLegend(pageRecords, filters);
 
   // Generate dynamic table headers
   const statHeaders = columns.map(col => 
@@ -1113,6 +1169,11 @@ const pageRecords = currentRecords.slice(start, end);
         </tbody>
         </table>
          </div>
+    ${showSoccerReviewLegend ? `
+      <div class="eligibility-legend soccer-review-legend">
+        ${SOCCER_PUBLIC_REVIEW_MARKER} Source under review
+      </div>
+    ` : ''}
     ${statsView === 'career-extended' ? `
       <div class="eligibility-legend">
         * Indicates participation beyond the standard 4-year eligibility window.
@@ -1194,12 +1255,13 @@ function renderTableRows(records, startIndex = 0, sportType = 'basketball', hide
   
   return records
     .map((record, index) => {
-let athleteName = record.stat_row?.["Athlete Name"] || "Unknown";
+const rawAthleteName = record.stat_row?.["Athlete Name"] || "Unknown";
+let athleteName = getAthleteDisplayLabel(record, rawAthleteName);
 const isActive = record.season === latestSeason;
 
 const isExtended =
   currentStatsView === 'career-extended' &&
-  athleteName.endsWith('*');
+  rawAthleteName.endsWith('*');
       const school = getSchoolAbbrev(record.school);
       const sport = buildSportDisplayLabel(record);
       const season = record.season || "";

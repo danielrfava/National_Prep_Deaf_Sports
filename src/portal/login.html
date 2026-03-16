@@ -61,6 +61,7 @@
           </form>
 
           <div class="portal-login-links">
+            <a href="forgot-password.html">Forgot password?</a>
             <a href="../index.html">Back to Public Site</a>
             <a href="mailto:danielrfava@gmail.com?subject=NPDS%20Portal%20School%20Access">Need help with approval?</a>
           </div>
@@ -83,6 +84,7 @@
       import { mountPublicTopNav } from "../components/publicTopNav.js";
       import {
         buildActivationHref,
+        buildPasswordResetHref,
         consumePortalFlash,
         getBlockedAccessMessage,
         isAdminProfile,
@@ -92,6 +94,16 @@
       } from "./schoolAccess.js";
 
       mountPublicTopNav({ active: "login", basePath: "../" });
+
+      const isRecoveryFlow =
+        window.location.hash.includes("type=recovery") || window.location.search.includes("type=recovery");
+
+      if (isRecoveryFlow) {
+        const resetHref = new URL(buildPasswordResetHref());
+        resetHref.search = window.location.search;
+        resetHref.hash = window.location.hash;
+        window.location.replace(resetHref.toString());
+      }
 
       const form = document.getElementById("loginForm");
       const loginBtn = document.getElementById("loginBtn");

@@ -17,6 +17,7 @@ const applyFiltersBtn = document.querySelector("#applyFiltersBtn");
 
 let activeRequest = 0;
 let allSchools = [];
+let allSportOptions = [];
 let hasAppliedFilters = false;
 
 mountPublicTopNav({ active: "research" });
@@ -36,7 +37,6 @@ function buildFilters() {
     division: divisionFilter?.value || "",
     season: seasonFilter?.value || "",
     footballFormat: footballFormatFilter?.value || "",
-    maxRows: 3000,
   };
 }
 
@@ -156,13 +156,46 @@ function updateSchoolFilter() {
 function populateSimpleSelect(select, values, placeholder) {
   if (!select) return;
 
+  const previousValue = select.value;
   select.innerHTML = `<option value="">${placeholder}</option>`;
   values.forEach((value) => {
     const option = document.createElement("option");
-    option.value = value;
-    option.textContent = value;
+    if (value && typeof value === "object") {
+      option.value = value.value ?? "";
+      option.textContent = value.label ?? value.value ?? "";
+    } else {
+      option.value = value;
+      option.textContent = value;
+    }
     select.appendChild(option);
   });
+
+  if (previousValue && Array.from(select.options).some((option) => option.value === previousValue)) {
+    select.value = previousValue;
+  }
+}
+
+function resolveInitialSportValue(initialSport) {
+  const normalized = String(initialSport || "").trim().toLowerCase();
+  if (!normalized) {
+    return "";
+  }
+
+  const exactMatch = allSportOptions.find((option) => {
+    const optionValue = String(option?.value || "").trim().toLowerCase();
+    const optionLabel = String(option?.label || "").trim().toLowerCase();
+    return optionValue === normalized || optionLabel === normalized;
+  });
+
+  if (exactMatch?.value) {
+    return exactMatch.value;
+  }
+
+  const sportKeyMatches = allSportOptions.filter(
+    (option) => String(option?.sportKey || "").trim().toLowerCase() === normalized
+  );
+
+  return sportKeyMatches.length === 1 ? sportKeyMatches[0].value : "";
 }
 
 function applyInitialParams() {
@@ -183,7 +216,10 @@ function applyInitialParams() {
   }
 
   if (initialSport && sportFilter) {
-    sportFilter.value = initialSport;
+    const resolvedSportValue = resolveInitialSportValue(initialSport);
+    if (resolvedSportValue) {
+      sportFilter.value = resolvedSportValue;
+    }
     toggleFootballFormatFilter();
   }
 
@@ -208,9 +244,10 @@ async function init() {
     ]);
 
     allSchools = schools || [];
+    allSportOptions = sports || [];
     updateSchoolFilter();
 
-    populateSimpleSelect(sportFilter, sports || [], "All sports");
+    populateSimpleSelect(sportFilter, allSportOptions, "All sports");
     populateSimpleSelect(seasonFilter, seasons || [], "All seasons");
     populateFootballFormatSelect(footballFormatFilter, {
       includeBlank: false,

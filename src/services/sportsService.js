@@ -1,16 +1,18 @@
 import { supabase } from "../supabaseClient.js";
 import { normalizeFootballFormat } from "../footballFormat.js";
 import { normalizePublicRecordRows } from "../publicRecordNormalizer.js";
-import { normalizeSportKey } from "../sportContext.js";
+import { buildSportContextKey, normalizeSportKey, resolveSportContext } from "../sportContext.js";
 
 const RECORD_SELECT_BASE = "id, school_id, school, sport, season, stat_row";
 const RECORD_SELECT = "id, school_id, school, sport, sport_variant, season, stat_row";
-const DEFAULT_RECORD_LIMIT = 800;
-const MAX_RECORD_LIMIT = 1500;
+const METADATA_SELECT_BASE = "id, school_id, school, sport, season";
+const PUBLIC_QUERY_PAGE_SIZE = 1000;
 
 let visibleSchoolsCache = null;
 let visibleSportsCache = null;
 let visibleSeasonsCache = null;
+let publicMetadataRowsCache = null;
+let publicMetadataRowsPromise = null;
 
 function normalizeText(value) {
   return String(value || "").trim();
@@ -21,6 +23,232 @@ function normalizeSchoolToken(value) {
     .toLowerCase()
     .replace(/[^\w\s]/g, "")
     .replace(/\s+/g, " ");
+}
+
+function parseSeasonStartYear(value) {
+  const text = normalizeText(value);
+  const rangeMatch = text.match(/^(\d{2,4})\s*[-/]\s*(\d{2,4})$/);
+  if (rangeMatch) {
+    const start = rangeMatch[1];
+    if (start.length === 4) {
+      return Number(start);
+    }
+    if (start.length === 2) {
+      const numeric = Number(start);
+      if (Number.isInteger(numeric)) {
+        return numeric > 50 ? 1900 + numeric : 2000 + numeric;
+      }
+    }
+  }
+
+  const singleYearMatch = text.match(/(19|20)\d{2}/);
+  return singleYearMatch ? Number(singleYearMatch[0]) : 0;
+}
+
+function compareSeasonLabelsDesc(left, right) {
+  const leftYear = parseSeasonStartYear(left);
+  const rightYear = parseSeasonStartYear(right);
+
+  if (leftYear !== rightYear) {
+    return rightYear - leftYear;
+  }
+
+  return String(right || "").localeCompare(String(left || ""));
+}
+
+function isMeaningfulPublicRow(row, { requireStatRow = true } = {}) {
+  const hasSchool = Boolean(normalizeText(row?.school_id) || normalizeText(row?.school));
+  const hasSport = Boolean(normalizeText(row?.sport));
+  const hasSeason = Boolean(normalizeText(row?.season));
+
+  if (!hasSchool || !hasSport || !hasSeason) {
+    return false;
+  }
+
+  if (!requireStatRow) {
+    return true;
+  }
+
+  return Boolean(row?.stat_row && typeof row.stat_row === "object" && !Array.isArray(row.stat_row));
+}
+
+function mapPublicSportOption(row) {
+  const context = resolveSportContext(row?.sport, row?.gender);
+
+  if (!context.sportKey) {
+    return null;
+  }
+
+  if (context.isBasketball && !context.isVarsity) {
+    return null;
+  }
+
+  return {
+    genderKey: context.genderKey || "",
+    label: row?.sport_display || context.competitionLabel || context.sportLabel || normalizeText(row?.sport),
+    levelKey: context.levelKey || "",
+    sportKey: context.sportKey,
+    value: buildSportContextKey(row?.sport, row?.gender),
+  };
+}
+
+function normalizeMetadataSportRows(rows) {
+  return (rows || [])
+    .filter((row) => isMeaningfulPublicRow(row, { requireStatRow: false }))
+    .map((row) => {
+      const context = resolveSportContext(row?.sport, row?.gender);
+
+      if (!context.sportKey || (context.isBasketball && !context.isVarsity)) {
+        return null;
+      }
+
+      return {
+        ...row,
+        competition_level: context.levelKey || null,
+        gender: context.genderKey || null,
+        sport: context.sportKey,
+        sport_display: context.competitionLabel || context.sportLabel || normalizeText(row?.sport),
+      };
+    })
+    .filter(Boolean);
+}
+
+function parseSportFilterValue(value) {
+  const rawValue = normalizeText(value);
+  if (!rawValue) {
+    return {
+      exactContext: false,
+      genderKey: "",
+      levelKey: "",
+      sportKey: "",
+      value: "",
+    };
+  }
+
+  if (rawValue.includes("|")) {
+    const [sportPart = "", genderPart = "", levelPart = ""] = rawValue.split("|");
+    return {
+      exactContext: true,
+      genderKey: normalizeText(genderPart).toLowerCase(),
+      levelKey: normalizeText(levelPart).toLowerCase(),
+      sportKey: normalizeSportKey(sportPart),
+      value: rawValue,
+    };
+  }
+
+  const context = resolveSportContext(rawValue);
+  return {
+    exactContext: Boolean(context.genderKey || context.levelKey),
+    genderKey: context.genderKey || "",
+    levelKey: context.levelKey || "",
+    sportKey: context.sportKey || normalizeSportKey(rawValue),
+    value: rawValue,
+  };
+}
+
+function matchesSportFilter(row, sportFilter) {
+  if (!sportFilter?.sportKey) {
+    return true;
+  }
+
+  const context = resolveSportContext(row?.sport, row?.gender);
+  if (context.sportKey !== sportFilter.sportKey) {
+    return false;
+  }
+
+  if (sportFilter.exactContext && sportFilter.genderKey && context.genderKey !== sportFilter.genderKey) {
+    return false;
+  }
+
+  if (sportFilter.exactContext && sportFilter.levelKey && context.levelKey !== sportFilter.levelKey) {
+    return false;
+  }
+
+  return true;
+}
+
+async function fetchPagedPublicRows(selectColumns, buildRequest, { pageSize = PUBLIC_QUERY_PAGE_SIZE } = {}) {
+  const rows = [];
+  let start = 0;
+
+  while (true) {
+    const request = buildRequest(
+      supabase
+        .from("raw_stat_rows")
+        .select(selectColumns)
+        .order("id", { ascending: true })
+        .range(start, start + pageSize - 1)
+    );
+
+    if (!request) {
+      return rows;
+    }
+
+    const { data, error } = await request;
+    if (error) {
+      throw error;
+    }
+
+    const chunk = data || [];
+    rows.push(...chunk);
+
+    if (chunk.length < pageSize) {
+      break;
+    }
+
+    start += pageSize;
+  }
+
+  return rows;
+}
+
+async function fetchPagedPublicRowsWithFallback(
+  primarySelect,
+  fallbackSelect,
+  buildRequest,
+  { requireSportVariant = false } = {}
+) {
+  try {
+    return await fetchPagedPublicRows(primarySelect, buildRequest);
+  } catch (error) {
+    if (!isMissingRelationError(error, "sport_variant")) {
+      throw error;
+    }
+
+    if (requireSportVariant) {
+      throw new Error("Football format filtering requires the latest football format storage migration.");
+    }
+
+    const fallbackRows = await fetchPagedPublicRows(fallbackSelect, buildRequest);
+    return fallbackRows.map((row) => ({
+      ...row,
+      sport_variant: null,
+    }));
+  }
+}
+
+async function fetchPublicMetadataRows() {
+  if (publicMetadataRowsCache) {
+    return publicMetadataRowsCache;
+  }
+
+  if (!publicMetadataRowsPromise) {
+    publicMetadataRowsPromise = fetchPagedPublicRows(METADATA_SELECT_BASE, (request) =>
+      request
+        .not("sport", "is", null)
+        .not("season", "is", null)
+        .not("stat_row", "is", null)
+    )
+      .then((rows) => {
+        publicMetadataRowsCache = normalizeMetadataSportRows(rows);
+        return publicMetadataRowsCache;
+      })
+      .finally(() => {
+        publicMetadataRowsPromise = null;
+      });
+  }
+
+  return publicMetadataRowsPromise;
 }
 
 function isMissingRelationError(error, relationName) {
@@ -179,30 +407,23 @@ async function fetchVisibleSports() {
     return visibleSportsCache;
   }
 
-  const response = await supabase
-    .from("vw_public_visible_sports")
-    .select("sport")
-    .order("sport", { ascending: true });
+  const metadataRows = await fetchPublicMetadataRows();
+  const deduped = new Map();
 
-  if (!response.error) {
-    visibleSportsCache = Array.from(
-      new Set((response.data || []).map((row) => normalizeSportKey(row.sport)).filter(Boolean))
-    );
-    return visibleSportsCache;
-  }
+  metadataRows.forEach((row) => {
+    const option = mapPublicSportOption(row);
+    if (!option || !option.value || !option.label) {
+      return;
+    }
 
-  if (!isMissingRelationError(response.error, "vw_public_visible_sports")) {
-    throw new Error(response.error.message);
-  }
+    if (!deduped.has(option.value)) {
+      deduped.set(option.value, option);
+    }
+  });
 
-  const fallback = await supabase.from("vw_sports").select("sport");
-  if (fallback.error) {
-    throw new Error(fallback.error.message);
-  }
-
-  visibleSportsCache = Array.from(
-    new Set((fallback.data || []).map((row) => normalizeSportKey(row.sport)).filter(Boolean))
-  ).sort((left, right) => left.localeCompare(right));
+  visibleSportsCache = Array.from(deduped.values()).sort((left, right) =>
+    left.label.localeCompare(right.label)
+  );
 
   return visibleSportsCache;
 }
@@ -212,36 +433,10 @@ async function fetchVisibleSeasons() {
     return visibleSeasonsCache;
   }
 
-  const response = await supabase
-    .from("vw_public_visible_seasons")
-    .select("season")
-    .order("season", { ascending: false });
-
-  if (!response.error) {
-    visibleSeasonsCache = Array.from(
-      new Set((response.data || []).map((row) => normalizeText(row.season)).filter(Boolean))
-    );
-    return visibleSeasonsCache;
-  }
-
-  if (!isMissingRelationError(response.error, "vw_public_visible_seasons")) {
-    throw new Error(response.error.message);
-  }
-
-  const fallback = await supabase
-    .from("raw_stat_rows")
-    .select("season")
-    .not("season", "is", null)
-    .order("season", { ascending: false })
-    .limit(500);
-
-  if (fallback.error) {
-    throw new Error(fallback.error.message);
-  }
-
+  const metadataRows = await fetchPublicMetadataRows();
   visibleSeasonsCache = Array.from(
-    new Set((fallback.data || []).map((row) => normalizeText(row.season)).filter(Boolean))
-  );
+    new Set(metadataRows.map((row) => normalizeText(row.season)).filter(Boolean))
+  ).sort(compareSeasonLabelsDesc);
 
   return visibleSeasonsCache;
 }
@@ -268,7 +463,7 @@ export async function fetchPublicSchoolDirectory() {
 export async function fetchSportsRecords(query = "", filters = {}) {
   const normalizedQuery = normalizeText(query);
   const normalizedSchoolId = normalizeText(filters.schoolId);
-  const normalizedSport = normalizeText(filters.sport);
+  const sportFilter = parseSportFilterValue(filters.sport);
   const normalizedSeason = normalizeText(filters.season);
   const normalizedDivision = normalizeText(filters.division);
   const normalizedFootballVariant = normalizeFootballFormat(
@@ -278,7 +473,7 @@ export async function fetchSportsRecords(query = "", filters = {}) {
   const hasFilters = Boolean(
     normalizedQuery ||
       normalizedSchoolId ||
-      normalizedSport ||
+      sportFilter.sportKey ||
       normalizedSeason ||
       normalizedDivision ||
       normalizedFootballVariant
@@ -288,89 +483,65 @@ export async function fetchSportsRecords(query = "", filters = {}) {
     return [];
   }
 
-  async function buildRecordsRequest(selectColumns, { includeFootballVariant = true } = {}) {
-    let request = supabase
-      .from("raw_stat_rows")
-      .select(selectColumns)
-      .order("season", { ascending: false })
-      .limit(Math.min(Number(filters.maxRows) || DEFAULT_RECORD_LIMIT, MAX_RECORD_LIMIT));
+  let divisionSchoolIds = [];
+  let divisionSchoolNames = [];
+
+  if (normalizedDivision) {
+    const visibleSchools = await fetchVisibleSchools();
+    const schoolsInDivision = filterSchoolsByDivision(visibleSchools, normalizedDivision);
+    divisionSchoolIds = schoolsInDivision.map((school) => school.id).filter(Boolean);
+    divisionSchoolNames = schoolsInDivision.map((school) => school.full_name).filter(Boolean);
+
+    if (!divisionSchoolIds.length && !divisionSchoolNames.length) {
+      return [];
+    }
+  }
+
+  function buildRecordsRequest(request, { includeFootballVariant = true } = {}) {
+    let nextRequest = request
+      .not("sport", "is", null)
+      .not("season", "is", null)
+      .not("stat_row", "is", null);
 
     if (normalizedQuery) {
-      request = request.or(buildSearchFilter(normalizedQuery));
+      nextRequest = nextRequest.or(buildSearchFilter(normalizedQuery));
     }
 
     if (normalizedSchoolId) {
-      request = request.eq("school_id", normalizedSchoolId);
+      nextRequest = nextRequest.eq("school_id", normalizedSchoolId);
     }
 
     if (normalizedDivision) {
-      const visibleSchools = await fetchVisibleSchools();
-      const schoolsInDivision = filterSchoolsByDivision(visibleSchools, normalizedDivision);
-      const schoolIds = schoolsInDivision.map((school) => school.id).filter(Boolean);
-      const schoolNames = schoolsInDivision.map((school) => school.full_name).filter(Boolean);
-
-      if (!schoolIds.length && !schoolNames.length) {
-        return null;
-      }
-
-      if (schoolIds.length) {
-        request = request.in("school_id", schoolIds);
+      if (divisionSchoolIds.length) {
+        nextRequest = nextRequest.in("school_id", divisionSchoolIds);
       } else {
-        request = request.in("school", schoolNames);
+        nextRequest = nextRequest.in("school", divisionSchoolNames);
       }
     }
 
-    if (normalizedSport) {
-      request = applySportFilter(request, normalizedSport);
+    if (sportFilter.sportKey) {
+      nextRequest = applySportFilter(nextRequest, sportFilter.sportKey);
     }
 
     if (normalizedSeason) {
-      request = request.eq("season", normalizedSeason);
+      nextRequest = nextRequest.eq("season", normalizedSeason);
     }
 
     if (normalizedFootballVariant && includeFootballVariant) {
-      request = request.eq("sport_variant", normalizedFootballVariant);
+      nextRequest = nextRequest.eq("sport_variant", normalizedFootballVariant);
     }
 
-    return request;
+    return nextRequest;
   }
 
-  const primaryRequest = await buildRecordsRequest(RECORD_SELECT);
-  if (!primaryRequest) {
-    return [];
-  }
+  const rawRows = await fetchPagedPublicRowsWithFallback(
+    RECORD_SELECT,
+    RECORD_SELECT_BASE,
+    (request) => buildRecordsRequest(request, { includeFootballVariant: true }),
+    { requireSportVariant: Boolean(normalizedFootballVariant) }
+  );
 
-  const { data, error } = await primaryRequest;
-  if (error) {
-    if (isMissingRelationError(error, "sport_variant")) {
-      if (normalizedFootballVariant) {
-        throw new Error("Football format filtering requires the latest football format storage migration.");
-      }
-
-      const fallbackRequest = await buildRecordsRequest(RECORD_SELECT_BASE, {
-        includeFootballVariant: false,
-      });
-      if (!fallbackRequest) {
-        return [];
-      }
-
-      const fallbackResponse = await fallbackRequest;
-      if (fallbackResponse.error) {
-        throw new Error(fallbackResponse.error.message);
-      }
-
-      return normalizePublicRecordRows(
-        (fallbackResponse.data || []).map((row) => ({
-          ...row,
-          sport_variant: null,
-        }))
-      );
-    }
-
-    throw new Error(error.message);
-  }
-
-  return normalizePublicRecordRows(data || []);
+  return normalizePublicRecordRows(rawRows).filter((row) => matchesSportFilter(row, sportFilter));
 }
 
 export async function fetchSportsList() {

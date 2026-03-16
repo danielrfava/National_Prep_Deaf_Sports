@@ -122,6 +122,10 @@ export function buildActivationHref(requestId = "") {
   return url.toString();
 }
 
+export function buildPasswordResetHref() {
+  return new URL("reset-password.html", window.location.href).toString();
+}
+
 export function setPortalFlash(message, type = "error") {
   try {
     sessionStorage.setItem(FLASH_STORAGE_KEY, JSON.stringify({ message, type }));
