@@ -1,12 +1,13 @@
 import { supabase } from "../supabaseClient.js";
 import { normalizeFootballFormat } from "../footballFormat.js";
 import { normalizePublicRecordRows } from "../publicRecordNormalizer.js";
-import { buildSportContextKey, normalizeSportKey, resolveSportContext } from "../sportContext.js";
+import { normalizeSportKey, resolveSportContext } from "../sportContext.js";
 
 const RECORD_SELECT_BASE = "id, school_id, school, sport, season, stat_row";
 const RECORD_SELECT = "id, school_id, school, sport, sport_variant, season, stat_row";
 const METADATA_SELECT_BASE = "id, school_id, school, sport, season";
 const PUBLIC_QUERY_PAGE_SIZE = 1000;
+const PUBLIC_SPORT_FAMILY_ORDER = ["baseball", "basketball", "football", "soccer", "softball", "volleyball"];
 
 let visibleSchoolsCache = null;
 let visibleSportsCache = null;
@@ -84,11 +85,9 @@ function mapPublicSportOption(row) {
   }
 
   return {
-    genderKey: context.genderKey || "",
-    label: row?.sport_display || context.competitionLabel || context.sportLabel || normalizeText(row?.sport),
-    levelKey: context.levelKey || "",
+    label: context.sportLabel || row?.sport_display || normalizeText(row?.sport),
     sportKey: context.sportKey,
-    value: buildSportContextKey(row?.sport, row?.gender),
+    value: context.sportKey,
   };
 }
 
@@ -107,6 +106,8 @@ function normalizeMetadataSportRows(rows) {
         competition_level: context.levelKey || null,
         gender: context.genderKey || null,
         sport: context.sportKey,
+        sport_key: context.sportKey,
+        sport_label: context.sportLabel || normalizeText(row?.sport),
         sport_display: context.competitionLabel || context.sportLabel || normalizeText(row?.sport),
       };
     })
@@ -117,36 +118,27 @@ function parseSportFilterValue(value) {
   const rawValue = normalizeText(value);
   if (!rawValue) {
     return {
-      exactContext: false,
-      genderKey: "",
-      levelKey: "",
       sportKey: "",
       value: "",
     };
   }
 
-  if (rawValue.includes("|")) {
-    const [sportPart = "", genderPart = "", levelPart = ""] = rawValue.split("|");
-    return {
-      exactContext: true,
-      genderKey: normalizeText(genderPart).toLowerCase(),
-      levelKey: normalizeText(levelPart).toLowerCase(),
-      sportKey: normalizeSportKey(sportPart),
-      value: rawValue,
-    };
-  }
-
-  const context = resolveSportContext(rawValue);
   return {
-    exactContext: Boolean(context.genderKey || context.levelKey),
-    genderKey: context.genderKey || "",
-    levelKey: context.levelKey || "",
-    sportKey: context.sportKey || normalizeSportKey(rawValue),
+    sportKey: normalizeSportKey(rawValue),
     value: rawValue,
   };
 }
 
-function matchesSportFilter(row, sportFilter) {
+function normalizePublicDivisionValue(value) {
+  const normalized = normalizeText(value).toLowerCase();
+  if (normalized === "boys" || normalized === "girls") {
+    return normalized;
+  }
+
+  return "";
+}
+
+function matchesSportFilter(row, sportFilter, publicDivision = "") {
   if (!sportFilter?.sportKey) {
     return true;
   }
@@ -156,11 +148,7 @@ function matchesSportFilter(row, sportFilter) {
     return false;
   }
 
-  if (sportFilter.exactContext && sportFilter.genderKey && context.genderKey !== sportFilter.genderKey) {
-    return false;
-  }
-
-  if (sportFilter.exactContext && sportFilter.levelKey && context.levelKey !== sportFilter.levelKey) {
+  if (sportFilter.sportKey === "basketball" && publicDivision && context.genderKey !== publicDivision) {
     return false;
   }
 
@@ -416,14 +404,21 @@ async function fetchVisibleSports() {
       return;
     }
 
-    if (!deduped.has(option.value)) {
-      deduped.set(option.value, option);
+    if (!deduped.has(option.sportKey)) {
+      deduped.set(option.sportKey, option);
     }
   });
 
-  visibleSportsCache = Array.from(deduped.values()).sort((left, right) =>
-    left.label.localeCompare(right.label)
-  );
+  const sortIndex = new Map(PUBLIC_SPORT_FAMILY_ORDER.map((sportKey, index) => [sportKey, index]));
+  visibleSportsCache = Array.from(deduped.values()).sort((left, right) => {
+    const leftIndex = sortIndex.get(left.sportKey);
+    const rightIndex = sortIndex.get(right.sportKey);
+    if (leftIndex !== undefined || rightIndex !== undefined) {
+      return (leftIndex ?? Number.MAX_SAFE_INTEGER) - (rightIndex ?? Number.MAX_SAFE_INTEGER);
+    }
+
+    return left.label.localeCompare(right.label);
+  });
 
   return visibleSportsCache;
 }
@@ -441,17 +436,6 @@ async function fetchVisibleSeasons() {
   return visibleSeasonsCache;
 }
 
-function filterSchoolsByDivision(schools, division) {
-  const normalizedDivision = normalizeText(division).toLowerCase();
-  if (!normalizedDivision) {
-    return schools;
-  }
-
-  return (schools || []).filter(
-    (school) => normalizeText(school.division).toLowerCase() === normalizedDivision
-  );
-}
-
 export async function fetchSchools() {
   return fetchVisibleSchools();
 }
@@ -460,12 +444,33 @@ export async function fetchPublicSchoolDirectory() {
   return fetchVisibleSchools();
 }
 
+export async function fetchStatsFilterMetadata() {
+  const metadataRows = await fetchPublicMetadataRows();
+
+  return metadataRows.map((row) => {
+    const context = resolveSportContext(row?.sport, row?.gender);
+
+    return {
+      competitionLevel: context.levelKey || "",
+      genderKey: context.genderKey || "",
+      genderLabel: context.genderLabel || "",
+      school: normalizeText(row?.school),
+      schoolId: normalizeText(row?.school_id),
+      season: normalizeText(row?.season),
+      sportDisplay: context.competitionLabel || context.sportLabel || normalizeText(row?.sport),
+      sportFamilyLabel: context.sportLabel || normalizeText(row?.sport),
+      sportKey: context.sportKey || "",
+    };
+  });
+}
+
 export async function fetchSportsRecords(query = "", filters = {}) {
   const normalizedQuery = normalizeText(query);
   const normalizedSchoolId = normalizeText(filters.schoolId);
   const sportFilter = parseSportFilterValue(filters.sport);
   const normalizedSeason = normalizeText(filters.season);
-  const normalizedDivision = normalizeText(filters.division);
+  const normalizedDivision =
+    sportFilter.sportKey === "basketball" ? normalizePublicDivisionValue(filters.division) : "";
   const normalizedFootballVariant = normalizeFootballFormat(
     filters.footballFormat || filters.footballVariant,
     { allowBlank: true }
@@ -483,20 +488,6 @@ export async function fetchSportsRecords(query = "", filters = {}) {
     return [];
   }
 
-  let divisionSchoolIds = [];
-  let divisionSchoolNames = [];
-
-  if (normalizedDivision) {
-    const visibleSchools = await fetchVisibleSchools();
-    const schoolsInDivision = filterSchoolsByDivision(visibleSchools, normalizedDivision);
-    divisionSchoolIds = schoolsInDivision.map((school) => school.id).filter(Boolean);
-    divisionSchoolNames = schoolsInDivision.map((school) => school.full_name).filter(Boolean);
-
-    if (!divisionSchoolIds.length && !divisionSchoolNames.length) {
-      return [];
-    }
-  }
-
   function buildRecordsRequest(request, { includeFootballVariant = true } = {}) {
     let nextRequest = request
       .not("sport", "is", null)
@@ -509,14 +500,6 @@ export async function fetchSportsRecords(query = "", filters = {}) {
 
     if (normalizedSchoolId) {
       nextRequest = nextRequest.eq("school_id", normalizedSchoolId);
-    }
-
-    if (normalizedDivision) {
-      if (divisionSchoolIds.length) {
-        nextRequest = nextRequest.in("school_id", divisionSchoolIds);
-      } else {
-        nextRequest = nextRequest.in("school", divisionSchoolNames);
-      }
     }
 
     if (sportFilter.sportKey) {
@@ -541,7 +524,9 @@ export async function fetchSportsRecords(query = "", filters = {}) {
     { requireSportVariant: Boolean(normalizedFootballVariant) }
   );
 
-  return normalizePublicRecordRows(rawRows).filter((row) => matchesSportFilter(row, sportFilter));
+  return normalizePublicRecordRows(rawRows).filter((row) =>
+    matchesSportFilter(row, sportFilter, normalizedDivision)
+  );
 }
 
 export async function fetchSportsList() {

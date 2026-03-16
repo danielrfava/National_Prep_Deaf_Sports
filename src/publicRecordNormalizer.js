@@ -18,8 +18,11 @@ export function normalizePublicRecordRows(rows = []) {
         __sourceIndex: typeof row?.__sourceIndex === "number" ? row.__sourceIndex : index,
         gender_label: context.genderLabel || null,
         gender_display: context.genderLabel || null,
-        sport_filter_value: buildSportContextKey(row?.sport, row?.gender),
+        public_division: context.sportKey === "basketball" ? context.genderKey || "" : "",
+        sport_context_key: buildSportContextKey(row?.sport, row?.gender),
+        sport_filter_value: context.sportKey || normalizedRow?.sport || "",
         sport_key: context.sportKey || normalizedRow?.sport || "",
+        sport_label: context.sportLabel || normalizedRow?.sport_display || normalizedRow?.sport || "",
       };
     })
     .filter(Boolean);

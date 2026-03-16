@@ -1,13 +1,21 @@
-import { fetchSchools, fetchSportsList, fetchSportsRecords, fetchSeasonsList } from "./services/sportsService.js";
+import {
+  fetchSchools,
+  fetchSportsList,
+  fetchSportsRecords,
+  fetchSeasonsList,
+  fetchStatsFilterMetadata,
+} from "./services/sportsService.js";
 import { renderRecords } from "./components/renderRecords.js";
 import { mountPublicTopNav } from "./components/publicTopNav.js";
 import { isFootballSportValue, populateFootballFormatSelect } from "./footballFormat.js";
+import { resolveSportContext } from "./sportContext.js";
 
 const filterInput = document.querySelector("#athleteFilter");
 const status = document.querySelector("#status");
 const recordsContainer = document.querySelector("#records");
 const schoolFilter = document.querySelector("#schoolFilter");
 const divisionFilter = document.querySelector("#divisionFilter");
+const divisionFilterField = document.querySelector("#divisionFilterField");
 const sportFilter = document.querySelector("#sportFilter");
 const seasonFilter = document.querySelector("#seasonFilter");
 const footballFormatFilter = document.querySelector("#footballFormatFilter");
@@ -17,6 +25,7 @@ const applyFiltersBtn = document.querySelector("#applyFiltersBtn");
 
 let activeRequest = 0;
 let allSchools = [];
+let allMetadataRows = [];
 let allSportOptions = [];
 let hasAppliedFilters = false;
 
@@ -30,13 +39,49 @@ function updateStatus(message) {
   }
 }
 
+function parseSeasonStartYear(value) {
+  const text = String(value || "").trim();
+  const rangeMatch = text.match(/^(\d{2,4})\s*[-/]\s*(\d{2,4})$/);
+  if (rangeMatch) {
+    const start = rangeMatch[1];
+    if (start.length === 4) {
+      return Number(start);
+    }
+
+    if (start.length === 2) {
+      const numeric = Number(start);
+      if (Number.isInteger(numeric)) {
+        return numeric > 50 ? 1900 + numeric : 2000 + numeric;
+      }
+    }
+  }
+
+  const singleYearMatch = text.match(/(19|20)\d{2}/);
+  return singleYearMatch ? Number(singleYearMatch[0]) : 0;
+}
+
+function compareSeasonLabelsDesc(left, right) {
+  const leftYear = parseSeasonStartYear(left);
+  const rightYear = parseSeasonStartYear(right);
+
+  if (leftYear !== rightYear) {
+    return rightYear - leftYear;
+  }
+
+  return String(right || "").localeCompare(String(left || ""));
+}
+
 function buildFilters() {
+  const sport = sportFilter?.value || "";
+  const isBasketball = isBasketballSportSelection(sport);
+  const isFootball = isFootballSportValue(sport);
+
   return {
     schoolId: schoolFilter?.value || "",
-    sport: sportFilter?.value || "",
-    division: divisionFilter?.value || "",
+    sport,
+    division: isBasketball ? normalizeDivisionValue(divisionFilter?.value) : "",
     season: seasonFilter?.value || "",
-    footballFormat: footballFormatFilter?.value || "",
+    footballFormat: isFootball ? footballFormatFilter?.value || "" : "",
   };
 }
 
@@ -71,6 +116,27 @@ function toggleFootballFormatFilter() {
 
   if (!isFootball && footballFormatFilter) {
     footballFormatFilter.value = "";
+  }
+}
+
+function normalizeDivisionValue(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return normalized === "boys" || normalized === "girls" ? normalized : "";
+}
+
+function isBasketballSportSelection(value = sportFilter?.value || "") {
+  return String(value || "").trim().toLowerCase() === "basketball";
+}
+
+function syncDivisionFilterVisibility() {
+  const isBasketball = isBasketballSportSelection();
+
+  if (divisionFilterField) {
+    divisionFilterField.style.display = isBasketball ? "flex" : "none";
+  }
+
+  if (!isBasketball && divisionFilter) {
+    divisionFilter.value = "";
   }
 }
 
@@ -128,18 +194,37 @@ async function runSearch({ force = false } = {}) {
   }
 }
 
-function updateSchoolFilter() {
+function getSelectedMetadataRows() {
+  const selectedSport = String(sportFilter?.value || "").trim().toLowerCase();
+  const selectedDivision = isBasketballSportSelection(selectedSport)
+    ? normalizeDivisionValue(divisionFilter?.value)
+    : "";
+
+  return (allMetadataRows || []).filter((row) => {
+    if (selectedSport && String(row?.sportKey || "").trim().toLowerCase() !== selectedSport) {
+      return false;
+    }
+
+    if (selectedSport === "basketball" && selectedDivision) {
+      return String(row?.genderKey || "").trim().toLowerCase() === selectedDivision;
+    }
+
+    return true;
+  });
+}
+
+function updateSchoolFilter(metadataRows = []) {
   if (!schoolFilter) return;
 
   const prevValue = schoolFilter.value;
   schoolFilter.innerHTML = '<option value="">All schools</option>';
 
-  let filteredSchools = allSchools;
-  if (divisionFilter && divisionFilter.value) {
-    filteredSchools = allSchools.filter(
-      (school) => String(school.division || "").toLowerCase() === divisionFilter.value.toLowerCase()
-    );
-  }
+  const scopedRows = Array.isArray(metadataRows) ? metadataRows : [];
+  const shouldScopeSchools = Boolean(sportFilter?.value || normalizeDivisionValue(divisionFilter?.value));
+  const visibleSchoolIds = new Set(scopedRows.map((row) => String(row?.schoolId || "").trim()).filter(Boolean));
+  const filteredSchools = shouldScopeSchools
+    ? allSchools.filter((school) => visibleSchoolIds.has(String(school?.id || "").trim()))
+    : allSchools;
 
   filteredSchools.forEach((school) => {
     const option = document.createElement("option");
@@ -148,9 +233,30 @@ function updateSchoolFilter() {
     schoolFilter.appendChild(option);
   });
 
-  if (prevValue) {
+  if (prevValue && Array.from(schoolFilter.options).some((option) => option.value === prevValue)) {
     schoolFilter.value = prevValue;
   }
+}
+
+function updateSeasonFilter(metadataRows = []) {
+  if (!seasonFilter) return;
+
+  const shouldScopeSeasons = Boolean(sportFilter?.value || normalizeDivisionValue(divisionFilter?.value));
+  const scopedRows = shouldScopeSeasons
+    ? (Array.isArray(metadataRows) ? metadataRows : [])
+    : allMetadataRows;
+  const seasons = Array.from(
+    new Set(scopedRows.map((row) => String(row?.season || "").trim()).filter(Boolean))
+  ).sort(compareSeasonLabelsDesc);
+
+  populateSimpleSelect(seasonFilter, seasons, "All seasons");
+}
+
+function refreshScopedFilterOptions() {
+  syncDivisionFilterVisibility();
+  const metadataRows = getSelectedMetadataRows();
+  updateSchoolFilter(metadataRows);
+  updateSeasonFilter(metadataRows);
 }
 
 function populateSimpleSelect(select, values, placeholder) {
@@ -175,27 +281,26 @@ function populateSimpleSelect(select, values, placeholder) {
   }
 }
 
-function resolveInitialSportValue(initialSport) {
+function resolveInitialSportSelection(initialSport) {
   const normalized = String(initialSport || "").trim().toLowerCase();
   if (!normalized) {
-    return "";
+    return { divisionValue: "", sportValue: "" };
   }
 
+  const context = resolveSportContext(initialSport);
   const exactMatch = allSportOptions.find((option) => {
     const optionValue = String(option?.value || "").trim().toLowerCase();
     const optionLabel = String(option?.label || "").trim().toLowerCase();
     return optionValue === normalized || optionLabel === normalized;
   });
 
-  if (exactMatch?.value) {
-    return exactMatch.value;
-  }
+  const resolvedSportValue = exactMatch?.value || context.sportKey || "";
+  const resolvedDivisionValue = context.sportKey === "basketball" ? context.genderKey || "" : "";
 
-  const sportKeyMatches = allSportOptions.filter(
-    (option) => String(option?.sportKey || "").trim().toLowerCase() === normalized
-  );
-
-  return sportKeyMatches.length === 1 ? sportKeyMatches[0].value : "";
+  return {
+    divisionValue: resolvedDivisionValue,
+    sportValue: resolvedSportValue,
+  };
 }
 
 function applyInitialParams() {
@@ -203,6 +308,7 @@ function applyInitialParams() {
   const initialQuery = (params.get("q") || "").trim();
   const initialSchool = (params.get("school") || "").trim();
   const initialSport = (params.get("sport") || "").trim();
+  const initialDivision = (params.get("division") || params.get("gender") || "").trim().toLowerCase();
   const initialSeason = (params.get("season") || "").trim();
   const initialFootballFormat =
     (params.get("football_format") || params.get("footballFormat") || params.get("footballVariant") || "").trim();
@@ -216,10 +322,18 @@ function applyInitialParams() {
   }
 
   if (initialSport && sportFilter) {
-    const resolvedSportValue = resolveInitialSportValue(initialSport);
-    if (resolvedSportValue) {
-      sportFilter.value = resolvedSportValue;
+    const resolvedSportSelection = resolveInitialSportSelection(initialSport);
+    if (resolvedSportSelection.sportValue) {
+      sportFilter.value = resolvedSportSelection.sportValue;
     }
+
+    syncDivisionFilterVisibility();
+
+    const divisionValue = normalizeDivisionValue(initialDivision || resolvedSportSelection.divisionValue);
+    if (divisionValue && divisionFilter && isBasketballSportSelection(sportFilter.value)) {
+      divisionFilter.value = divisionValue;
+    }
+
     toggleFootballFormatFilter();
   }
 
@@ -237,15 +351,17 @@ async function init() {
   updateStatus("Loading filters...");
 
   try {
-    const [schools, sports, seasons] = await Promise.all([
+    const [schools, sports, seasons, metadataRows] = await Promise.all([
       fetchSchools(),
       fetchSportsList(),
       fetchSeasonsList(),
+      fetchStatsFilterMetadata(),
     ]);
 
     allSchools = schools || [];
+    allMetadataRows = metadataRows || [];
     allSportOptions = sports || [];
-    updateSchoolFilter();
+    updateSchoolFilter(allMetadataRows);
 
     populateSimpleSelect(sportFilter, allSportOptions, "All sports");
     populateSimpleSelect(seasonFilter, seasons || [], "All seasons");
@@ -256,6 +372,7 @@ async function init() {
     });
 
     applyInitialParams();
+    refreshScopedFilterOptions();
     toggleFootballFormatFilter();
 
     hasAppliedFilters = false;
@@ -284,6 +401,7 @@ if (schoolFilter) {
 
 if (sportFilter) {
   sportFilter.addEventListener("change", () => {
+    refreshScopedFilterOptions();
     toggleFootballFormatFilter();
     onFiltersChanged();
   });
@@ -295,7 +413,7 @@ if (seasonFilter) {
 
 if (divisionFilter) {
   divisionFilter.addEventListener("change", () => {
-    updateSchoolFilter();
+    refreshScopedFilterOptions();
     onFiltersChanged();
   });
 }

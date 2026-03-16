@@ -220,6 +220,18 @@ function getAthleteDisplayLabel(record, athleteName = "Unknown") {
   return `${normalizedName} ${SOCCER_PUBLIC_REVIEW_MARKER}`;
 }
 
+function buildSportDisplayLabel(record) {
+  const context = resolveSportContext(record?.sport, record?.gender);
+  const sport = record?.sport || "";
+  const sportVariant = record?.sport_variant || "";
+
+  if (isFootballSportValue(sport) && sportVariant) {
+    return `Football (${footballFormatLabel(sportVariant)})`;
+  }
+
+  return record?.sport_display || context.competitionLabel || sport;
+}
+
 function isSoccerOnlyView(records = [], filters = {}) {
   if (detectSportType(filters?.sport) === "soccer") {
     return true;
@@ -953,18 +965,6 @@ export function renderRecords(container, statsView = 'season', filters = {}, rec
 if (Array.isArray(records)) {
   rawRecords = normalizePublicRecordRows(records);
   currentPage = 1;
-}
-
-function buildSportDisplayLabel(record) {
-  const context = resolveSportContext(record?.sport, record?.gender);
-  const sport = record?.sport || "";
-  const sportVariant = record?.sport_variant || "";
-
-  if (isFootballSportValue(sport) && sportVariant) {
-    return `Football (${footballFormatLabel(sportVariant)})`;
-  }
-
-  return record?.sport_display || context.competitionLabel || sport;
 }
 
 let displayRecords = buildPreparedRecords(rawRecords, statsView);
