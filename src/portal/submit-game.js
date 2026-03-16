@@ -74,8 +74,12 @@ const mode1QuickIntake = document.getElementById("mode1QuickIntake");
 const mode2QuickHint = document.getElementById("mode2QuickHint");
 const modeCardModern = document.getElementById("modeCardModern");
 const modeCardPdf = document.getElementById("modeCardPdf");
+const modeCardSchedule = document.getElementById("modeCardSchedule");
+const modeCardArchive = document.getElementById("modeCardArchive");
 const modeModernPanel = document.getElementById("modeModernPanel");
 const modePdfPanel = document.getElementById("modePdfPanel");
+const modeSchedulePanel = document.getElementById("modeSchedulePanel");
+const modeArchivePanel = document.getElementById("modeArchivePanel");
 const templateToolkitTitle = document.getElementById("templateToolkitTitle");
 const templateToolkitDescription = document.getElementById("templateToolkitDescription");
 const templateToolkitContext = document.getElementById("templateToolkitContext");
@@ -279,7 +283,7 @@ function setupPdfFileUI() {
     if (!file) return;
 
     if (!isPdfFile(file)) {
-      alert("Please upload a PDF file.");
+      alert("Please upload a PDF evidence file.");
       return;
     }
 
@@ -298,8 +302,13 @@ function setupActions() {
   });
   submitBtn.addEventListener("click", submitSpreadsheet);
 
-  mode1Btn.addEventListener("click", () => switchSubmitMode("mode1"));
-  mode2Btn.addEventListener("click", () => switchSubmitMode("mode2"));
+  if (mode1Btn) {
+    mode1Btn.addEventListener("click", () => switchSubmitMode("mode1"));
+  }
+
+  if (mode2Btn) {
+    mode2Btn.addEventListener("click", () => switchSubmitMode("mode2"));
+  }
 
   if (downloadTemplateBtn) {
     downloadTemplateBtn.addEventListener("click", handleTemplateDownloadClick);
@@ -352,6 +361,14 @@ function setupActions() {
 
   if (modeCardPdf) {
     modeCardPdf.addEventListener("click", () => switchSubmissionMode("pdf"));
+  }
+
+  if (modeCardSchedule) {
+    modeCardSchedule.addEventListener("click", () => switchSubmissionMode("schedule"));
+  }
+
+  if (modeCardArchive) {
+    modeCardArchive.addEventListener("click", () => switchSubmissionMode("archive"));
   }
 
   if (pdfInspectBtn) {
@@ -428,7 +445,7 @@ function renderPdfSelectedFile() {
   pdfSelectedFileBox.style.display = "block";
   pdfSelectedFileBox.innerHTML = `
     <strong>${pdfSelectedFile.name}</strong>
-    <span>${(pdfSelectedFile.size / 1024).toFixed(1)} KB - Ready for PDF inspection</span>
+    <span>${(pdfSelectedFile.size / 1024).toFixed(1)} KB - Ready for evidence inspection</span>
   `;
 }
 
@@ -481,9 +498,9 @@ function renderTemplateToolkit() {
 function buildTemplateToolkitContext() {
   if (activeSubmissionMode !== "modern") {
     return {
-      title: "Templates are available in the spreadsheet workflow",
-      description: "Switch back to the modern spreadsheet lane to access current-sport templates and historical downloads.",
-      contextNote: "PDF review remains review-routed only. No spreadsheet template applies there.",
+      title: "Templates live in Mode 1",
+      description: "Switch back to the structured spreadsheet lane to access current-sport templates and historical downloads.",
+      contextNote: "Evidence, schedule/results, and archive lanes stay review-routed and do not use spreadsheet template downloads.",
       activeTemplate: null,
       canDownloadCurrentTemplate: false,
       canShowHeaderGuide: false,
@@ -1104,11 +1121,15 @@ function switchSubmissionMode(mode) {
   const panelMap = {
     modern: modeModernPanel,
     pdf: modePdfPanel,
+    schedule: modeSchedulePanel,
+    archive: modeArchivePanel,
   };
 
   const cardMap = {
     modern: modeCardModern,
     pdf: modeCardPdf,
+    schedule: modeCardSchedule,
+    archive: modeCardArchive,
   };
 
   Object.entries(panelMap).forEach(([key, panel]) => {
@@ -1132,8 +1153,14 @@ function switchSubmitMode(mode) {
   activeSubmitMode = mode;
   const isMode1 = mode === "mode1";
 
-  mode1Panel.classList.toggle("hidden", !isMode1);
-  mode2Panel.classList.toggle("hidden", isMode1);
+  if (mode1Panel) {
+    mode1Panel.classList.toggle("hidden", !isMode1);
+  }
+
+  if (mode2Panel) {
+    mode2Panel.classList.toggle("hidden", isMode1);
+  }
+
   if (mode1MetaFields) {
     mode1MetaFields.classList.toggle("hidden", !isMode1);
   }
@@ -1144,11 +1171,15 @@ function switchSubmitMode(mode) {
     mode2QuickHint.classList.toggle("hidden", isMode1);
   }
 
-  mode1Btn.classList.toggle("portal-btn-primary", isMode1);
-  mode1Btn.classList.toggle("portal-btn-secondary", !isMode1);
+  if (mode1Btn) {
+    mode1Btn.classList.toggle("portal-btn-primary", isMode1);
+    mode1Btn.classList.toggle("portal-btn-secondary", !isMode1);
+  }
 
-  mode2Btn.classList.toggle("portal-btn-primary", !isMode1);
-  mode2Btn.classList.toggle("portal-btn-secondary", isMode1);
+  if (mode2Btn) {
+    mode2Btn.classList.toggle("portal-btn-primary", !isMode1);
+    mode2Btn.classList.toggle("portal-btn-secondary", isMode1);
+  }
 
   if (!isMode1) {
     handleMode2LaneChange();
@@ -1761,13 +1792,13 @@ async function handlePdfInspect() {
   }
 
   if (!pdfSelectedFile || !isPdfFile(pdfSelectedFile)) {
-    alert("Upload a PDF file first.");
+    alert("Upload a PDF evidence file first.");
     return;
   }
 
   pdfInspectBtn.disabled = true;
   pdfInspectBtn.textContent = "Inspecting...";
-  pdfStatus.textContent = "Inspecting PDF...";
+  pdfStatus.textContent = "Inspecting evidence...";
 
   try {
     const footballFormat = getValidatedFootballFormat(
@@ -1789,11 +1820,11 @@ async function handlePdfInspect() {
     confidence = clamp(confidence, 30, 88);
 
     const duplicateRisk = seasonValue ? "medium" : "low";
-    const routeLabel = "Needs PDF review";
+    const routeLabel = "Needs evidence review";
 
     const warnings = [
-      "PDF submissions are preview-first and always require admin review.",
-      "PDF uploads never auto-publish to live leaderboards.",
+      "Evidence submissions are preview-first and always require admin review.",
+      "Evidence uploads never auto-publish to live leaderboards.",
     ];
 
     if (!seasonValue) {
@@ -1801,7 +1832,7 @@ async function handlePdfInspect() {
     }
 
     if (pdfType === "Unknown PDF type") {
-      warnings.push("PDF content type could not be detected and may need manual extraction.");
+      warnings.push("Evidence content type could not be detected and may need manual extraction.");
     }
 
     pdfDraftPayload = {
@@ -1883,20 +1914,20 @@ async function handlePdfInspect() {
 
     renderWarningList(pdfWarnings, warnings, "No warnings.");
     pdfPreviewCard.classList.remove("hidden");
-    pdfStatus.textContent = "PDF inspected. Review route labels before submit.";
+    pdfStatus.textContent = "Evidence inspected. Review route labels before submit.";
   } catch (error) {
     console.error(error);
-    alert(error.message || "Could not inspect PDF.");
-    pdfStatus.textContent = "PDF inspection failed.";
+    alert(error.message || "Could not inspect evidence.");
+    pdfStatus.textContent = "Evidence inspection failed.";
   } finally {
     pdfInspectBtn.disabled = false;
-    pdfInspectBtn.textContent = "Inspect PDF";
+    pdfInspectBtn.textContent = "Inspect Evidence";
   }
 }
 
 async function submitPdfUpload() {
   if (!pdfDraftPayload) {
-    alert("Inspect a PDF first.");
+    alert("Inspect an evidence file first.");
     return;
   }
 
@@ -1904,10 +1935,10 @@ async function submitPdfUpload() {
     draft: pdfDraftPayload,
     button: submitPdfBtn,
     pendingLabel: "Submitting...",
-    idleLabel: "Submit PDF for Review",
+    idleLabel: "Submit Evidence for Review",
     statusTarget: pdfStatus,
-    pendingStatus: "Submitting PDF intake...",
-    successStatus: "PDF submitted successfully and queued for admin review.",
+    pendingStatus: "Submitting evidence intake...",
+    successStatus: "Evidence submitted successfully and queued for admin review.",
     onSuccess: () => {
       pdfDraftPayload = null;
       pdfPreviewCard.classList.add("hidden");

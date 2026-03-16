@@ -17,12 +17,12 @@
             <input id="athleteFilter" type="search" placeholder="Search athlete name" autocomplete="off" />
           </div>
 
-          <div class="filter-field" id="divisionFilterField" style="display: none;">
+          <div class="filter-field" id="divisionFilterField">
             <label for="divisionFilter">Division</label>
             <select id="divisionFilter">
               <option value="">All divisions</option>
-              <option value="boys">Boys</option>
-              <option value="girls">Girls</option>
+              <option value="d1">Division 1</option>
+              <option value="d2">Division 2</option>
             </select>
           </div>
 
@@ -71,11 +71,13 @@
         <p id="status" class="status" aria-live="polite"></p>
       </section>
 
-      <section>
+      <section class="stats-results-section">
         <h2>Player Statistics</h2>
-        <div id="records"></div>
+        <div id="records" class="stats-results-shell"></div>
       </section>
     </main>
+
+    <footer data-public-footer></footer>
 
     <script src="./env.js"></script>
     <script type="module" src="./supabaseClient.js"></script>

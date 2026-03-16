@@ -980,7 +980,11 @@ const latestSeason = displayRecords
 currentRecords = [...displayRecords];
 
 if (!currentRecords.length) {
-  container.innerHTML = "<p>No records found.</p>";
+  container.innerHTML = `
+    <div class="stats-results-card">
+      <div class="public-empty">No records found.</div>
+    </div>
+  `;
   return {
     renderedCount: 0,
     sourceCount: rawRecords.length,
@@ -1104,9 +1108,12 @@ const pageRecords = currentRecords.slice(start, end);
 const showSoccerReviewLegend = shouldRenderSoccerReviewLegend(pageRecords, filters);
 
   // Generate dynamic table headers
-  const statHeaders = columns.map(col => 
-    `<th data-sort="${col.key}">${col.label}</th>`
-  ).join('');
+  const statHeaders = columns
+    .map(
+      (col) =>
+        `<th class="stats-table-head-cell stats-table-head-cell-number" data-sort="${col.key}">${col.label}</th>`
+    )
+    .join('');
 
   // Generate stat category tabs for baseball/softball/football
   const categoryTabsHTML = needsCategories ? `
@@ -1121,65 +1128,68 @@ const showSoccerReviewLegend = shouldRenderSoccerReviewLegend(pageRecords, filte
 
   const advancedToggleHTML = canShowAdvancedToggle ? `
     <button class="advanced-toggle" type="button" aria-expanded="${showAdvancedStats}">
-      ${showAdvancedStats ? '− Hide Advanced Stats' : '+ Advanced Stats'}
+      ${showAdvancedStats ? 'Hide advanced stats' : 'Show advanced stats'}
     </button>
   ` : '';
 
   const tableHTML = `
-    ${categoryTabsHTML}
-    <div class="pagination-controls">
-      <div class="pagination-info">
-      Showing ${start + 1}-${Math.min(end, currentRecords.length)} of ${currentRecords.length} ${
-       statsView === 'career-standard'
-        ? 'players (4-year standard)'
-        : statsView === 'career-extended'
-        ? 'players (full participation)'
-        : 'season records'
-}
-      </div>
-      <div class="pagination-actions">
-        ${advancedToggleHTML}
-        <label for="perPage">Show:</label>
-        <select id="perPage" class="per-page-selector">
-          <option value="25" ${recordsPerPage === 25 ? 'selected' : ''}>25</option>
-          <option value="50" ${recordsPerPage === 50 ? 'selected' : ''}>50</option>
-          <option value="100" ${recordsPerPage === 100 ? 'selected' : ''}>100</option>
-        </select>
-        <div class="page-nav">
-          <button class="prev-page" ${currentPage === 1 ? 'disabled' : ''}>← Prev</button>
-          <span class="page-numbers">Page ${currentPage} of ${totalPages}</span>
-          <button class="next-page" ${currentPage === totalPages ? 'disabled' : ''}>Next →</button>
+    <div class="stats-results-card">
+      ${categoryTabsHTML}
+      <div class="pagination-controls">
+        <div class="pagination-info">
+        Showing ${start + 1}-${Math.min(end, currentRecords.length)} of ${currentRecords.length} ${
+         statsView === 'career-standard'
+          ? 'players (4-year standard)'
+          : statsView === 'career-extended'
+          ? 'players (full participation)'
+          : 'season records'
+  }
+        </div>
+        <div class="pagination-actions">
+          ${advancedToggleHTML}
+          <div class="page-size-control">
+            <label for="perPage">Show</label>
+            <select id="perPage" class="per-page-selector">
+              <option value="25" ${recordsPerPage === 25 ? 'selected' : ''}>25</option>
+              <option value="50" ${recordsPerPage === 50 ? 'selected' : ''}>50</option>
+              <option value="100" ${recordsPerPage === 100 ? 'selected' : ''}>100</option>
+            </select>
+          </div>
+          <div class="page-nav">
+            <button class="prev-page" ${currentPage === 1 ? 'disabled' : ''}>Prev</button>
+            <span class="page-numbers">Page ${currentPage} of ${totalPages}</span>
+            <button class="next-page" ${currentPage === totalPages ? 'disabled' : ''}>Next</button>
+          </div>
         </div>
       </div>
+      <div class="stats-table-container">
+        <table class="stats-table">
+          <thead>
+            <tr>
+              <th class="stats-table-head-cell rank-head" data-sort="rank">#</th>
+              <th class="stats-table-head-cell player-head" data-sort="name">Player</th>
+              ${hideSchool ? '' : '<th class="stats-table-head-cell school-head" data-sort="school">School</th>'}
+              ${hideSport ? '' : '<th class="stats-table-head-cell sport-head" data-sort="sport">Sport</th>'}
+              <th class="stats-table-head-cell season-head" data-sort="season">Season</th>
+              ${statHeaders}
+            </tr>
+          </thead>
+          <tbody>
+            ${renderTableRows(pageRecords, start, sportType, hideSchool, hideSport, columns, latestSeason)}
+          </tbody>
+          </table>
+      </div>
+      ${showSoccerReviewLegend ? `
+        <div class="eligibility-legend soccer-review-legend">
+          ${SOCCER_PUBLIC_REVIEW_MARKER} Source under review
+        </div>
+      ` : ''}
+      ${statsView === 'career-extended' ? `
+        <div class="eligibility-legend">
+          * Indicates participation beyond the standard 4-year eligibility window.
+        </div>
+      ` : ''}
     </div>
-    <div class="stats-table-container">
-      <table class="stats-table">
-        <thead>
-          <tr>
-            <th data-sort="rank">#</th>
-            <th data-sort="name">Player</th>
-            ${hideSchool ? '' : '<th data-sort="school">School</th>'}
-            ${hideSport ? '' : '<th data-sort="sport">Sport</th>'}
-            <th data-sort="season">Season</th>
-            ${statHeaders}
-          </tr>
-        </thead>
-        <tbody>
-          ${renderTableRows(pageRecords, start, sportType, hideSchool, hideSport, columns, latestSeason)}
-        </tbody>
-        </table>
-         </div>
-    ${showSoccerReviewLegend ? `
-      <div class="eligibility-legend soccer-review-legend">
-        ${SOCCER_PUBLIC_REVIEW_MARKER} Source under review
-      </div>
-    ` : ''}
-    ${statsView === 'career-extended' ? `
-      <div class="eligibility-legend">
-        * Indicates participation beyond the standard 4-year eligibility window.
-      </div>
-    ` : ''}
-
   `;
 
   container.innerHTML = tableHTML;
@@ -1290,7 +1300,7 @@ const isExtended =
         ) {
          const gpValue = parseFloat(value) || 0;
          if (gpValue > 140) {
-         value = `${value} ⚠`;
+         value = `${value} !`;
          }
         }
 
@@ -1311,18 +1321,18 @@ const isExtended =
           }
         }
         
-        return `<td>${value}</td>`;
+        return `<td class="stat-value stat-value-number">${value}</td>`;
       }).join('');
 
       return `
         <tr class="${isActive ? 'active-player' : ''}">
-          <td>${startIndex + index + 1}</td>
-          <td class="athlete-name ${isExtended ? 'extended-player' : ''}">
+          <td class="rank-cell">${startIndex + index + 1}</td>
+          <td class="athlete-name player-cell ${isExtended ? 'extended-player' : ''}">
   ${athleteName}
 </td>
-          ${hideSchool ? '' : `<td>${school}</td>`}
-          ${hideSport ? '' : `<td>${sport}</td>`}
-          <td>${season}</td>
+          ${hideSchool ? '' : `<td class="school-cell">${school}</td>`}
+          ${hideSport ? '' : `<td class="sport-cell">${sport}</td>`}
+          <td class="season-cell">${season}</td>
           ${statCells}
         </tr>
       `;

@@ -7,7 +7,15 @@ const RECORD_SELECT_BASE = "id, school_id, school, sport, season, stat_row";
 const RECORD_SELECT = "id, school_id, school, sport, sport_variant, season, stat_row";
 const METADATA_SELECT_BASE = "id, school_id, school, sport, season";
 const PUBLIC_QUERY_PAGE_SIZE = 1000;
-const PUBLIC_SPORT_FAMILY_ORDER = ["baseball", "basketball", "football", "soccer", "softball", "volleyball"];
+const PUBLIC_SPORT_OPTIONS = Object.freeze([
+  { value: "baseball", label: "Baseball", sportKey: "baseball" },
+  { value: "boys_basketball", label: "Boys Basketball", sportKey: "basketball", genderKey: "boys" },
+  { value: "girls_basketball", label: "Girls Basketball", sportKey: "basketball", genderKey: "girls" },
+  { value: "football", label: "Football", sportKey: "football" },
+  { value: "soccer", label: "Soccer", sportKey: "soccer" },
+  { value: "softball", label: "Softball", sportKey: "softball" },
+  { value: "volleyball", label: "Volleyball", sportKey: "volleyball" },
+]);
 
 let visibleSchoolsCache = null;
 let visibleSportsCache = null;
@@ -75,20 +83,7 @@ function isMeaningfulPublicRow(row, { requireStatRow = true } = {}) {
 
 function mapPublicSportOption(row) {
   const context = resolveSportContext(row?.sport, row?.gender);
-
-  if (!context.sportKey) {
-    return null;
-  }
-
-  if (context.isBasketball && !context.isVarsity) {
-    return null;
-  }
-
-  return {
-    label: context.sportLabel || row?.sport_display || normalizeText(row?.sport),
-    sportKey: context.sportKey,
-    value: context.sportKey,
-  };
+  return resolvePublicSportOption(context);
 }
 
 function normalizeMetadataSportRows(rows) {
@@ -118,27 +113,58 @@ function parseSportFilterValue(value) {
   const rawValue = normalizeText(value);
   if (!rawValue) {
     return {
+      genderKey: "",
+      label: "",
       sportKey: "",
       value: "",
     };
   }
 
+  const option = findPublicSportOption(rawValue);
+  if (option) {
+    return {
+      ...option,
+      genderKey: option.genderKey || "",
+      label: option.label,
+      sportKey: option.sportKey,
+      value: option.value,
+    };
+  }
+
+  const context = resolveSportContext(rawValue);
+  const fallbackOption = resolvePublicSportOption(context);
+  if (fallbackOption) {
+    return {
+      ...fallbackOption,
+      genderKey: fallbackOption.genderKey || "",
+      label: fallbackOption.label,
+      sportKey: fallbackOption.sportKey,
+      value: fallbackOption.value,
+    };
+  }
+
   return {
+    genderKey: "",
+    label: rawValue,
     sportKey: normalizeSportKey(rawValue),
     value: rawValue,
   };
 }
 
-function normalizePublicDivisionValue(value) {
+function normalizeSchoolDivisionValue(value) {
   const normalized = normalizeText(value).toLowerCase();
-  if (normalized === "boys" || normalized === "girls") {
-    return normalized;
+  if (["d1", "division 1", "division1", "1"].includes(normalized)) {
+    return "d1";
+  }
+
+  if (["d2", "division 2", "division2", "2"].includes(normalized)) {
+    return "d2";
   }
 
   return "";
 }
 
-function matchesSportFilter(row, sportFilter, publicDivision = "") {
+function matchesSportFilter(row, sportFilter) {
   if (!sportFilter?.sportKey) {
     return true;
   }
@@ -148,11 +174,34 @@ function matchesSportFilter(row, sportFilter, publicDivision = "") {
     return false;
   }
 
-  if (sportFilter.sportKey === "basketball" && publicDivision && context.genderKey !== publicDivision) {
+  if (sportFilter.genderKey && context.genderKey !== sportFilter.genderKey) {
     return false;
   }
 
   return true;
+}
+
+function findPublicSportOption(value) {
+  const normalizedValue = normalizeText(value).toLowerCase();
+  return (
+    PUBLIC_SPORT_OPTIONS.find((option) => {
+      return option.value === normalizedValue || option.label.toLowerCase() === normalizedValue;
+    }) || null
+  );
+}
+
+function resolvePublicSportOption(context) {
+  if (!context?.sportKey || (context.isBasketball && !context.isVarsity)) {
+    return null;
+  }
+
+  if (context.sportKey === "basketball") {
+    return PUBLIC_SPORT_OPTIONS.find(
+      (option) => option.sportKey === "basketball" && option.genderKey === context.genderKey
+    ) || null;
+  }
+
+  return PUBLIC_SPORT_OPTIONS.find((option) => option.sportKey === context.sportKey && !option.genderKey) || null;
 }
 
 async function fetchPagedPublicRows(selectColumns, buildRequest, { pageSize = PUBLIC_QUERY_PAGE_SIZE } = {}) {
@@ -268,13 +317,16 @@ function buildSearchFilter(query) {
   ].join(",");
 }
 
-function applySportFilter(request, sportKey) {
-  const normalizedSport = normalizeSportKey(sportKey);
-  if (!normalizedSport) {
+function applySportFilter(request, sportFilter) {
+  if (!sportFilter?.sportKey) {
     return request;
   }
 
-  return request.ilike("sport", `%${normalizedSport}%`);
+  if (sportFilter.sportKey === "basketball" && sportFilter.label) {
+    return request.ilike("sport", `%${normalizeText(sportFilter.label)}%`);
+  }
+
+  return request.ilike("sport", `%${sportFilter.sportKey}%`);
 }
 
 function dedupeVisibleSchools(rows) {
@@ -395,31 +447,8 @@ async function fetchVisibleSports() {
     return visibleSportsCache;
   }
 
-  const metadataRows = await fetchPublicMetadataRows();
-  const deduped = new Map();
-
-  metadataRows.forEach((row) => {
-    const option = mapPublicSportOption(row);
-    if (!option || !option.value || !option.label) {
-      return;
-    }
-
-    if (!deduped.has(option.sportKey)) {
-      deduped.set(option.sportKey, option);
-    }
-  });
-
-  const sortIndex = new Map(PUBLIC_SPORT_FAMILY_ORDER.map((sportKey, index) => [sportKey, index]));
-  visibleSportsCache = Array.from(deduped.values()).sort((left, right) => {
-    const leftIndex = sortIndex.get(left.sportKey);
-    const rightIndex = sortIndex.get(right.sportKey);
-    if (leftIndex !== undefined || rightIndex !== undefined) {
-      return (leftIndex ?? Number.MAX_SAFE_INTEGER) - (rightIndex ?? Number.MAX_SAFE_INTEGER);
-    }
-
-    return left.label.localeCompare(right.label);
-  });
-
+  await fetchPublicMetadataRows();
+  visibleSportsCache = [...PUBLIC_SPORT_OPTIONS];
   return visibleSportsCache;
 }
 
@@ -460,6 +489,7 @@ export async function fetchStatsFilterMetadata() {
       sportDisplay: context.competitionLabel || context.sportLabel || normalizeText(row?.sport),
       sportFamilyLabel: context.sportLabel || normalizeText(row?.sport),
       sportKey: context.sportKey || "",
+      sportValue: resolvePublicSportOption(context)?.value || "",
     };
   });
 }
@@ -469,8 +499,7 @@ export async function fetchSportsRecords(query = "", filters = {}) {
   const normalizedSchoolId = normalizeText(filters.schoolId);
   const sportFilter = parseSportFilterValue(filters.sport);
   const normalizedSeason = normalizeText(filters.season);
-  const normalizedDivision =
-    sportFilter.sportKey === "basketball" ? normalizePublicDivisionValue(filters.division) : "";
+  const normalizedDivision = normalizeSchoolDivisionValue(filters.division);
   const normalizedFootballVariant = normalizeFootballFormat(
     filters.footballFormat || filters.footballVariant,
     { allowBlank: true }
@@ -488,6 +517,22 @@ export async function fetchSportsRecords(query = "", filters = {}) {
     return [];
   }
 
+  let divisionSchoolIds = [];
+  let divisionSchoolNames = [];
+
+  if (normalizedDivision) {
+    const visibleSchools = await fetchVisibleSchools();
+    const schoolsInDivision = visibleSchools.filter(
+      (school) => normalizeSchoolDivisionValue(school?.division) === normalizedDivision
+    );
+    divisionSchoolIds = schoolsInDivision.map((school) => school.id).filter(Boolean);
+    divisionSchoolNames = schoolsInDivision.map((school) => school.full_name).filter(Boolean);
+
+    if (!divisionSchoolIds.length && !divisionSchoolNames.length) {
+      return [];
+    }
+  }
+
   function buildRecordsRequest(request, { includeFootballVariant = true } = {}) {
     let nextRequest = request
       .not("sport", "is", null)
@@ -503,7 +548,15 @@ export async function fetchSportsRecords(query = "", filters = {}) {
     }
 
     if (sportFilter.sportKey) {
-      nextRequest = applySportFilter(nextRequest, sportFilter.sportKey);
+      nextRequest = applySportFilter(nextRequest, sportFilter);
+    }
+
+    if (normalizedDivision) {
+      if (divisionSchoolIds.length) {
+        nextRequest = nextRequest.in("school_id", divisionSchoolIds);
+      } else {
+        nextRequest = nextRequest.in("school", divisionSchoolNames);
+      }
     }
 
     if (normalizedSeason) {
@@ -524,9 +577,7 @@ export async function fetchSportsRecords(query = "", filters = {}) {
     { requireSportVariant: Boolean(normalizedFootballVariant) }
   );
 
-  return normalizePublicRecordRows(rawRows).filter((row) =>
-    matchesSportFilter(row, sportFilter, normalizedDivision)
-  );
+  return normalizePublicRecordRows(rawRows).filter((row) => matchesSportFilter(row, sportFilter));
 }
 
 export async function fetchSportsList() {

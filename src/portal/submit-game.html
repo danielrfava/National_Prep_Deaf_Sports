@@ -46,7 +46,7 @@
 
     .mode-grid {
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 5px;
       margin-bottom: 5px;
     }
@@ -74,6 +74,41 @@
     border-color: var(--npds-accent);
     background: linear-gradient(180deg, #132233 0%, #11202f 100%);
     box-shadow: 0 0 0 1px var(--npds-accent-soft), 0 14px 28px rgba(2, 8, 16, 0.46);
+  }
+
+  .mode-placeholder-panel {
+    border: 1px dashed #35506b;
+    border-radius: 14px;
+    background: rgba(15, 23, 34, 0.74);
+    padding: 18px;
+    display: grid;
+    gap: 10px;
+  }
+
+  .mode-placeholder-panel strong {
+    color: #ecf5ff;
+    font-size: 0.94rem;
+  }
+
+  .mode-placeholder-panel p {
+    margin: 0;
+    color: var(--npds-muted);
+    line-height: 1.45;
+    font-size: 0.84rem;
+  }
+
+  .mode-placeholder-note {
+    display: inline-flex;
+    width: fit-content;
+    border-radius: 999px;
+    border: 1px solid #35506b;
+    background: #112337;
+    color: #bdd2e6;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 4px 8px;
   }
 
   .mode-kicker {
@@ -1045,13 +1080,23 @@
     <section class="mode-grid" aria-label="Submission modes">
       <button id="modeCardModern" class="mode-card is-active" data-mode="modern" type="button">
         <span class="mode-kicker">Mode 1</span>
-        <strong class="mode-title">Modern Stats File</strong>
-        <span class="mode-copy">CSV/XLSX intake with mapping, validation, confidence, and preview.</span>
+        <strong class="mode-title">Structured Spreadsheet Upload</strong>
+        <span class="mode-copy">CSV/XLSX fast lane for clean season-summary files, validation, mapping, and preview.</span>
       </button>
       <button id="modeCardPdf" class="mode-card" data-mode="pdf" type="button">
         <span class="mode-kicker">Mode 2</span>
-        <strong class="mode-title">PDF Reports</strong>
-        <span class="mode-copy">PDF review lane with preview-first rules and admin routing.</span>
+        <strong class="mode-title">Evidence / Document Upload</strong>
+        <span class="mode-copy">Review-first document lane for PDFs now, with broader evidence intake living here next.</span>
+      </button>
+      <button id="modeCardSchedule" class="mode-card" data-mode="schedule" type="button">
+        <span class="mode-kicker">Mode 3</span>
+        <strong class="mode-title">Schedule &amp; Results</strong>
+        <span class="mode-copy">Score-only seasons, opponent chronology, and team-history intake live as a dedicated lane.</span>
+      </button>
+      <button id="modeCardArchive" class="mode-card" data-mode="archive" type="button">
+        <span class="mode-kicker">Mode 4</span>
+        <strong class="mode-title">Legacy Archive / Record Book</strong>
+        <span class="mode-copy">Partial archive facts, yearbook claims, and citation-heavy record-book intake belong here.</span>
       </button>
     </section>
 
@@ -1060,8 +1105,8 @@
         <div class="portal-grid">
       <aside class="portal-card compact-mode-panel">
         <div class="portal-card-header">
-          <h2>Mode 1 - Spreadsheet Upload</h2>
-          <p>Pick sport, optional season note, lane, then drop your file.</p>
+          <h2>Mode 1 - Structured Spreadsheet Upload</h2>
+          <p>Pick sport, add an optional season note, then upload a clean spreadsheet for parser review.</p>
         </div>
         <div class="portal-card-body">
           <div class="form-stack modern-intake-form">
@@ -1094,7 +1139,7 @@
                 </div>
               </div>
 
-            <div class="field-group lane-control-group">
+            <div class="field-group lane-control-group hidden">
               <label>Lane</label>
               <div class="btn-row lane-tabs lane-tabs-inline lane-tabs-compact">
                 <button id="mode1Btn" class="portal-btn portal-btn-primary" type="button">Spreadsheet</button>
@@ -1108,7 +1153,7 @@
                   <span class="template-kicker">Upload Helpers</span>
                   <strong id="templateToolkitTitle" class="template-title">Templates for Spreadsheet Uploads</strong>
                   <p id="templateToolkitDescription" class="template-description">
-                    Select basketball or volleyball to unlock sport-specific templates. Historical downloads stay available below.
+                    Select basketball or volleyball to unlock parser-matched templates. Historical and schedule/archive starter files stay available below.
                   </p>
                 </div>
                 <div class="template-action-row">
@@ -1397,8 +1442,8 @@ Tyler Brooks: 11 points, 4 rebounds, 7 assists"
       <div id="modePdfPanel" class="wizard-panel hidden">
         <section class="portal-card">
           <div class="portal-card-header">
-            <h2>Mode 2 - PDF Review Engine</h2>
-            <p>Select sport, add optional season note, then drop the PDF to start review.</p>
+            <h2>Mode 2 - Evidence / Document Review</h2>
+            <p>PDF evidence is live now. Image and document review uploads will route through this same approval-first lane.</p>
           </div>
           <div class="portal-card-body">
             <div class="form-stack pdf-intake-form">
@@ -1429,28 +1474,28 @@ Tyler Brooks: 11 points, 4 rebounds, 7 assists"
                 </div>
               </div>
               <div class="field-group">
-                <label>PDF file</label>
+                <label>Evidence file</label>
                 <div id="pdfDropzone" class="file-dropzone dropzone-hero">
                   <div class="dropzone-icon">PDF</div>
-                  <div class="dropzone-title">Drop your PDF report here</div>
+                  <div class="dropzone-title">Drop your PDF evidence file here</div>
                   <div class="dropzone-subtitle">Drag and drop or click to browse</div>
                   <input id="pdfInput" type="file" accept=".pdf,application/pdf" class="hidden" />
                 </div>
-                <div class="dropzone-types">Accepted: .pdf</div>
+                <div class="dropzone-types">Live today: .pdf review routing. Image and .docx evidence lanes are next in this mode.</div>
               </div>
               <div id="pdfSelectedFile" class="selected-file"></div>
-              <div class="help-note">PDF uploads are always review-routed. No direct publish path is allowed.</div>
+              <div class="help-note">Evidence uploads are always review-routed. No direct publish path is allowed.</div>
               <div class="btn-row hero-action-row">
-                <button id="pdfInspectBtn" class="portal-btn portal-btn-primary" type="button">Inspect PDF</button>
+                <button id="pdfInspectBtn" class="portal-btn portal-btn-primary" type="button">Inspect Evidence</button>
               </div>
-              <div id="pdfStatus" class="status-pill">Waiting for PDF file</div>
+              <div id="pdfStatus" class="status-pill">Waiting for evidence file</div>
             </div>
           </div>
         </section>
 
         <section id="pdfPreviewCard" class="portal-card hidden" style="margin-top: 20px;">
           <div class="portal-card-header">
-            <h2>PDF Intake Preview</h2>
+            <h2>Evidence Intake Preview</h2>
             <p>Confirm route labels and summary before queue submission.</p>
           </div>
           <div class="portal-card-body">
@@ -1458,18 +1503,69 @@ Tyler Brooks: 11 points, 4 rebounds, 7 assists"
             <div class="warnings-box" style="margin: 18px 0;">
               <div class="section-head">
                 <h3>Warnings</h3>
-                <p>PDF review warnings and confidence notes.</p>
+                <p>Evidence review warnings and confidence notes.</p>
               </div>
               <ul id="pdfWarnings" class="warnings-list"></ul>
             </div>
             <div class="preview-actions">
-              <button id="submitPdfBtn" class="portal-btn portal-btn-success" type="button">Submit PDF for Review</button>
+              <button id="submitPdfBtn" class="portal-btn portal-btn-success" type="button">Submit Evidence for Review</button>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div id="modeSchedulePanel" class="wizard-panel hidden">
+        <section class="portal-card">
+          <div class="portal-card-header">
+            <h2>Mode 3 - Schedule &amp; Results</h2>
+            <p>Score-only seasons, opponent timelines, and team-history uploads belong here as their own shape.</p>
+          </div>
+          <div class="portal-card-body">
+            <div class="mode-placeholder-panel">
+              <span class="mode-placeholder-note">Coming soon</span>
+              <strong>Mode 3 is restored in the portal architecture.</strong>
+              <p>Use this lane for season schedules, results, records, and opponent chronology where player stats are not required.</p>
+              <p>It will support both structured spreadsheet intake and evidence-first uploads without forcing schedule history into box score logic.</p>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div id="modeArchivePanel" class="wizard-panel hidden">
+        <section class="portal-card">
+          <div class="portal-card-header">
+            <h2>Mode 4 - Legacy Archive / Record Book</h2>
+            <p>Record-book pages, yearbook fragments, and one-off historical claims need a citation-heavy archive lane.</p>
+          </div>
+          <div class="portal-card-body">
+            <div class="mode-placeholder-panel">
+              <span class="mode-placeholder-note">Coming soon</span>
+              <strong>Mode 4 is back as a distinct intake path.</strong>
+              <p>This lane is reserved for partial archive facts, legacy summaries, and review-first historical claims that do not fit clean spreadsheet ingestion.</p>
+              <p>It will stay separate from modern parser uploads so archival evidence can be reviewed, transcribed, and approved carefully.</p>
             </div>
           </div>
         </section>
       </div>
     </section>
   </main>
+
+  <footer class="public-footer">
+    <div class="public-footer-shell">
+      <div class="public-footer-brand">
+        <p class="public-footer-title">&copy; National Prep Deaf Sports</p>
+        <p class="public-footer-copy">Independent preservation and publishing platform for Deaf high school athletics.</p>
+      </div>
+      <nav class="public-footer-links" aria-label="Trust and legal">
+        <a class="public-footer-link" href="../about.html">About</a>
+        <a class="public-footer-link" href="../privacy.html">Privacy Policy</a>
+        <a class="public-footer-link" href="../terms.html">Terms of Use</a>
+        <a class="public-footer-link" href="../disclaimer.html">Data Accuracy Disclaimer</a>
+        <a class="public-footer-link" href="../ownership.html">Ownership &amp; Use</a>
+        <a class="public-footer-link" href="../contact.html">Contact</a>
+      </nav>
+    </div>
+  </footer>
 
   <script src="../env.js"></script>
   <script type="module" src="./submit-game.js"></script>

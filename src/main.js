@@ -15,7 +15,6 @@ const status = document.querySelector("#status");
 const recordsContainer = document.querySelector("#records");
 const schoolFilter = document.querySelector("#schoolFilter");
 const divisionFilter = document.querySelector("#divisionFilter");
-const divisionFilterField = document.querySelector("#divisionFilterField");
 const sportFilter = document.querySelector("#sportFilter");
 const seasonFilter = document.querySelector("#seasonFilter");
 const footballFormatFilter = document.querySelector("#footballFormatFilter");
@@ -73,13 +72,12 @@ function compareSeasonLabelsDesc(left, right) {
 
 function buildFilters() {
   const sport = sportFilter?.value || "";
-  const isBasketball = isBasketballSportSelection(sport);
   const isFootball = isFootballSportValue(sport);
 
   return {
     schoolId: schoolFilter?.value || "",
     sport,
-    division: isBasketball ? normalizeDivisionValue(divisionFilter?.value) : "",
+    division: normalizeDivisionValue(divisionFilter?.value),
     season: seasonFilter?.value || "",
     footballFormat: isFootball ? footballFormatFilter?.value || "" : "",
   };
@@ -121,23 +119,40 @@ function toggleFootballFormatFilter() {
 
 function normalizeDivisionValue(value) {
   const normalized = String(value || "").trim().toLowerCase();
-  return normalized === "boys" || normalized === "girls" ? normalized : "";
-}
-
-function isBasketballSportSelection(value = sportFilter?.value || "") {
-  return String(value || "").trim().toLowerCase() === "basketball";
-}
-
-function syncDivisionFilterVisibility() {
-  const isBasketball = isBasketballSportSelection();
-
-  if (divisionFilterField) {
-    divisionFilterField.style.display = isBasketball ? "flex" : "none";
+  if (["d1", "division 1", "division1", "1"].includes(normalized)) {
+    return "d1";
   }
 
-  if (!isBasketball && divisionFilter) {
-    divisionFilter.value = "";
+  if (["d2", "division 2", "division2", "2"].includes(normalized)) {
+    return "d2";
   }
+
+  return "";
+}
+
+function getSelectedSportOption(value = sportFilter?.value || "") {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (!normalized) {
+    return null;
+  }
+
+  return (
+    allSportOptions.find((option) => String(option?.value || "").trim().toLowerCase() === normalized) || null
+  );
+}
+
+function getSelectedDivisionSchoolIds() {
+  const normalizedDivision = normalizeDivisionValue(divisionFilter?.value);
+  if (!normalizedDivision) {
+    return null;
+  }
+
+  return new Set(
+    allSchools
+      .filter((school) => normalizeDivisionValue(school?.division) === normalizedDivision)
+      .map((school) => String(school?.id || "").trim())
+      .filter(Boolean)
+  );
 }
 
 function onFiltersChanged() {
@@ -195,18 +210,29 @@ async function runSearch({ force = false } = {}) {
 }
 
 function getSelectedMetadataRows() {
-  const selectedSport = String(sportFilter?.value || "").trim().toLowerCase();
-  const selectedDivision = isBasketballSportSelection(selectedSport)
-    ? normalizeDivisionValue(divisionFilter?.value)
-    : "";
+  const selectedSportOption = getSelectedSportOption();
+  const divisionSchoolIds = getSelectedDivisionSchoolIds();
 
   return (allMetadataRows || []).filter((row) => {
-    if (selectedSport && String(row?.sportKey || "").trim().toLowerCase() !== selectedSport) {
-      return false;
+    if (selectedSportOption) {
+      if (
+        String(row?.sportKey || "").trim().toLowerCase() !==
+        String(selectedSportOption.sportKey || "").trim().toLowerCase()
+      ) {
+        return false;
+      }
+
+      if (
+        selectedSportOption.genderKey &&
+        String(row?.genderKey || "").trim().toLowerCase() !==
+          String(selectedSportOption.genderKey || "").trim().toLowerCase()
+      ) {
+        return false;
+      }
     }
 
-    if (selectedSport === "basketball" && selectedDivision) {
-      return String(row?.genderKey || "").trim().toLowerCase() === selectedDivision;
+    if (divisionSchoolIds && !divisionSchoolIds.has(String(row?.schoolId || "").trim())) {
+      return false;
     }
 
     return true;
@@ -220,7 +246,7 @@ function updateSchoolFilter(metadataRows = []) {
   schoolFilter.innerHTML = '<option value="">All schools</option>';
 
   const scopedRows = Array.isArray(metadataRows) ? metadataRows : [];
-  const shouldScopeSchools = Boolean(sportFilter?.value || normalizeDivisionValue(divisionFilter?.value));
+  const shouldScopeSchools = Boolean(getSelectedSportOption() || normalizeDivisionValue(divisionFilter?.value));
   const visibleSchoolIds = new Set(scopedRows.map((row) => String(row?.schoolId || "").trim()).filter(Boolean));
   const filteredSchools = shouldScopeSchools
     ? allSchools.filter((school) => visibleSchoolIds.has(String(school?.id || "").trim()))
@@ -241,7 +267,7 @@ function updateSchoolFilter(metadataRows = []) {
 function updateSeasonFilter(metadataRows = []) {
   if (!seasonFilter) return;
 
-  const shouldScopeSeasons = Boolean(sportFilter?.value || normalizeDivisionValue(divisionFilter?.value));
+  const shouldScopeSeasons = Boolean(getSelectedSportOption() || normalizeDivisionValue(divisionFilter?.value));
   const scopedRows = shouldScopeSeasons
     ? (Array.isArray(metadataRows) ? metadataRows : [])
     : allMetadataRows;
@@ -253,7 +279,6 @@ function updateSeasonFilter(metadataRows = []) {
 }
 
 function refreshScopedFilterOptions() {
-  syncDivisionFilterVisibility();
   const metadataRows = getSelectedMetadataRows();
   updateSchoolFilter(metadataRows);
   updateSeasonFilter(metadataRows);
@@ -281,25 +306,39 @@ function populateSimpleSelect(select, values, placeholder) {
   }
 }
 
-function resolveInitialSportSelection(initialSport) {
+function resolveInitialSportSelection(initialSport, legacyBasketballGender = "") {
   const normalized = String(initialSport || "").trim().toLowerCase();
   if (!normalized) {
-    return { divisionValue: "", sportValue: "" };
+    return { sportValue: "" };
   }
 
-  const context = resolveSportContext(initialSport);
   const exactMatch = allSportOptions.find((option) => {
     const optionValue = String(option?.value || "").trim().toLowerCase();
     const optionLabel = String(option?.label || "").trim().toLowerCase();
     return optionValue === normalized || optionLabel === normalized;
   });
 
-  const resolvedSportValue = exactMatch?.value || context.sportKey || "";
-  const resolvedDivisionValue = context.sportKey === "basketball" ? context.genderKey || "" : "";
+  if (exactMatch?.value) {
+    return { sportValue: exactMatch.value };
+  }
+
+  const context = resolveSportContext(initialSport);
+  if (context.sportKey === "basketball") {
+    const explicitBasketballOption = allSportOptions.find((option) => {
+      return (
+        String(option?.sportKey || "").trim().toLowerCase() === "basketball" &&
+        String(option?.genderKey || "").trim().toLowerCase() ===
+          String(context.genderKey || legacyBasketballGender || "").trim().toLowerCase()
+      );
+    });
+
+    return {
+      sportValue: explicitBasketballOption?.value || "",
+    };
+  }
 
   return {
-    divisionValue: resolvedDivisionValue,
-    sportValue: resolvedSportValue,
+    sportValue: context.sportKey || "",
   };
 }
 
@@ -308,7 +347,9 @@ function applyInitialParams() {
   const initialQuery = (params.get("q") || "").trim();
   const initialSchool = (params.get("school") || "").trim();
   const initialSport = (params.get("sport") || "").trim();
-  const initialDivision = (params.get("division") || params.get("gender") || "").trim().toLowerCase();
+  const initialDivisionRaw = (params.get("division") || "").trim().toLowerCase();
+  const initialDivision = normalizeDivisionValue(initialDivisionRaw);
+  const legacyBasketballGender = ["boys", "girls"].includes(initialDivisionRaw) ? initialDivisionRaw : "";
   const initialSeason = (params.get("season") || "").trim();
   const initialFootballFormat =
     (params.get("football_format") || params.get("footballFormat") || params.get("footballVariant") || "").trim();
@@ -322,19 +363,16 @@ function applyInitialParams() {
   }
 
   if (initialSport && sportFilter) {
-    const resolvedSportSelection = resolveInitialSportSelection(initialSport);
+    const resolvedSportSelection = resolveInitialSportSelection(initialSport, legacyBasketballGender);
     if (resolvedSportSelection.sportValue) {
       sportFilter.value = resolvedSportSelection.sportValue;
     }
 
-    syncDivisionFilterVisibility();
-
-    const divisionValue = normalizeDivisionValue(initialDivision || resolvedSportSelection.divisionValue);
-    if (divisionValue && divisionFilter && isBasketballSportSelection(sportFilter.value)) {
-      divisionFilter.value = divisionValue;
-    }
-
     toggleFootballFormatFilter();
+  }
+
+  if (initialDivision && divisionFilter) {
+    divisionFilter.value = initialDivision;
   }
 
   if (initialSeason && seasonFilter) {
