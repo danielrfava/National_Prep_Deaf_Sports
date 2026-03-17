@@ -16,12 +16,13 @@ const FOOTER_ITEMS = [
 ];
 
 function wireResponsiveNav(host) {
-  const backdrop = host.querySelector("[data-public-nav-backdrop]");
-  const closeButton = host.querySelector("[data-public-nav-close]");
-  const flyoutShell = host.querySelector("[data-public-nav-flyout-shell]");
-  const flyout = host.querySelector("[data-public-nav-flyout]");
   const toggle = host.querySelector("[data-public-nav-toggle]");
-  const flyoutLinks = host.querySelector("[data-public-nav-flyout-links]");
+  const overlayRoot = document.querySelector("[data-public-nav-overlay-root]");
+  const backdrop = overlayRoot?.querySelector("[data-public-nav-backdrop]");
+  const closeButton = overlayRoot?.querySelector("[data-public-nav-close]");
+  const flyoutShell = overlayRoot?.querySelector("[data-public-nav-flyout-shell]");
+  const flyout = overlayRoot?.querySelector("[data-public-nav-flyout]");
+  const flyoutLinks = overlayRoot?.querySelector("[data-public-nav-flyout-links]");
   const root = document.documentElement;
   let backdropHideTimer = null;
 
@@ -124,6 +125,13 @@ export function mountPublicTopNav(options = {}) {
 
   host.className = landing ? "topbar public-topbar landing-topbar" : "topbar public-topbar";
   const menuId = "publicNavMenu";
+  let overlayRoot = document.querySelector("[data-public-nav-overlay-root]");
+
+  if (!overlayRoot) {
+    overlayRoot = document.createElement("div");
+    overlayRoot.setAttribute("data-public-nav-overlay-root", "");
+    document.body.appendChild(overlayRoot);
+  }
 
   host.innerHTML = `
     <div class="topbar-container">
@@ -155,35 +163,38 @@ export function mountPublicTopNav(options = {}) {
           return `<a class="nav-link${isActive ? " nav-link-active" : ""}" data-nav-key="${item.key}" href="${basePath}${item.href}"${isActive ? ' aria-current="page"' : ""}>${item.label}</a>`;
         }).join("")}
       </nav>
+    </div>
+  `;
 
-      <div class="public-nav-backdrop" data-public-nav-backdrop hidden></div>
+  overlayRoot.className = "public-nav-overlay-root";
+  overlayRoot.innerHTML = `
+    <div class="public-nav-backdrop" data-public-nav-backdrop hidden></div>
 
-      <div class="public-nav-flyout-shell" data-public-nav-flyout-shell>
-        <nav
-          class="public-nav-flyout"
-          id="${menuId}"
-          aria-label="Primary"
-          aria-hidden="true"
-          data-public-nav-flyout
-        >
-          <div class="public-nav-panel-head">
-            <div>
-              <p class="public-nav-panel-kicker">Menu</p>
-              <p class="public-nav-panel-title">National Prep Deaf Sports</p>
-            </div>
-            <button class="public-nav-close" type="button" data-public-nav-close>
-              <span class="sr-only">Close navigation</span>
-              <span aria-hidden="true">+</span>
-            </button>
+    <div class="public-nav-flyout-shell" data-public-nav-flyout-shell aria-hidden="true">
+      <nav
+        class="public-nav-flyout"
+        id="${menuId}"
+        aria-label="Primary"
+        aria-hidden="true"
+        data-public-nav-flyout
+      >
+        <div class="public-nav-panel-head">
+          <div>
+            <p class="public-nav-panel-kicker">Menu</p>
+            <p class="public-nav-panel-title">National Prep Deaf Sports</p>
           </div>
-          <div class="public-nav-flyout-links" data-public-nav-flyout-links>
-            ${NAV_ITEMS.map((item) => {
-              const isActive = item.key === active;
-              return `<a class="nav-link public-nav-flyout-link${isActive ? " nav-link-active" : ""}" data-nav-key="${item.key}" href="${basePath}${item.href}"${isActive ? ' aria-current="page"' : ""}>${item.label}</a>`;
-            }).join("")}
-          </div>
-        </nav>
-      </div>
+          <button class="public-nav-close" type="button" data-public-nav-close>
+            <span class="sr-only">Close navigation</span>
+            <span aria-hidden="true">+</span>
+          </button>
+        </div>
+        <div class="public-nav-flyout-links" data-public-nav-flyout-links>
+          ${NAV_ITEMS.map((item) => {
+            const isActive = item.key === active;
+            return `<a class="nav-link public-nav-flyout-link${isActive ? " nav-link-active" : ""}" data-nav-key="${item.key}" href="${basePath}${item.href}"${isActive ? ' aria-current="page"' : ""}>${item.label}</a>`;
+          }).join("")}
+        </div>
+      </nav>
     </div>
   `;
 

@@ -1436,7 +1436,6 @@ body.public-nav-open {
   position: sticky;
   top: 0;
   z-index: 80;
-  isolation: isolate;
   overflow: visible;
   background: rgba(10, 16, 24, 0.88);
   backdrop-filter: blur(14px);
@@ -1468,6 +1467,11 @@ body.public-nav-open {
 
 .public-nav-backdrop {
   display: none;
+}
+
+.public-nav-overlay-root {
+  position: relative;
+  z-index: 12000;
 }
 
 .public-nav-flyout-shell {
@@ -2409,7 +2413,7 @@ body.public-nav-open {
     display: block;
     position: fixed;
     inset: 0;
-    z-index: 84;
+    z-index: 12010;
     background: rgba(5, 11, 18, 0.28);
     backdrop-filter: blur(6px);
     opacity: 0;
@@ -2430,8 +2434,8 @@ body.public-nav-open {
     display: block;
     position: fixed;
     inset: 0;
-    z-index: 85;
-    overflow: hidden;
+    z-index: 12020;
+    overflow: visible;
     pointer-events: none;
   }
 
@@ -2445,13 +2449,13 @@ body.public-nav-open {
     align-items: stretch !important;
     justify-content: flex-start !important;
     flex-wrap: nowrap !important;
-    position: absolute;
+    position: fixed;
     top: calc(env(safe-area-inset-top, 0px) + 60px);
-    right: 14px;
+    right: max(14px, env(safe-area-inset-right, 0px));
     width: min(292px, calc(100vw - 28px));
     max-width: calc(100vw - 28px);
     max-height: calc(100vh - env(safe-area-inset-top, 0px) - 84px);
-    z-index: 86;
+    z-index: 12030;
     gap: 0;
     padding: 12px;
     border: 1px solid rgba(210, 227, 241, 0.14);
