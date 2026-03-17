@@ -45,8 +45,6 @@
 
     <script type="module">
       import { mountPublicTopNav } from "./components/publicTopNav.js";
-      import { attachSearchAutocomplete } from "./components/searchAutocomplete.js";
-      import { buildAthleteProfileHref } from "./services/publicEntityService.js";
 
       mountPublicTopNav({ active: "search", landing: true });
 
@@ -138,29 +136,46 @@
         });
       }
 
-      attachSearchAutocomplete(searchInput, {
-        onSelect(result) {
-          activateSearchState();
+      async function initHomepageSearchEnhancements() {
+        if (!searchInput) {
+          return;
+        }
 
-          if (result.type === "athlete") {
-            window.location.href = buildAthleteProfileHref(result);
-            return;
-          }
+        try {
+          const [{ attachSearchAutocomplete }, { buildAthleteProfileHref }] = await Promise.all([
+            import("./components/searchAutocomplete.js"),
+            import("./services/publicEntityService.js"),
+          ]);
 
-          if (result.type === "school") {
-            if (result.schoolId) {
-              window.location.href = `stats.html?school=${encodeURIComponent(result.schoolId)}`;
-              return;
-            }
+          attachSearchAutocomplete(searchInput, {
+            onSelect(result) {
+              activateSearchState();
 
-            const schoolQuery = result.title || result.query || "";
-            window.location.href = `stats.html${schoolQuery ? `?q=${encodeURIComponent(schoolQuery)}` : ""}`;
-            return;
-          }
+              if (result.type === "athlete") {
+                window.location.href = buildAthleteProfileHref(result);
+                return;
+              }
 
-          window.location.href = `search.html?q=${encodeURIComponent(result.query || result.title || "")}`;
-        },
-      });
+              if (result.type === "school") {
+                if (result.schoolId) {
+                  window.location.href = `stats.html?school=${encodeURIComponent(result.schoolId)}`;
+                  return;
+                }
+
+                const schoolQuery = result.title || result.query || "";
+                window.location.href = `stats.html${schoolQuery ? `?q=${encodeURIComponent(schoolQuery)}` : ""}`;
+                return;
+              }
+
+              window.location.href = `search.html?q=${encodeURIComponent(result.query || result.title || "")}`;
+            },
+          });
+        } catch (error) {
+          console.error("Homepage search enhancements unavailable.", error);
+        }
+      }
+
+      initHomepageSearchEnhancements();
     </script>
   </body>
 </html>
