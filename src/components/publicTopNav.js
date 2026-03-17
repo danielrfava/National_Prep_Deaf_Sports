@@ -18,28 +18,47 @@ const FOOTER_ITEMS = [
 function wireResponsiveNav(host) {
   const backdrop = host.querySelector("[data-public-nav-backdrop]");
   const closeButton = host.querySelector("[data-public-nav-close]");
-  const drawerShell = host.querySelector("[data-public-nav-drawer-shell]");
-  const drawer = host.querySelector("[data-public-nav-drawer]");
+  const flyoutShell = host.querySelector("[data-public-nav-flyout-shell]");
+  const flyout = host.querySelector("[data-public-nav-flyout]");
   const toggle = host.querySelector("[data-public-nav-toggle]");
-  const drawerLinks = host.querySelector("[data-public-nav-drawer-links]");
+  const flyoutLinks = host.querySelector("[data-public-nav-flyout-links]");
   const root = document.documentElement;
+  let backdropHideTimer = null;
 
-  if (!toggle || !drawer || !drawerShell || !backdrop || !drawerLinks) {
+  if (!toggle || !flyout || !flyoutShell || !backdrop || !flyoutLinks) {
     return;
   }
 
+  const clearBackdropTimer = () => {
+    if (backdropHideTimer) {
+      window.clearTimeout(backdropHideTimer);
+      backdropHideTimer = null;
+    }
+  };
+
   const setOpen = (isOpen) => {
+    clearBackdropTimer();
+    if (isOpen) {
+      backdrop.hidden = false;
+    }
+
     toggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
-    drawer.setAttribute("aria-hidden", isOpen ? "false" : "true");
-    drawerShell.setAttribute("aria-hidden", isOpen ? "false" : "true");
+    flyout.setAttribute("aria-hidden", isOpen ? "false" : "true");
+    flyoutShell.setAttribute("aria-hidden", isOpen ? "false" : "true");
     backdrop.setAttribute("aria-hidden", isOpen ? "false" : "true");
-    drawerShell.classList.toggle("is-open", isOpen);
-    drawer.classList.toggle("is-open", isOpen);
-    backdrop.hidden = !isOpen;
+    flyoutShell.classList.toggle("is-open", isOpen);
+    flyout.classList.toggle("is-open", isOpen);
     backdrop.classList.toggle("is-open", isOpen);
     host.classList.toggle("is-nav-open", isOpen);
     root.classList.toggle("public-nav-open", isOpen);
     document.body.classList.toggle("public-nav-open", isOpen);
+
+    if (!isOpen) {
+      backdropHideTimer = window.setTimeout(() => {
+        backdrop.hidden = true;
+        backdropHideTimer = null;
+      }, 180);
+    }
   };
 
   setOpen(false);
@@ -71,7 +90,7 @@ function wireResponsiveNav(host) {
   closeButton?.addEventListener("click", () => closeMenu(true));
   backdrop.addEventListener("click", () => closeMenu(true));
 
-  drawerLinks.querySelectorAll("a").forEach((link) => {
+  flyoutLinks.querySelectorAll("a").forEach((link) => {
     link.addEventListener("click", () => closeMenu());
   });
 
@@ -121,6 +140,7 @@ export function mountPublicTopNav(options = {}) {
         type="button"
         aria-expanded="false"
         aria-controls="${menuId}"
+        aria-haspopup="dialog"
         data-public-nav-toggle
       >
         <span class="sr-only">Toggle navigation</span>
@@ -138,12 +158,13 @@ export function mountPublicTopNav(options = {}) {
 
       <div class="public-nav-backdrop" data-public-nav-backdrop hidden></div>
 
-      <div class="public-nav-drawer-shell" data-public-nav-drawer-shell>
+      <div class="public-nav-flyout-shell" data-public-nav-flyout-shell>
         <nav
-          class="public-nav-drawer"
+          class="public-nav-flyout"
           id="${menuId}"
           aria-label="Primary"
-          data-public-nav-drawer
+          aria-hidden="true"
+          data-public-nav-flyout
         >
           <div class="public-nav-panel-head">
             <div>
@@ -155,10 +176,10 @@ export function mountPublicTopNav(options = {}) {
               <span aria-hidden="true">+</span>
             </button>
           </div>
-          <div class="public-nav-drawer-links" data-public-nav-drawer-links>
+          <div class="public-nav-flyout-links" data-public-nav-flyout-links>
             ${NAV_ITEMS.map((item) => {
               const isActive = item.key === active;
-              return `<a class="nav-link public-nav-drawer-link${isActive ? " nav-link-active" : ""}" data-nav-key="${item.key}" href="${basePath}${item.href}"${isActive ? ' aria-current="page"' : ""}>${item.label}</a>`;
+              return `<a class="nav-link public-nav-flyout-link${isActive ? " nav-link-active" : ""}" data-nav-key="${item.key}" href="${basePath}${item.href}"${isActive ? ' aria-current="page"' : ""}>${item.label}</a>`;
             }).join("")}
           </div>
         </nav>
