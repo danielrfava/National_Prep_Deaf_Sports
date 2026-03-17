@@ -5,12 +5,12 @@ const REQUEST_ACCESS_LOG_PREFIX = "[request-school-access]";
 
 export const REQUEST_ACCESS_STEPS = Object.freeze({
   schoolLookup: "school_lookup",
-  requestInsert: "request_insert",
+  authSignup: "auth_signup",
 });
 
 const REQUEST_ACCESS_STEP_LABELS = Object.freeze({
   [REQUEST_ACCESS_STEPS.schoolLookup]: "school lookup",
-  [REQUEST_ACCESS_STEPS.requestInsert]: "request write",
+  [REQUEST_ACCESS_STEPS.authSignup]: "account creation",
 });
 
 function cleanValue(value) {
@@ -103,7 +103,7 @@ export function describeRequestAccessError(error) {
   return {
     step,
     stepLabel: buildStepLabel(step),
-    userMessage: `Could not complete the school access request flow. Step: ${buildStepLabel(step)}.`,
+    userMessage: `Could not complete the create account flow. Step: ${buildStepLabel(step)}.`,
   };
 }
 
@@ -167,40 +167,103 @@ export async function loadRequestSchoolOptions() {
 }
 
 export async function submitSchoolAccessRequest(payload) {
+  const email = cleanValue(payload?.email).toLowerCase();
+  const password = String(payload?.password || "");
+  const metadata = {
+    full_name: cleanValue(payload?.full_name),
+    school_id: cleanValue(payload?.school_id),
+    school_name: cleanValue(payload?.school_name),
+    role: cleanValue(payload?.role),
+    job_title: cleanValue(payload?.job_title),
+    reference_ad_name: cleanValue(payload?.reference_ad_name),
+    reference_ad_email: cleanValue(payload?.reference_ad_email).toLowerCase(),
+    verification_notes: cleanValue(payload?.verification_notes),
+  };
+
   try {
-    const { error } = await supabase.from("school_access_requests").insert(payload);
+    const {
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession();
+
+    if (sessionError) {
+      throw sessionError;
+    }
+
+    if (session?.user?.id) {
+      throw buildRequestAccessError(
+        REQUEST_ACCESS_STEPS.authSignup,
+        "Sign out of the current account before creating a new school account."
+      );
+    }
+
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: metadata,
+      },
+    });
 
     if (error) {
       throw error;
     }
+
+    const identities = Array.isArray(data?.user?.identities) ? data.user.identities : null;
+    if (identities && identities.length === 0) {
+      throw buildRequestAccessError(
+        REQUEST_ACCESS_STEPS.authSignup,
+        "A school account or pending request already exists for this email."
+      );
+    }
+
+    if (!data?.user?.id) {
+      throw buildRequestAccessError(
+        REQUEST_ACCESS_STEPS.authSignup,
+        "Could not create your account. Step: account creation."
+      );
+    }
+
+    return data;
   } catch (error) {
-    logRequestAccessError(REQUEST_ACCESS_STEPS.requestInsert, error, {
-      email: cleanValue(payload?.email).toLowerCase(),
-      role: cleanValue(payload?.role),
-      school_id: cleanValue(payload?.school_id),
+    logRequestAccessError(REQUEST_ACCESS_STEPS.authSignup, error, {
+      email,
+      role: metadata.role,
+      school_id: metadata.school_id,
     });
+
+    if (error?.step === REQUEST_ACCESS_STEPS.authSignup) {
+      throw error;
+    }
 
     const normalizedMessage = getErrorMessage(error).toLowerCase();
 
-    if (normalizedMessage.includes("duplicate key")) {
+    if (
+      normalizedMessage.includes("already registered") ||
+      normalizedMessage.includes("already exists") ||
+      normalizedMessage.includes("duplicate key")
+    ) {
       throw buildRequestAccessError(
-        REQUEST_ACCESS_STEPS.requestInsert,
-        "A school access request is already in review for this email.",
+        REQUEST_ACCESS_STEPS.authSignup,
+        "A school account or pending request already exists for this email.",
         error
       );
     }
 
-    if (normalizedMessage.includes("already exists")) {
+    if (
+      normalizedMessage.includes("password") &&
+      (normalizedMessage.includes("short") || normalizedMessage.includes("least"))
+    ) {
       throw buildRequestAccessError(
-        REQUEST_ACCESS_STEPS.requestInsert,
-        "A school access account already exists for this email.",
+        REQUEST_ACCESS_STEPS.authSignup,
+        "Password must be at least 10 characters.",
         error
       );
     }
 
     throw buildRequestAccessError(
-      REQUEST_ACCESS_STEPS.requestInsert,
-      "Could not submit your school access request. Step: request write.",
+      REQUEST_ACCESS_STEPS.authSignup,
+      "Could not create your account. Step: account creation.",
       error
     );
   }

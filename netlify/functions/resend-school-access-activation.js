@@ -59,6 +59,12 @@ exports.handler = async (event) => {
       });
     }
 
+    if (String(request.auth_user_id || "").trim()) {
+      return respond(409, {
+        error: "This approved account already has a linked auth user and does not use the legacy activation email flow.",
+      });
+    }
+
     if (request.activated_at || request.activated_user_id) {
       return respond(409, {
         error: "This school access request is already activated.",

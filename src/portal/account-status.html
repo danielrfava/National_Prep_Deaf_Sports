@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>NPDS - Account Status</title>
+    <link rel="stylesheet" href="../styles.css" />
+  </head>
+  <body class="public-page portal-auth-page">
+    <header data-public-nav class="topbar public-topbar"></header>
+
+    <main class="portal-auth-main">
+      <div class="portal-auth-stack">
+        <section class="portal-login-card portal-login-card-wide">
+          <p class="public-kicker">School Dashboard Access</p>
+          <h1 id="statusTitle" class="portal-login-title">Checking account status...</h1>
+          <p id="statusSubline" class="portal-login-subline">Loading your school account review state.</p>
+
+          <div id="statusBanner" class="portal-alert" hidden></div>
+          <div id="statusSummary" class="portal-card-note"></div>
+          <div id="statusDetails" class="portal-status-grid"></div>
+
+          <div class="portal-auth-actions">
+            <button id="refreshBtn" type="button" class="portal-login-btn">Refresh Status</button>
+            <button id="logoutBtn" type="button" class="portal-secondary-action">Sign Out</button>
+            <a class="portal-secondary-action" href="../index.html">Back to Public Site</a>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <footer data-public-footer></footer>
+
+    <script src="../env.js"></script>
+    <script type="module" src="./account-status.js"></script>
+  </body>
+</html>

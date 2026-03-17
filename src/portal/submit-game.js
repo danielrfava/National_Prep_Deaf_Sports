@@ -9,10 +9,13 @@ import {
   triggerTemplateDownload,
 } from "./submissionTemplateCatalog.js";
 import {
+  buildAccountStatusHref,
+  buildActivationHref,
   fetchCurrentSessionProfile,
   getBlockedAccessMessage,
   isAdminProfile,
   isApprovedSchoolProfile,
+  needsActivationProfile,
   setPortalFlash,
 } from "./schoolAccess.js";
 import {
@@ -155,10 +158,14 @@ async function requireAuth() {
     return;
   }
 
+  if (needsActivationProfile(profile)) {
+    window.location.href = buildActivationHref();
+    return;
+  }
+
   if (!isApprovedSchoolProfile(profile)) {
     setPortalFlash(getBlockedAccessMessage(profile));
-    await supabase.auth.signOut();
-    window.location.href = "login.html";
+    window.location.href = buildAccountStatusHref();
     return;
   }
 

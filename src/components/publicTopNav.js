@@ -15,6 +15,52 @@ const FOOTER_ITEMS = [
   { key: "contact", label: "Contact", href: "contact.html" },
 ];
 
+function wireResponsiveNav(host) {
+  const toggle = host.querySelector("[data-public-nav-toggle]");
+  const nav = host.querySelector("[data-public-nav-menu]");
+
+  if (!toggle || !nav) {
+    return;
+  }
+
+  const setOpen = (isOpen) => {
+    toggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
+    nav.classList.toggle("is-open", isOpen);
+    host.classList.toggle("is-nav-open", isOpen);
+  };
+
+  setOpen(false);
+
+  toggle.addEventListener("click", () => {
+    const isOpen = toggle.getAttribute("aria-expanded") === "true";
+    setOpen(!isOpen);
+  });
+
+  nav.querySelectorAll("a").forEach((link) => {
+    link.addEventListener("click", () => setOpen(false));
+  });
+
+  document.addEventListener("click", (event) => {
+    if (!(event.target instanceof Node) || host.contains(event.target)) {
+      return;
+    }
+
+    setOpen(false);
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      setOpen(false);
+    }
+  });
+
+  window.addEventListener("resize", () => {
+    if (window.innerWidth > 768) {
+      setOpen(false);
+    }
+  });
+}
+
 export function mountPublicTopNav(options = {}) {
   const { active = "search", footerActive = active, landing = false, basePath = "" } = options;
   const host = document.querySelector("[data-public-nav]");
@@ -28,6 +74,7 @@ export function mountPublicTopNav(options = {}) {
   }
 
   host.className = landing ? "topbar public-topbar landing-topbar" : "topbar public-topbar";
+  const menuId = "publicNavMenu";
 
   host.innerHTML = `
     <div class="topbar-container">
@@ -39,7 +86,20 @@ export function mountPublicTopNav(options = {}) {
         </div>
       </a>
 
-      <nav class="nav public-nav" aria-label="Primary">
+      <button
+        class="public-nav-toggle"
+        type="button"
+        aria-expanded="false"
+        aria-controls="${menuId}"
+        data-public-nav-toggle
+      >
+        <span class="sr-only">Toggle navigation</span>
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+
+      <nav class="nav public-nav" id="${menuId}" aria-label="Primary" data-public-nav-menu>
         ${NAV_ITEMS.map((item) => {
           const isActive = item.key === active;
           return `<a class="nav-link${isActive ? " nav-link-active" : ""}" data-nav-key="${item.key}" href="${basePath}${item.href}"${isActive ? ' aria-current="page"' : ""}>${item.label}</a>`;
@@ -47,6 +107,8 @@ export function mountPublicTopNav(options = {}) {
       </nav>
     </div>
   `;
+
+  wireResponsiveNav(host);
 
   if (footerHost) {
     mountPublicFooter(footerHost, footerActive, basePath);

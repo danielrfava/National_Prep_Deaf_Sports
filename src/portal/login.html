@@ -69,11 +69,11 @@
 
         <section class="portal-secondary-card" aria-labelledby="createAccountTitle">
           <p class="portal-secondary-kicker">Need school access to submit stats?</p>
-          <h2 id="createAccountTitle" class="portal-secondary-title">Request school dashboard access</h2>
+          <h2 id="createAccountTitle" class="portal-secondary-title">Create your school dashboard account</h2>
           <p class="portal-secondary-copy">
-            School access is reviewed before activation, and you will set your password after approval.
+            Create your account now, then wait for athletic director approval before the school portal unlocks.
           </p>
-          <a class="portal-secondary-action" href="create-account.html">Request School Access</a>
+          <a class="portal-secondary-action" href="create-account.html">Create Account</a>
         </section>
       </div>
     </main>
@@ -85,6 +85,7 @@
       import { supabase } from "../supabaseClient.js";
       import { mountPublicTopNav } from "../components/publicTopNav.js";
       import {
+        buildAccountStatusHref,
         buildActivationHref,
         buildPasswordResetHref,
         consumePortalFlash,
@@ -154,11 +155,11 @@
         }
 
         if (profile) {
-          window.location.href = "dashboard.html";
+          window.location.href = buildAccountStatusHref();
           return;
         }
 
-        const blockedMessage = getBlockedAccessMessage(profile);
+        const blockedMessage = "Could not load a school account profile for this login.";
         setPortalFlash(blockedMessage);
         await supabase.auth.signOut();
         throw new Error(blockedMessage);

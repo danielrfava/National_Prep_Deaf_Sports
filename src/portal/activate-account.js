@@ -25,7 +25,7 @@ async function init() {
 
   if (!session?.user?.id) {
     activationSummary.textContent =
-      "Open the approval email from NPDS to continue activation. If the link expired, ask an admin to resend it.";
+      "Open the legacy NPDS activation email to continue setup. If the link expired, ask an admin to resend it.";
     return;
   }
 
@@ -79,7 +79,7 @@ function renderActivationSummary(user) {
   activationSummary.innerHTML = `
     <strong>${escapeHtml(fullName)}</strong><br />
     <span>${escapeHtml(schoolName)} | ${escapeHtml(role)}</span><br />
-    <span>Set your password once and your dashboard access will activate immediately.</span>
+    <span>Finish this legacy password setup once and your dashboard access will activate immediately.</span>
   `;
 }
 

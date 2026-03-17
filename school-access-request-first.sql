@@ -1,13 +1,13 @@
 -- ============================================
--- NPDS REQUEST-FIRST SCHOOL ACCESS FLOW
+-- NPDS CREATE-ACCOUNT SCHOOL ACCESS FLOW
 -- ============================================
--- Run this in Supabase SQL editor before deploying the request-first school access redesign.
+-- Run this in Supabase SQL editor before deploying the auth-first Create Account school access flow.
 --
 -- Goals:
--- 1. Store school access requests before any auth account exists
--- 2. Let admins review the same request source the public form writes to
--- 3. Support approval-first activation and password setup after invite
--- 4. Keep existing approved/admin user_profiles compatible
+-- 1. Create the real auth user first during public account creation
+-- 2. Persist linked pending school access request + user profile rows immediately
+-- 3. Unlock portal access only after athletic director/admin approval
+-- 4. Preserve legacy invite/activation rows that do not yet have auth_user_id
 
 create table if not exists public.school_access_requests (
   id uuid primary key default gen_random_uuid(),
@@ -78,6 +78,9 @@ create table if not exists public.school_access_requests (
   )
 );
 
+alter table public.school_access_requests
+add column if not exists auth_user_id uuid references auth.users(id);
+
 create index if not exists idx_school_access_requests_status
   on public.school_access_requests(status, created_at);
 
@@ -92,6 +95,10 @@ create unique index if not exists idx_school_access_requests_activated_user
   on public.school_access_requests(activated_user_id)
   where activated_user_id is not null;
 
+create unique index if not exists idx_school_access_requests_auth_user
+  on public.school_access_requests(auth_user_id)
+  where auth_user_id is not null;
+
 insert into public.school_access_requests (
   email,
   full_name,
@@ -102,6 +109,7 @@ insert into public.school_access_requests (
   reference_ad_name,
   reference_ad_email,
   verification_notes,
+  auth_user_id,
   status,
   created_at,
   updated_at
@@ -116,6 +124,7 @@ select
   up.reference_ad_name,
   up.reference_ad_email,
   up.verification_notes,
+  up.id,
   case
     when up.status = 'rejected' then 'rejected'
     else 'pending'
@@ -131,6 +140,23 @@ where up.role <> 'admin'
     from public.school_access_requests existing
     where lower(existing.email) = lower(up.email)
   );
+
+update public.school_access_requests
+set auth_user_id = activated_user_id,
+    updated_at = now()
+where auth_user_id is null
+  and activated_user_id is not null;
+
+update public.school_access_requests request_row
+set auth_user_id = profile.id,
+    updated_at = now()
+from public.user_profiles profile
+where request_row.auth_user_id is null
+  and request_row.activated_user_id is null
+  and request_row.status in ('pending', 'rejected')
+  and lower(request_row.email) = lower(profile.email)
+  and profile.role <> 'admin'
+  and profile.status in ('pending', 'rejected');
 
 alter table public.user_profiles
 drop constraint if exists user_profiles_status_check;
@@ -163,6 +189,7 @@ begin
   new.job_title := btrim(coalesce(new.job_title, ''));
   new.role := lower(btrim(coalesce(new.role, 'school_staff')));
   new.approved_role := nullif(lower(btrim(coalesce(new.approved_role, ''))), '');
+  new.auth_user_id := coalesce(new.auth_user_id, new.activated_user_id);
   new.reference_ad_name := nullif(btrim(coalesce(new.reference_ad_name, '')), '');
   new.reference_ad_email := nullif(lower(btrim(coalesce(new.reference_ad_email, ''))), '');
   new.verification_notes := nullif(btrim(coalesce(new.verification_notes, '')), '');
@@ -178,7 +205,6 @@ begin
     new.approved_role := null;
     new.activation_email_sent_at := null;
     new.activated_at := null;
-    new.activated_user_id := null;
     new.rejection_reason := null;
   end if;
 
@@ -270,7 +296,7 @@ end;
 $$;
 
 comment on function public.sync_school_access_request_state() is
-  'SECURITY DEFINER is required because public school access request inserts pass through this trigger and it validates existing user_profiles rows.';
+  'SECURITY DEFINER is required because auth-linked school access request rows are validated and normalized inside this trigger.';
 
 drop trigger if exists trg_sync_school_access_requests on public.school_access_requests;
 
@@ -289,6 +315,14 @@ declare
   request_id uuid;
   request_record public.school_access_requests%rowtype;
   resolved_role text;
+  requested_role text;
+  requested_school_id text;
+  requested_school_name text;
+  requested_full_name text;
+  requested_reference_ad_name text;
+  requested_reference_ad_email text;
+  requested_job_title text;
+  requested_verification_notes text;
 begin
   begin
     request_id := nullif(new.raw_user_meta_data ->> 'school_access_request_id', '')::uuid;
@@ -297,20 +331,115 @@ begin
       request_id := null;
   end;
 
-  if request_id is null then
+  if request_id is not null then
+    select *
+    into request_record
+    from public.school_access_requests
+    where id = request_id;
+
+    if not found then
+      return new;
+    end if;
+
+    resolved_role := coalesce(request_record.approved_role, request_record.role, 'school_staff');
+
+    insert into public.user_profiles (
+      id,
+      email,
+      full_name,
+      school_id,
+      school_name,
+      role,
+      status,
+      reference_ad_name,
+      reference_ad_email,
+      job_title,
+      verification_notes,
+      approved_by,
+      approved_at,
+      archived_at
+    )
+    values (
+      new.id,
+      lower(new.email),
+      request_record.full_name,
+      request_record.school_id,
+      request_record.school_name,
+      resolved_role,
+      'invited',
+      request_record.reference_ad_name,
+      request_record.reference_ad_email,
+      request_record.job_title,
+      request_record.verification_notes,
+      request_record.approved_by,
+      request_record.approved_at,
+      null
+    )
+    on conflict (id) do update
+    set email = excluded.email,
+        full_name = excluded.full_name,
+        school_id = excluded.school_id,
+        school_name = excluded.school_name,
+        role = excluded.role,
+        status = 'invited',
+        reference_ad_name = excluded.reference_ad_name,
+        reference_ad_email = excluded.reference_ad_email,
+        job_title = excluded.job_title,
+        verification_notes = excluded.verification_notes,
+        approved_by = excluded.approved_by,
+        approved_at = excluded.approved_at,
+        archived_at = null,
+        updated_at = now();
+
+    update public.school_access_requests
+    set auth_user_id = coalesce(auth_user_id, new.id),
+        updated_at = now()
+    where id = request_record.id;
+
     return new;
   end if;
 
-  select *
-  into request_record
-  from public.school_access_requests
-  where id = request_id;
+  requested_role := lower(coalesce(new.raw_user_meta_data ->> 'role', 'school_staff'));
 
-  if not found then
-    return new;
+  if requested_role not in (
+    'athletic_director',
+    'assistant_ad',
+    'coach',
+    'stats_staff',
+    'volunteer',
+    'school_staff',
+    'former_staff'
+  ) then
+    requested_role := 'school_staff';
   end if;
 
-  resolved_role := coalesce(request_record.approved_role, request_record.role, 'school_staff');
+  requested_school_id := nullif(new.raw_user_meta_data ->> 'school_id', '');
+
+  if requested_school_id is not null then
+    select full_name
+    into requested_school_name
+    from public.schools
+    where id = requested_school_id;
+  end if;
+
+  if requested_school_name is null then
+    requested_school_name := nullif(new.raw_user_meta_data ->> 'school_name', '');
+  end if;
+
+  requested_full_name := coalesce(
+    nullif(new.raw_user_meta_data ->> 'full_name', ''),
+    split_part(lower(new.email), '@', 1)
+  );
+  requested_reference_ad_name := nullif(btrim(coalesce(new.raw_user_meta_data ->> 'reference_ad_name', '')), '');
+  requested_reference_ad_email := nullif(
+    lower(btrim(coalesce(new.raw_user_meta_data ->> 'reference_ad_email', ''))),
+    ''
+  );
+  requested_job_title := nullif(btrim(coalesce(new.raw_user_meta_data ->> 'job_title', '')), '');
+  requested_verification_notes := nullif(
+    btrim(coalesce(new.raw_user_meta_data ->> 'verification_notes', '')),
+    ''
+  );
 
   insert into public.user_profiles (
     id,
@@ -331,17 +460,17 @@ begin
   values (
     new.id,
     lower(new.email),
-    request_record.full_name,
-    request_record.school_id,
-    request_record.school_name,
-    resolved_role,
-    'invited',
-    request_record.reference_ad_name,
-    request_record.reference_ad_email,
-    request_record.job_title,
-    request_record.verification_notes,
-    request_record.approved_by,
-    request_record.approved_at,
+    requested_full_name,
+    requested_school_id,
+    requested_school_name,
+    requested_role,
+    'pending',
+    requested_reference_ad_name,
+    requested_reference_ad_email,
+    requested_job_title,
+    requested_verification_notes,
+    null,
+    null,
     null
   )
   on conflict (id) do update
@@ -350,15 +479,54 @@ begin
       school_id = excluded.school_id,
       school_name = excluded.school_name,
       role = excluded.role,
-      status = 'invited',
+      status = case
+        when user_profiles.status in ('approved', 'archived') then user_profiles.status
+        else 'pending'
+      end,
       reference_ad_name = excluded.reference_ad_name,
       reference_ad_email = excluded.reference_ad_email,
       job_title = excluded.job_title,
       verification_notes = excluded.verification_notes,
-      approved_by = excluded.approved_by,
-      approved_at = excluded.approved_at,
-      archived_at = null,
+      approved_by = case
+        when user_profiles.status in ('approved', 'archived') then user_profiles.approved_by
+        else null
+      end,
+      approved_at = case
+        when user_profiles.status in ('approved', 'archived') then user_profiles.approved_at
+        else null
+      end,
+      archived_at = case
+        when user_profiles.status = 'archived' then user_profiles.archived_at
+        else null
+      end,
       updated_at = now();
+
+  insert into public.school_access_requests (
+    email,
+    full_name,
+    school_id,
+    school_name,
+    role,
+    job_title,
+    reference_ad_name,
+    reference_ad_email,
+    verification_notes,
+    auth_user_id,
+    status
+  )
+  values (
+    lower(new.email),
+    requested_full_name,
+    requested_school_id,
+    requested_school_name,
+    requested_role,
+    requested_job_title,
+    requested_reference_ad_name,
+    requested_reference_ad_email,
+    requested_verification_notes,
+    new.id,
+    'pending'
+  );
 
   return new;
 end;
@@ -422,6 +590,12 @@ begin
     raise exception 'This school access request is not approved yet.';
   end if;
 
+  if request_record.auth_user_id is not null
+     and request_record.activation_email_sent_at is null
+     and request_record.activated_user_id is null then
+    raise exception 'This school access request already has a linked auth account. Sign in after approval instead of using activation.';
+  end if;
+
   resolved_role := coalesce(request_record.approved_role, request_record.role, 'school_staff');
 
   insert into public.user_profiles (
@@ -474,6 +648,7 @@ begin
 
   update public.school_access_requests
   set status = 'activated',
+      auth_user_id = coalesce(auth_user_id, current_user_id),
       activated_at = coalesce(activated_at, now()),
       activated_user_id = current_user_id,
       reviewed_at = coalesce(reviewed_at, now()),
@@ -495,22 +670,6 @@ alter table public.school_access_requests enable row level security;
 drop policy if exists "Anyone can submit school access requests" on public.school_access_requests;
 drop policy if exists "Admins can view school access requests" on public.school_access_requests;
 drop policy if exists "Admins can update school access requests" on public.school_access_requests;
-
-create policy "Anyone can submit school access requests"
-on public.school_access_requests for insert
-to anon, authenticated
-with check (
-  status = 'pending'
-  and approved_role is null
-  and reviewed_by is null
-  and reviewed_at is null
-  and approved_by is null
-  and approved_at is null
-  and activation_email_sent_at is null
-  and activated_at is null
-  and activated_user_id is null
-  and rejection_reason is null
-);
 
 create policy "Admins can view school access requests"
 on public.school_access_requests for select
@@ -543,5 +702,8 @@ with check (
       and admin_user.role = 'admin'
   )
 );
+
+-- Public inserts now flow through auth.users signup + handle_school_account_signup().
+-- Do not recreate an anon/authenticated insert policy here, or the app can drift back into request-only behavior.
 
 grant execute on function public.complete_school_access_activation(uuid) to authenticated;

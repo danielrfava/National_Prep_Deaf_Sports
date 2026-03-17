@@ -1,15 +1,18 @@
 import { supabase } from "../supabaseClient.js";
 import {
+  buildAccountStatusHref,
   cleanAthleteDisplayName,
   extractAthleteClassTag,
   extractAthleteNameCandidates,
   normalizeAthleteIdentity,
 } from "../services/publicEntityService.js";
 import {
+  buildActivationHref,
   fetchCurrentSessionProfile,
   isAdminProfile,
   isApprovedSchoolProfile,
   getBlockedAccessMessage,
+  needsActivationProfile,
   normalizeStatus,
 } from "./schoolAccess.js";
 import {
@@ -142,10 +145,15 @@ async function init() {
     return;
   }
 
+  if (needsActivationProfile(profile)) {
+    window.location.href = buildActivationHref();
+    return;
+  }
+
   elements.logout?.addEventListener("click", handleLogout);
 
   if (!isApprovedSchoolProfile(profile)) {
-    renderBlockedState(profile);
+    window.location.href = buildAccountStatusHref();
     return;
   }
 

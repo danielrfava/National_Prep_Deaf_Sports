@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>NPDS - Request School Access</title>
+    <title>NPDS - Create Account</title>
     <link rel="stylesheet" href="../styles.css" />
   </head>
   <body class="public-page portal-auth-page">
@@ -31,9 +31,9 @@
       <div class="portal-auth-stack">
         <section class="portal-login-card portal-login-card-wide">
           <p class="public-kicker">School Dashboard Access</p>
-          <h1 class="portal-login-title">Request School Access</h1>
+          <h1 class="portal-login-title">Create Account</h1>
           <p class="portal-login-subline">
-            School access requests are reviewed before activation. You will set your password after approval.
+            Create your school account now. Portal access will stay locked until your athletic director approves it.
           </p>
 
           <div id="alert" class="portal-alert" hidden></div>
@@ -48,6 +48,32 @@
               <div class="portal-field">
                 <label class="portal-label" for="email">Email</label>
                 <input id="email" name="email" type="email" autocomplete="email" required />
+              </div>
+
+              <div class="portal-field">
+                <label class="portal-label" for="password">Password</label>
+                <input
+                  id="password"
+                  name="password"
+                  type="password"
+                  autocomplete="new-password"
+                  minlength="10"
+                  required
+                />
+                <p class="portal-field-help">Use at least 10 characters.</p>
+              </div>
+
+              <div class="portal-field">
+                <label class="portal-label" for="confirmPassword">Confirm Password</label>
+                <input
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  type="password"
+                  autocomplete="new-password"
+                  minlength="10"
+                  required
+                />
+                <p id="confirmPasswordHelp" class="portal-field-help">Re-enter the same password.</p>
               </div>
 
               <div class="portal-field">
@@ -127,16 +153,20 @@
             </div>
 
             <div class="portal-auth-actions">
-              <button type="submit" class="portal-login-btn" id="submitBtn">Submit Request</button>
+              <button type="submit" class="portal-login-btn" id="submitBtn">Create Account</button>
               <a class="portal-secondary-action" href="login.html">Back to Login</a>
             </div>
           </form>
 
           <div id="successState" hidden>
             <p class="portal-card-note">
-              Your request is in the review queue. After approval, NPDS will email you an activation link so you can set your password.
+              Your account request has been submitted and is now pending review by your athletic director.
+            </p>
+            <p class="portal-card-note">
+              You’ll be able to sign in fully once your athletic director approves your account.
             </p>
             <div class="portal-auth-actions">
+              <a id="accountStatusLink" class="portal-secondary-action" href="account-status.html" hidden>View Account Status</a>
               <a class="portal-secondary-action" href="login.html">Return to Login</a>
             </div>
           </div>

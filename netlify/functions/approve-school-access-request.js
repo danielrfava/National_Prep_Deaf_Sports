@@ -3,6 +3,7 @@ const {
   getUserFromAccessToken,
   getUserProfile,
   respond,
+  upsertUserProfile,
   updateLegacyProfilesByEmail,
   updateSchoolAccessRequest,
 } = require("./_supabase");
@@ -23,6 +24,30 @@ const APPROVED_ROLE_VALUES = new Set([
 
 function normalizeRole(value) {
   return String(value || "").trim().toLowerCase();
+}
+
+function cleanValue(value) {
+  return String(value || "").trim();
+}
+
+function buildApprovedProfilePayload(request, approvedRole, adminProfileId, approvalStamp) {
+  return {
+    id: cleanValue(request.auth_user_id),
+    email: cleanValue(request.email).toLowerCase(),
+    full_name: cleanValue(request.full_name),
+    school_id: cleanValue(request.school_id),
+    school_name: cleanValue(request.school_name),
+    role: approvedRole,
+    status: "approved",
+    reference_ad_name: cleanValue(request.reference_ad_name) || null,
+    reference_ad_email: cleanValue(request.reference_ad_email).toLowerCase() || null,
+    job_title: cleanValue(request.job_title),
+    verification_notes: cleanValue(request.verification_notes) || null,
+    approved_by: adminProfileId,
+    approved_at: approvalStamp,
+    archived_at: null,
+    updated_at: approvalStamp,
+  };
 }
 
 function buildApprovalBlockers(request, approvedRole) {
@@ -131,6 +156,21 @@ exports.handler = async (event) => {
       rejection_reason: null,
     });
 
+    const linkedAuthUserId = cleanValue(request.auth_user_id);
+
+    if (linkedAuthUserId) {
+      const approvedProfile = await upsertUserProfile(
+        buildApprovedProfilePayload(request, approvedRole, adminProfile.id, approvalStamp)
+      );
+
+      return respond(200, {
+        ok: true,
+        flow: "linked_auth_user",
+        request: approvedRequest || request,
+        profile: approvedProfile,
+      });
+    }
+
     await updateLegacyProfilesByEmail(request.email, {
       status: "invited",
       role: approvedRole,
@@ -157,6 +197,7 @@ exports.handler = async (event) => {
 
       return respond(200, {
         ok: true,
+        flow: "legacy_activation",
         activationMode,
         request: updatedRequest || approvedRequest,
       });

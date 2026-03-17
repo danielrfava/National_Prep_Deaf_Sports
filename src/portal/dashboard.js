@@ -1,5 +1,6 @@
 import { supabase } from "../supabaseClient.js";
 import {
+  buildAccountStatusHref,
   buildActivationHref,
   STAFF_ROLE_OPTIONS,
   fetchCurrentSessionProfile,
@@ -99,6 +100,11 @@ async function init() {
     return;
   }
 
+  if (!isApprovedSchoolProfile(profile)) {
+    window.location.href = buildAccountStatusHref();
+    return;
+  }
+
   currentUser = profile;
   elements.schoolChip.textContent = profile.school_name || profile.school_id || "Your School";
   if (elements.schoolDataLink) {
@@ -107,11 +113,6 @@ async function init() {
   }
 
   elements.logout?.addEventListener("click", handleLogout);
-
-  if (!isApprovedSchoolProfile(profile)) {
-    renderLimitedDashboard(profile);
-    return;
-  }
 
   elements.tabs.forEach((tab) =>
     tab.addEventListener("click", () => {
@@ -152,9 +153,9 @@ function renderLimitedDashboard(profile) {
   const isPending = status === "pending";
   const isInvited = status === "invited";
   const message = isPending
-    ? "Account received / pending review. You can sign in, but submission tools stay locked until approval."
+    ? "Your account is pending review. You’ll be able to access the school portal after your athletic director approves your request."
     : isInvited
-    ? "Your access request was approved. Finish activation from the email link before using the school dashboard."
+    ? "Your account was approved under the legacy activation flow. Finish the activation email steps before using the school dashboard."
     : getBlockedAccessMessage(profile);
 
   toggleApprovedDashboard(false);
@@ -165,7 +166,7 @@ function renderLimitedDashboard(profile) {
   elements.readinessChip.classList.remove("ok", "warn");
   elements.readinessChip.classList.add("warn");
   elements.readinessChip.textContent =
-    isPending ? "Status: pending review" : isInvited ? "Status: activation required" : `Status: ${staffStatusLabel(status)}`;
+    isPending ? "Status: pending review" : isInvited ? "Status: legacy activation" : `Status: ${staffStatusLabel(status)}`;
 
   if (elements.limitedDashboardPanel) {
     elements.limitedDashboardPanel.hidden = false;

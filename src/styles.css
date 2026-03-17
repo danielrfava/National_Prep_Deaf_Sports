@@ -1418,11 +1418,47 @@ body.landing-shell.video-unavailable .video-background video {
 .public-topbar .topbar-container {
   max-width: 1240px;
   grid-template-columns: auto 1fr;
+  position: relative;
 }
 
 .public-nav {
   justify-content: flex-end;
   gap: 12px;
+}
+
+.public-nav-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 46px;
+  height: 46px;
+  border: 1px solid rgba(139, 169, 197, 0.28);
+  border-radius: 12px;
+  background: rgba(14, 25, 37, 0.92);
+  cursor: pointer;
+  padding: 0;
+}
+
+.public-nav-toggle span:not(.sr-only) {
+  display: block;
+  width: 18px;
+  height: 2px;
+  border-radius: 999px;
+  background: #eef6ff;
+  transition: transform 160ms ease, opacity 160ms ease;
+}
+
+.public-topbar.is-nav-open .public-nav-toggle span:nth-child(2) {
+  transform: translateY(6px) rotate(45deg);
+}
+
+.public-topbar.is-nav-open .public-nav-toggle span:nth-child(3) {
+  opacity: 0;
+}
+
+.public-topbar.is-nav-open .public-nav-toggle span:nth-child(4) {
+  transform: translateY(-6px) rotate(-45deg);
 }
 
 .public-main {
@@ -2217,8 +2253,91 @@ body.landing-shell.video-unavailable .video-background video {
     flex-direction: column;
   }
 
+  .public-search-form button,
+  .public-page .apply-filters-btn {
+    width: 100%;
+  }
+
+  .public-hero {
+    padding: 16px 14px;
+  }
+
+  .public-hero h1 {
+    font-size: 1.28rem;
+  }
+
+  .public-page .filter-actions,
+  .public-page .pagination-actions {
+    width: 100%;
+  }
+
+  .public-page .pagination-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .public-page .page-size-control,
+  .public-page .page-nav {
+    width: 100%;
+  }
+
+  .public-page .page-size-control {
+    justify-content: space-between;
+  }
+
+  .public-topbar .topbar-container {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px;
+    padding: 12px 14px;
+  }
+
+  .public-topbar .brand {
+    min-width: 0;
+    gap: 10px;
+  }
+
+  .public-topbar .brand-text {
+    min-width: 0;
+  }
+
+  .public-topbar .brand-title,
+  .public-topbar .brand-tag {
+    white-space: normal;
+  }
+
+  .public-nav-toggle {
+    display: inline-flex;
+    flex-direction: column;
+  }
+
   .public-nav {
-    justify-content: flex-start;
+    display: none;
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 14px;
+    right: 14px;
+    z-index: 30;
+    gap: 8px;
+    padding: 12px;
+    border: 1px solid rgba(64, 88, 114, 0.95);
+    border-radius: 16px;
+    background: linear-gradient(180deg, rgba(8, 15, 23, 0.98) 0%, rgba(12, 20, 30, 0.98) 100%);
+    box-shadow: 0 18px 40px rgba(2, 8, 16, 0.5);
+  }
+
+  .public-nav.is-open {
+    display: grid;
+  }
+
+  .public-nav .nav-link {
+    width: 100%;
+    border: 1px solid rgba(45, 66, 89, 0.96);
+    border-radius: 12px;
+    padding: 0.8rem 0.9rem;
+  }
+
+  .portal-status-grid {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -2929,6 +3048,7 @@ body.landing-shell.video-unavailable .video-background video {
 }
 
 .portal-secondary-action {
+  appearance: none;
   display: inline-flex;
   justify-content: center;
   align-items: center;
@@ -2940,8 +3060,10 @@ body.landing-shell.video-unavailable .video-background video {
   text-decoration: none;
   font-size: 0.92rem;
   font-weight: 800;
+  font-family: inherit;
   letter-spacing: 0.01em;
   padding: 0.75rem 1rem;
+  cursor: pointer;
   transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease;
 }
 
@@ -2956,6 +3078,37 @@ body.landing-shell.video-unavailable .video-background video {
   color: #8ea3b8;
   font-size: 0.78rem;
   line-height: 1.35;
+}
+
+.portal-status-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.portal-status-card {
+  margin: 0;
+  border: 1px solid rgba(54, 73, 95, 0.95);
+  border-radius: 14px;
+  background: rgba(12, 22, 33, 0.92);
+  padding: 0.9rem 0.95rem;
+}
+
+.portal-status-label {
+  margin: 0 0 6px;
+  color: #90a5bb;
+  font-size: 0.73rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.portal-status-value {
+  margin: 0;
+  color: #ebf4fd;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  white-space: pre-line;
 }
 
 .portal-login-links {

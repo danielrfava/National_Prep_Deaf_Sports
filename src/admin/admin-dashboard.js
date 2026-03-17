@@ -426,7 +426,7 @@ async function fetchPendingUsers() {
   const { data, error } = await supabase
     .from("school_access_requests")
     .select(
-      "id, created_at, email, full_name, school_id, school_name, role, approved_role, status, job_title, reference_ad_name, reference_ad_email, verification_notes, rejection_reason, reviewed_at, approved_at, activation_email_sent_at, activated_at"
+      "id, auth_user_id, created_at, email, full_name, school_id, school_name, role, approved_role, status, job_title, reference_ad_name, reference_ad_email, verification_notes, rejection_reason, reviewed_at, approved_at, activation_email_sent_at, activated_at"
     )
     .in("status", ["pending", "approved"])
     .is("activated_at", null)
@@ -473,7 +473,7 @@ function sortSchoolAccessQueue(rows) {
 function renderPendingUsers() {
   if (!pendingUsers.length) {
     elements.pendingUsersContainer.innerHTML =
-      '<div class="empty-state">No school access requests are waiting on approval or activation right now.</div>';
+      '<div class="empty-state">No school accounts are waiting on approval or legacy activation right now.</div>';
     return;
   }
 
@@ -512,13 +512,10 @@ function renderPendingUserCard(user) {
       ${renderDetailCard("School ID", user.school_id || "Not set")}
       ${renderDetailCard("Verification Notes", user.verification_notes || "None provided")}
       ${renderDetailCard("Approved At", user.approved_at ? displayDate(user.approved_at, true) : "Not approved yet")}
-      ${renderDetailCard(
-        "Activation Email",
-        user.activation_email_sent_at ? displayDate(user.activation_email_sent_at, true) : "Not sent yet"
-      )}
+      ${renderDetailCard(model.accountLinkLabel, model.accountLinkValue)}
     </div>
     ${
-      model.canApprove
+      model.showRoleSelect
         ? `<label class="review-subline" for="role-${escapeHtmlAttr(user.id)}">Approve as role</label>
     <select id="role-${escapeHtmlAttr(user.id)}" class="request-role-select" data-role-select>
       ${STAFF_ROLE_OPTIONS.map(
@@ -529,28 +526,35 @@ function renderPendingUserCard(user) {
     </select>`
         : ""
     }
-    <div class="action-buttons">
+    ${
+      model.showActionButtons
+        ? `<div class="action-buttons">
       ${
         model.canResendActivation
           ? `<button class="btn btn-approve" type="button" data-action="resend-user-activation">
-        Resend Activation Email
+        Resend Legacy Activation
       </button>`
           : `<button class="btn btn-approve" type="button" data-action="approve-user">
-        Approve and Send Activation
+        ${escapeHtml(model.approveButtonLabel)}
       </button>
       <button class="btn btn-reject" type="button" data-action="reject-user">Reject Request</button>`
       }
-    </div>
+    </div>`
+        : ""
+    }
   </article>`;
 }
 
 function buildPendingUserReviewModel(user, roleOverride = "") {
   const status = normalizeStatus(user?.status);
   const requestedRole = normalizeRole(roleOverride || user?.approved_role || user?.role) || "school_staff";
+  const hasLinkedAuthUser = Boolean(String(user?.auth_user_id || "").trim());
   const blockingReasons = [];
   const reviewNotes = [];
+  const showRoleSelect = status === "pending";
   const canApprove = status === "pending";
-  const canResendActivation = status === "approved" && !user?.activated_at;
+  const canResendActivation = status === "approved" && !hasLinkedAuthUser && !user?.activated_at;
+  const isApprovedLinkedAccount = status === "approved" && hasLinkedAuthUser;
 
   if (canApprove) {
     if (!String(user?.full_name || "").trim()) {
@@ -584,10 +588,20 @@ function buildPendingUserReviewModel(user, roleOverride = "") {
     } else {
       reviewNotes.push("Athletic Director requests can be approved without a reference contact.");
     }
+
+    reviewNotes.push(
+      hasLinkedAuthUser
+        ? "Auth account already exists. Approval will unlock portal access immediately."
+        : "Legacy request without a linked auth user. Approval will send an activation email."
+    );
   }
 
   if (String(user?.verification_notes || "").trim()) {
     reviewNotes.push("Verification notes are attached to this request.");
+  }
+
+  if (isApprovedLinkedAccount) {
+    reviewNotes.push("This approved request is linked to an existing auth user. No activation email is needed.");
   }
 
   if (canResendActivation) {
@@ -603,6 +617,8 @@ function buildPendingUserReviewModel(user, roleOverride = "") {
     blockingReasons: dedupeStrings(blockingReasons),
     canApprove: canApprove && blockingReasons.length === 0,
     canResendActivation,
+    showActionButtons: showRoleSelect || canResendActivation,
+    showRoleSelect,
     reviewNotes: dedupeStrings(reviewNotes),
     actionBoxItems: canResendActivation
       ? [
@@ -611,16 +627,35 @@ function buildPendingUserReviewModel(user, roleOverride = "") {
             : "Approved request is waiting on activation and still needs the first activation email.",
         ]
       : canApprove && blockingReasons.length === 0
-      ? ["This request is complete enough to approve and send activation."]
+      ? [
+          hasLinkedAuthUser
+            ? "This request is complete enough to approve. Approval will unlock the existing account immediately."
+            : "This legacy request is complete enough to approve and send activation.",
+        ]
+      : isApprovedLinkedAccount
+      ? ["Portal access should already be available for this approved account."]
       : [],
-    actionBoxTitle: canResendActivation ? "Activation follow-up" : "Ready to invite",
-    rolePillLabel: canResendActivation ? "Approved Role" : "Requested Role",
-    roleValue: canResendActivation ? user?.approved_role || requestedRole : requestedRole,
-    statusLabel: canResendActivation ? "Approved" : canApprove && blockingReasons.length === 0 ? "Ready" : "Blocked",
-    statusMetaLabel: canResendActivation
+    actionBoxTitle: canResendActivation
+      ? "Legacy activation follow-up"
+      : showRoleSelect
+      ? "Ready to approve"
+      : isApprovedLinkedAccount
+      ? "Portal access"
+      : "Review status",
+    approveButtonLabel: hasLinkedAuthUser ? "Approve and Unlock Access" : "Approve and Send Activation",
+    accountLinkLabel: hasLinkedAuthUser ? "Auth Account" : "Legacy Activation",
+    accountLinkValue: hasLinkedAuthUser
+      ? "Linked auth user on file"
+      : user.activation_email_sent_at
+      ? `Activation email sent ${displayDate(user.activation_email_sent_at, true)}`
+      : "No linked auth user yet",
+    rolePillLabel: status === "approved" ? "Approved Role" : "Requested Role",
+    roleValue: status === "approved" ? user?.approved_role || requestedRole : requestedRole,
+    statusLabel: status === "approved" ? "Approved" : canApprove && blockingReasons.length === 0 ? "Ready" : "Blocked",
+    statusMetaLabel: status === "approved"
       ? `Approved ${displayDate(user?.approved_at, true)}`
       : `Submitted ${displayDate(user?.created_at, true)}`,
-    statusTone: canResendActivation || (canApprove && blockingReasons.length === 0) ? "pending" : "danger",
+    statusTone: status === "approved" || (canApprove && blockingReasons.length === 0) ? "pending" : "danger",
   };
 }
 
@@ -1556,7 +1591,12 @@ async function approvePendingUser(userId, requestedRole, button) {
     return;
   }
 
-  if (!confirm("Approve this school access request and send the NPDS activation email?")) {
+  const approvalPrompt =
+    request?.auth_user_id
+      ? "Approve this school account request and unlock portal access for the linked account?"
+      : "Approve this legacy school access request and send the NPDS activation email?";
+
+  if (!confirm(approvalPrompt)) {
     return;
   }
 
@@ -1600,6 +1640,11 @@ async function approvePendingUser(userId, requestedRole, button) {
     }
 
     await loadDashboard();
+    if (result?.flow === "legacy_activation") {
+      alert("Request approved and legacy activation email sent.");
+    } else {
+      alert("Request approved and portal access unlocked.");
+    }
   } catch (error) {
     console.error("User approval failed:", error);
     alert(`Could not approve school access: ${error.message}`);
@@ -1610,7 +1655,7 @@ async function approvePendingUser(userId, requestedRole, button) {
 }
 
 async function resendUserActivation(userId, button) {
-  if (!confirm("Resend the NPDS activation email for this approved school access request?")) {
+  if (!confirm("Resend the legacy NPDS activation email for this approved school access request?")) {
     return;
   }
 

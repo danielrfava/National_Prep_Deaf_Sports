@@ -1,5 +1,6 @@
 import { mountPublicTopNav } from "../components/publicTopNav.js";
 import {
+  buildAccountStatusHref,
   CREATE_ACCOUNT_ROLE_OPTIONS,
   requiresAthleticDirectorReference,
 } from "./schoolAccessShared.js";
@@ -12,10 +13,14 @@ import {
 mountPublicTopNav({ active: "login", basePath: "../" });
 
 const SUCCESS_MESSAGE =
-  "Your request is in the review queue. After approval, NPDS will email you an activation link to set your password.";
+  "Your account request has been submitted and is now pending review by your athletic director.";
 
 const form = document.getElementById("requestForm");
 const alertBox = document.getElementById("alert");
+const accountStatusLink = document.getElementById("accountStatusLink");
+const confirmPasswordHelp = document.getElementById("confirmPasswordHelp");
+const confirmPasswordInput = document.getElementById("confirmPassword");
+const passwordInput = document.getElementById("password");
 const submitBtn = document.getElementById("submitBtn");
 const successState = document.getElementById("successState");
 const schoolSearchInput = document.getElementById("schoolSearch");
@@ -47,7 +52,10 @@ async function init() {
   }
 
   syncConditionalFields();
+  syncPasswordValidity();
   roleSelect?.addEventListener("change", syncConditionalFields);
+  passwordInput?.addEventListener("input", syncPasswordValidity);
+  confirmPasswordInput?.addEventListener("input", syncPasswordValidity);
   bindSchoolCombobox();
   form?.addEventListener("submit", handleSubmit);
 }
@@ -128,7 +136,7 @@ function setRequestFormAvailability(enabled) {
   });
 
   if (submitBtn) {
-    submitBtn.textContent = enabled ? "Submit Request" : "Request Unavailable";
+    submitBtn.textContent = enabled ? "Create Account" : "Create Account Unavailable";
   }
 }
 
@@ -358,10 +366,36 @@ function syncSchoolValidity() {
   schoolSearchInput.setCustomValidity("");
 }
 
+function syncPasswordValidity() {
+  if (!passwordInput || !confirmPasswordInput) {
+    return;
+  }
+
+  const password = passwordInput.value || "";
+  const confirmPassword = confirmPasswordInput.value || "";
+
+  passwordInput.setCustomValidity(password.length >= 10 ? "" : "Password must be at least 10 characters.");
+
+  if (!confirmPassword) {
+    confirmPasswordInput.setCustomValidity("");
+    if (confirmPasswordHelp) {
+      confirmPasswordHelp.textContent = "Re-enter the same password.";
+    }
+    return;
+  }
+
+  const matches = password === confirmPassword;
+  confirmPasswordInput.setCustomValidity(matches ? "" : "Passwords do not match.");
+  if (confirmPasswordHelp) {
+    confirmPasswordHelp.textContent = matches ? "Passwords match." : "Passwords must match.";
+  }
+}
+
 async function handleSubmit(event) {
   event.preventDefault();
   hideAlert();
   syncConditionalFields();
+  syncPasswordValidity();
   syncSchoolValidity();
 
   if (!form?.reportValidity()) {
@@ -375,12 +409,13 @@ async function handleSubmit(event) {
   }
 
   submitBtn.disabled = true;
-  submitBtn.textContent = "Submitting...";
+  submitBtn.textContent = "Creating Account...";
 
   try {
     const email = document.getElementById("email")?.value?.trim().toLowerCase() || "";
     const payload = {
       email,
+      password: passwordInput?.value || "",
       full_name: document.getElementById("fullName")?.value?.trim() || "",
       school_id: selectedSchool.id,
       school_name: selectedSchool.full_name,
@@ -391,17 +426,22 @@ async function handleSubmit(event) {
       verification_notes: verificationNotesInput?.value?.trim() || "",
     };
 
-    await submitSchoolAccessRequest(payload);
+    const result = await submitSchoolAccessRequest(payload);
 
     form.hidden = true;
     successState.hidden = false;
+    if (accountStatusLink) {
+      const hasSession = Boolean(result?.session?.user?.id);
+      accountStatusLink.hidden = !hasSession;
+      accountStatusLink.href = buildAccountStatusHref();
+    }
     showAlert(SUCCESS_MESSAGE, "success");
   } catch (error) {
     const { userMessage } = describeRequestAccessError(error);
     showAlert(userMessage);
   } finally {
     submitBtn.disabled = false;
-    submitBtn.textContent = "Submit Request";
+    submitBtn.textContent = "Create Account";
   }
 }
 

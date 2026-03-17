@@ -97,6 +97,19 @@ async function getUserProfile(userId) {
   return Array.isArray(rows) ? rows[0] || null : null;
 }
 
+async function upsertUserProfile(payload) {
+  const rows = await supabaseRest("/rest/v1/user_profiles", {
+    method: "POST",
+    query: "?select=*",
+    headers: {
+      Prefer: "resolution=merge-duplicates,return=representation",
+    },
+    body: [payload],
+  });
+
+  return Array.isArray(rows) ? rows[0] || null : null;
+}
+
 async function getSchoolAccessRequest(requestId) {
   const rows = await supabaseRest("/rest/v1/school_access_requests", {
     query: `?id=eq.${encodeURIComponent(requestId)}&select=*`,
@@ -174,6 +187,7 @@ module.exports = {
   getSchoolAccessRequest,
   getUserFromAccessToken,
   getUserProfile,
+  upsertUserProfile,
   respond,
   sendInviteEmail,
   sendRecoveryEmail,

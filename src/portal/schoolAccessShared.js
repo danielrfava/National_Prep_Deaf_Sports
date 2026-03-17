@@ -88,15 +88,15 @@ export function getBlockedAccessMessage(profile) {
   const role = normalizeRole(profile?.role);
 
   if (status === "invited") {
-    return "Your request was approved. Check your email for the activation link so you can set your password.";
+    return "Your account was approved under the legacy activation flow. Check your email for the activation link to finish setup.";
   }
 
   if (status === "pending") {
-    return "Your school account is pending approval. You cannot submit stats yet.";
+    return "Your account is pending review. You’ll be able to access the school portal after your athletic director approves your request.";
   }
 
   if (status === "rejected") {
-    return "Your request was not approved. Contact platform admin if this is an error.";
+    return "Your account request was not approved. Contact your athletic director or NPDS admin if you believe this is a mistake.";
   }
 
   if (status === "archived") {
@@ -120,6 +120,10 @@ export function buildActivationHref(requestId = "") {
     url.searchParams.set("request", cleanValue(requestId));
   }
   return url.toString();
+}
+
+export function buildAccountStatusHref() {
+  return new URL("account-status.html", window.location.href).toString();
 }
 
 export function buildPasswordResetHref() {
