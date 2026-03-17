@@ -16,28 +16,55 @@ const FOOTER_ITEMS = [
 ];
 
 function wireResponsiveNav(host) {
+  const backdrop = host.querySelector("[data-public-nav-backdrop]");
+  const closeButton = host.querySelector("[data-public-nav-close]");
   const toggle = host.querySelector("[data-public-nav-toggle]");
   const nav = host.querySelector("[data-public-nav-menu]");
 
-  if (!toggle || !nav) {
+  if (!toggle || !nav || !backdrop) {
     return;
   }
 
   const setOpen = (isOpen) => {
     toggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
     nav.classList.toggle("is-open", isOpen);
+    backdrop.hidden = !isOpen;
+    backdrop.classList.toggle("is-open", isOpen);
     host.classList.toggle("is-nav-open", isOpen);
+    document.body.classList.toggle("public-nav-open", isOpen);
   };
 
   setOpen(false);
 
+  const openMenu = () => {
+    setOpen(true);
+    window.requestAnimationFrame(() => {
+      closeButton?.focus({ preventScroll: true });
+    });
+  };
+
+  const closeMenu = (restoreFocus = false) => {
+    setOpen(false);
+    if (restoreFocus) {
+      toggle.focus({ preventScroll: true });
+    }
+  };
+
   toggle.addEventListener("click", () => {
     const isOpen = toggle.getAttribute("aria-expanded") === "true";
-    setOpen(!isOpen);
+    if (isOpen) {
+      closeMenu();
+      return;
+    }
+
+    openMenu();
   });
 
+  closeButton?.addEventListener("click", () => closeMenu(true));
+  backdrop.addEventListener("click", () => closeMenu(true));
+
   nav.querySelectorAll("a").forEach((link) => {
-    link.addEventListener("click", () => setOpen(false));
+    link.addEventListener("click", () => closeMenu());
   });
 
   document.addEventListener("click", (event) => {
@@ -45,18 +72,18 @@ function wireResponsiveNav(host) {
       return;
     }
 
-    setOpen(false);
+    closeMenu();
   });
 
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
-      setOpen(false);
+      closeMenu(true);
     }
   });
 
   window.addEventListener("resize", () => {
     if (window.innerWidth > 768) {
-      setOpen(false);
+      closeMenu();
     }
   });
 }
@@ -99,7 +126,19 @@ export function mountPublicTopNav(options = {}) {
         <span></span>
       </button>
 
+      <div class="public-nav-backdrop" data-public-nav-backdrop hidden></div>
+
       <nav class="nav public-nav" id="${menuId}" aria-label="Primary" data-public-nav-menu>
+        <div class="public-nav-panel-head">
+          <div>
+            <p class="public-nav-panel-kicker">Menu</p>
+            <p class="public-nav-panel-title">National Prep Deaf Sports</p>
+          </div>
+          <button class="public-nav-close" type="button" data-public-nav-close>
+            <span class="sr-only">Close navigation</span>
+            <span aria-hidden="true">+</span>
+          </button>
+        </div>
         ${NAV_ITEMS.map((item) => {
           const isActive = item.key === active;
           return `<a class="nav-link${isActive ? " nav-link-active" : ""}" data-nav-key="${item.key}" href="${basePath}${item.href}"${isActive ? ' aria-current="page"' : ""}>${item.label}</a>`;

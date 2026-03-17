@@ -23,6 +23,12 @@ This repository contains the complete static web application for Deaf Sports His
 - Ready for deployment on Netlify as a static site (see deployment guides).
 - Supabase environment variables (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY) are required for production.
 
+## Canonical public URL
+
+- Use `https://www.nationalprepdeafsports.com` as the public-facing canonical domain.
+- Treat the apex/root host (`https://nationalprepdeafsports.com`) as redirect-only until Netlify marks it fully stable everywhere.
+- Do not add separate GoDaddy SSL or extra DNS experiments unless there is confirmed root-cause evidence.
+
 ## ⚠️ UI Layout & Filter Row Policy (v4.3)
 
 - The statistics page (`src/stats.html`) must have **only one filter row** at the top (School, Sport, Stats View), styled as shown in the screenshots and demo videos.

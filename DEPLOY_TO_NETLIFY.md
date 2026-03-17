@@ -20,3 +20,12 @@ Optional Windows helper:
    - `set NETLIFY_BUILD_HOOK_URL=https://api.netlify.com/build_hooks/your_hook_id`
 
 Netlify will generate src/env.js during build.
+
+Domain notes:
+
+- Canonical public URL: `https://www.nationalprepdeafsports.com`
+- Keep the apex/root host (`https://nationalprepdeafsports.com`) as redirect-only to `www`
+- Keep DNS aligned with Netlify:
+  - `A @ -> 75.2.60.5`
+  - `A @ -> 99.83.190.102`
+  - `CNAME www -> mellow-bombolone-40e79d.netlify.app`

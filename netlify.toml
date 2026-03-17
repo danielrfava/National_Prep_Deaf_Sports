@@ -9,3 +9,21 @@
 [dev]
   publish = "src"
   autoLaunch = false
+
+[[redirects]]
+  from = "https://nationalprepdeafsports.com/*"
+  to = "https://www.nationalprepdeafsports.com/:splat"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "http://nationalprepdeafsports.com/*"
+  to = "https://www.nationalprepdeafsports.com/:splat"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "https://mellow-bombolone-40e79d.netlify.app/*"
+  to = "https://www.nationalprepdeafsports.com/:splat"
+  status = 301
+  force = true
