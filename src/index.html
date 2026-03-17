@@ -54,7 +54,7 @@
       const body = document.body;
       const searchInput = document.getElementById("homeSearch");
       const searchForm = document.querySelector(".home-search-form");
-      const searchNavLink = document.querySelector('[data-nav-key="search"]');
+      const searchNavLinks = Array.from(document.querySelectorAll('[data-nav-key="search"]'));
       const searchHero = document.getElementById("searchHero");
       let searchActivated = false;
 
@@ -118,14 +118,14 @@
         }
       });
 
-      if (searchNavLink) {
+      searchNavLinks.forEach((searchNavLink) => {
         searchNavLink.addEventListener("click", (event) => {
           event.preventDefault();
           activateSearchState();
           searchHero?.scrollIntoView({ behavior: "smooth", block: "center" });
           searchInput?.focus({ preventScroll: true });
         });
-      }
+      });
 
       if (searchInput) {
         searchInput.addEventListener("focus", activateSearchState);

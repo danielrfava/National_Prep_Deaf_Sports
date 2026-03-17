@@ -14,6 +14,33 @@ export const CREATE_ACCOUNT_ROLE_OPTIONS = Object.freeze([
   { label: "Former Staff", value: "former_staff" },
 ]);
 
+export const BOOTSTRAP_CREATE_ACCOUNT_ROLE_OPTIONS = Object.freeze([
+  { label: "Athletic Director", value: "athletic_director" },
+  { label: "Coach", value: "coach" },
+  { label: "Stats Staff", value: "stats_staff" },
+  { label: "Volunteer", value: "volunteer" },
+  { label: "School Staff", value: "school_staff" },
+  { label: "Former Staff", value: "former_staff" },
+]);
+
+export const MANAGED_CREATE_ACCOUNT_ROLE_OPTIONS = Object.freeze([
+  { label: "Assistant AD", value: "assistant_ad" },
+  { label: "Coach", value: "coach" },
+  { label: "Stats Staff", value: "stats_staff" },
+  { label: "Volunteer", value: "volunteer" },
+  { label: "School Staff", value: "school_staff" },
+  { label: "Former Staff", value: "former_staff" },
+]);
+
+export const SCHOOL_MANAGED_STAFF_ROLE_OPTIONS = Object.freeze([
+  { label: "Assistant AD", value: "assistant_ad" },
+  { label: "Coach", value: "coach" },
+  { label: "Stats Staff", value: "stats_staff" },
+  { label: "Volunteer", value: "volunteer" },
+  { label: "School Staff", value: "school_staff" },
+  { label: "Former Staff", value: "former_staff" },
+]);
+
 export const STAFF_ROLE_OPTIONS = Object.freeze([...CREATE_ACCOUNT_ROLE_OPTIONS]);
 
 export const ROLE_LABELS = Object.freeze({
@@ -62,7 +89,41 @@ export function staffStatusLabel(value) {
 }
 
 export function requiresAthleticDirectorReference(roleValue) {
-  return normalizeRole(roleValue) !== "athletic_director";
+  const role = normalizeRole(roleValue);
+  return Boolean(role) && role !== "athletic_director";
+}
+
+export function normalizeSchoolAdminState(state) {
+  return {
+    hasVerifiedSchoolAdmin: Boolean(state?.hasVerifiedSchoolAdmin),
+    primarySchoolAdminUserId: cleanValue(state?.primarySchoolAdminUserId) || null,
+  };
+}
+
+export function getCreateAccountRoleOptionsForSchool(state) {
+  return normalizeSchoolAdminState(state).hasVerifiedSchoolAdmin
+    ? MANAGED_CREATE_ACCOUNT_ROLE_OPTIONS
+    : BOOTSTRAP_CREATE_ACCOUNT_ROLE_OPTIONS;
+}
+
+export function getCreateAccountRoleHelpText(state) {
+  return normalizeSchoolAdminState(state).hasVerifiedSchoolAdmin
+    ? "School administrator access is already assigned for this school. Contact NPDS if this needs to be updated."
+    : "Athletic Director requests for schools without an assigned school admin are reviewed directly by NPDS.";
+}
+
+export function buildCreateAccountSuccessCopy(state) {
+  return normalizeSchoolAdminState(state).hasVerifiedSchoolAdmin
+    ? {
+        primary:
+          "Your account request has been submitted and is now pending review by your athletic director.",
+        secondary:
+          "You'll be able to sign in fully once your athletic director approves your account.",
+      }
+    : {
+        primary: "Your account request has been submitted and is now pending review by NPDS.",
+        secondary: "You'll be able to sign in fully once NPDS approves your account.",
+      };
 }
 
 export function isAdminProfile(profile) {
@@ -92,7 +153,7 @@ export function getBlockedAccessMessage(profile) {
   }
 
   if (status === "pending") {
-    return "Your account is pending review. You’ll be able to access the school portal after your athletic director approves your request.";
+    return "Your account is pending review. You'll be able to access the school portal after your account is approved.";
   }
 
   if (status === "rejected") {

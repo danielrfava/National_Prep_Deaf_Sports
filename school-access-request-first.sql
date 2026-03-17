@@ -81,6 +81,55 @@ create table if not exists public.school_access_requests (
 alter table public.school_access_requests
 add column if not exists auth_user_id uuid references auth.users(id);
 
+alter table public.school_access_requests
+add column if not exists approval_route text;
+
+alter table public.school_access_requests
+add column if not exists assigned_reviewer_user_id uuid references public.user_profiles(id);
+
+alter table public.school_access_requests
+add column if not exists approval_source text;
+
+alter table public.school_access_requests
+add column if not exists acting_admin_user_id uuid references public.user_profiles(id);
+
+alter table public.school_access_requests
+add column if not exists acted_at timestamptz;
+
+alter table public.school_access_requests
+add column if not exists override_reason text;
+
+alter table public.school_access_requests
+drop constraint if exists school_access_requests_approval_route_check;
+
+alter table public.school_access_requests
+add constraint school_access_requests_approval_route_check
+check (
+  approval_route is null
+  or approval_route = any (
+    array[
+      'npds_admin',
+      'school_admin'
+    ]
+  )
+);
+
+alter table public.school_access_requests
+drop constraint if exists school_access_requests_approval_source_check;
+
+alter table public.school_access_requests
+add constraint school_access_requests_approval_source_check
+check (
+  approval_source is null
+  or approval_source = any (
+    array[
+      'school_admin',
+      'npds_bootstrap',
+      'npds_admin_override'
+    ]
+  )
+);
+
 create index if not exists idx_school_access_requests_status
   on public.school_access_requests(status, created_at);
 
@@ -98,6 +147,13 @@ create unique index if not exists idx_school_access_requests_activated_user
 create unique index if not exists idx_school_access_requests_auth_user
   on public.school_access_requests(auth_user_id)
   where auth_user_id is not null;
+
+create index if not exists idx_school_access_requests_review_route
+  on public.school_access_requests(status, approval_route, school_id);
+
+create index if not exists idx_school_access_requests_assigned_reviewer
+  on public.school_access_requests(assigned_reviewer_user_id, status)
+  where assigned_reviewer_user_id is not null;
 
 insert into public.school_access_requests (
   email,
@@ -175,6 +231,88 @@ check (
   )
 );
 
+create or replace function public.get_school_admin_state(requested_school_id text)
+returns table (
+  has_verified_school_admin boolean,
+  primary_school_admin_user_id uuid
+)
+language sql
+security definer
+set search_path = public
+as $$
+  with primary_admin as (
+    select up.id
+    from public.user_profiles up
+    where up.school_id = nullif(btrim(coalesce(requested_school_id, '')), '')
+      and up.role = 'athletic_director'
+      and up.status = 'approved'
+      and up.archived_at is null
+    order by up.approved_at asc nulls last, up.created_at asc nulls last, up.id asc
+    limit 1
+  )
+  select
+    exists(select 1 from primary_admin) as has_verified_school_admin,
+    (select id from primary_admin) as primary_school_admin_user_id;
+$$;
+
+comment on function public.get_school_admin_state(text) is
+  'Returns whether a school currently has an approved active Athletic Director and which profile is the primary reviewer.';
+
+create or replace function public.resolve_school_access_authority(
+  requested_school_id text,
+  requested_role text
+)
+returns table (
+  has_verified_school_admin boolean,
+  primary_school_admin_user_id uuid,
+  approval_route text,
+  assigned_reviewer_user_id uuid
+)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  normalized_school_id text := nullif(btrim(coalesce(requested_school_id, '')), '');
+  normalized_role text := lower(btrim(coalesce(requested_role, 'school_staff')));
+  admin_state record;
+begin
+  if normalized_school_id is null then
+    raise exception 'Select a valid school before submitting.';
+  end if;
+
+  select *
+  into admin_state
+  from public.get_school_admin_state(normalized_school_id);
+
+  if normalized_role = 'athletic_director' and coalesce(admin_state.has_verified_school_admin, false) then
+    raise exception 'Athletic Director access is already assigned for this school. Contact NPDS if this needs to be updated.';
+  end if;
+
+  if normalized_role = 'assistant_ad' and not coalesce(admin_state.has_verified_school_admin, false) then
+    raise exception 'Assistant AD access can only be requested after a verified school administrator is established for this school.';
+  end if;
+
+  return query
+  select
+    coalesce(admin_state.has_verified_school_admin, false),
+    admin_state.primary_school_admin_user_id,
+    case
+      when coalesce(admin_state.has_verified_school_admin, false)
+           and normalized_role <> 'athletic_director' then 'school_admin'
+      else 'npds_admin'
+    end,
+    case
+      when coalesce(admin_state.has_verified_school_admin, false)
+           and normalized_role <> 'athletic_director' then admin_state.primary_school_admin_user_id
+      else null
+    end;
+end;
+$$;
+
+comment on function public.resolve_school_access_authority(text, text) is
+  'Validates requested role against the school admin state and returns the approval route for pending school access requests.';
+
 create or replace function public.sync_school_access_request_state()
 returns trigger
 language plpgsql
@@ -183,13 +321,17 @@ set search_path = public
 as $$
 declare
   resolved_school_name text;
+  authority_record record;
 begin
   new.email := lower(btrim(coalesce(new.email, '')));
   new.full_name := btrim(coalesce(new.full_name, ''));
   new.job_title := btrim(coalesce(new.job_title, ''));
   new.role := lower(btrim(coalesce(new.role, 'school_staff')));
   new.approved_role := nullif(lower(btrim(coalesce(new.approved_role, ''))), '');
+  new.approval_route := nullif(lower(btrim(coalesce(new.approval_route, ''))), '');
+  new.approval_source := nullif(lower(btrim(coalesce(new.approval_source, ''))), '');
   new.auth_user_id := coalesce(new.auth_user_id, new.activated_user_id);
+  new.override_reason := nullif(btrim(coalesce(new.override_reason, '')), '');
   new.reference_ad_name := nullif(btrim(coalesce(new.reference_ad_name, '')), '');
   new.reference_ad_email := nullif(lower(btrim(coalesce(new.reference_ad_email, ''))), '');
   new.verification_notes := nullif(btrim(coalesce(new.verification_notes, '')), '');
@@ -203,8 +345,12 @@ begin
     new.approved_by := null;
     new.approved_at := null;
     new.approved_role := null;
+    new.approval_source := null;
     new.activation_email_sent_at := null;
     new.activated_at := null;
+    new.acted_at := null;
+    new.acting_admin_user_id := null;
+    new.override_reason := null;
     new.rejection_reason := null;
   end if;
 
@@ -244,6 +390,14 @@ begin
     raise exception 'Approved role is not supported.';
   end if;
 
+  if new.approval_source is not null and new.approval_source not in (
+    'school_admin',
+    'npds_bootstrap',
+    'npds_admin_override'
+  ) then
+    raise exception 'Approval source is not supported.';
+  end if;
+
   select full_name
   into resolved_school_name
   from public.schools
@@ -275,6 +429,28 @@ begin
     raise exception 'A school access account already exists for this email.';
   end if;
 
+  if tg_op = 'INSERT'
+     or (
+       new.status = 'pending'
+       and (
+         old.school_id is distinct from new.school_id
+         or old.role is distinct from new.role
+         or old.status is distinct from new.status
+         or old.approval_route is null
+         or old.assigned_reviewer_user_id is null
+       )
+     ) then
+    select *
+    into authority_record
+    from public.resolve_school_access_authority(new.school_id, new.role);
+
+    new.approval_route := authority_record.approval_route;
+    new.assigned_reviewer_user_id := authority_record.assigned_reviewer_user_id;
+  elsif tg_op = 'UPDATE' then
+    new.approval_route := coalesce(new.approval_route, old.approval_route);
+    new.assigned_reviewer_user_id := coalesce(new.assigned_reviewer_user_id, old.assigned_reviewer_user_id);
+  end if;
+
   if tg_op = 'UPDATE' then
     if new.status = 'approved' and old.status is distinct from 'approved' and new.approved_at is null then
       new.approved_at := now();
@@ -286,8 +462,21 @@ begin
       new.reviewed_at := now();
     end if;
 
+    if new.status in ('approved', 'rejected', 'activated')
+       and old.status is distinct from new.status
+       and new.acted_at is null then
+      new.acted_at := coalesce(new.reviewed_at, new.approved_at, now());
+    end if;
+
     if new.status <> 'rejected' then
       new.rejection_reason := null;
+    end if;
+
+    if new.status = 'pending' and old.status is distinct from 'pending' then
+      new.approval_source := null;
+      new.acting_admin_user_id := null;
+      new.acted_at := null;
+      new.override_reason := null;
     end if;
   end if;
 
@@ -304,6 +493,71 @@ create trigger trg_sync_school_access_requests
 before insert or update on public.school_access_requests
 for each row
 execute function public.sync_school_access_request_state();
+
+with routed_requests as (
+  select
+    request_row.id,
+    case
+      when request_row.role <> 'athletic_director'
+           and admin_state.has_verified_school_admin then 'school_admin'
+      else 'npds_admin'
+    end as approval_route,
+    case
+      when request_row.role <> 'athletic_director'
+           and admin_state.has_verified_school_admin then admin_state.primary_school_admin_user_id
+      else null
+    end as assigned_reviewer_user_id
+  from public.school_access_requests request_row
+  cross join lateral public.get_school_admin_state(request_row.school_id) admin_state
+)
+update public.school_access_requests request_row
+set approval_route = routed_requests.approval_route,
+    assigned_reviewer_user_id = routed_requests.assigned_reviewer_user_id,
+    updated_at = now()
+from routed_requests
+where request_row.id = routed_requests.id
+  and (
+    request_row.approval_route is distinct from routed_requests.approval_route
+    or request_row.assigned_reviewer_user_id is distinct from routed_requests.assigned_reviewer_user_id
+  );
+
+with acted_requests as (
+  select
+    request_row.id,
+    coalesce(request_row.reviewed_by, request_row.approved_by) as actor_id,
+    coalesce(request_row.reviewed_at, request_row.approved_at) as acted_at,
+    case
+      when actor.role = 'admin' and request_row.approval_route = 'school_admin' then 'npds_admin_override'
+      when actor.role = 'admin' then 'npds_bootstrap'
+      when actor.role = 'athletic_director' then 'school_admin'
+      else null
+    end as approval_source
+  from public.school_access_requests request_row
+  left join public.user_profiles actor
+    on actor.id = coalesce(request_row.reviewed_by, request_row.approved_by)
+  where request_row.status in ('approved', 'rejected', 'activated')
+)
+update public.school_access_requests request_row
+set approval_source = coalesce(request_row.approval_source, acted_requests.approval_source),
+    acting_admin_user_id = coalesce(
+      request_row.acting_admin_user_id,
+      case
+        when acted_requests.approval_source in ('npds_bootstrap', 'npds_admin_override') then acted_requests.actor_id
+        else null
+      end
+    ),
+    acted_at = coalesce(request_row.acted_at, acted_requests.acted_at),
+    updated_at = now()
+from acted_requests
+where request_row.id = acted_requests.id
+  and (
+    request_row.approval_source is null
+    or request_row.acted_at is null
+    or (
+      request_row.acting_admin_user_id is null
+      and acted_requests.approval_source in ('npds_bootstrap', 'npds_admin_override')
+    )
+  );
 
 create or replace function public.handle_school_account_signup()
 returns trigger
@@ -670,6 +924,7 @@ alter table public.school_access_requests enable row level security;
 drop policy if exists "Anyone can submit school access requests" on public.school_access_requests;
 drop policy if exists "Admins can view school access requests" on public.school_access_requests;
 drop policy if exists "Admins can update school access requests" on public.school_access_requests;
+drop policy if exists "Assigned school reviewers can view routed school access requests" on public.school_access_requests;
 
 create policy "Admins can view school access requests"
 on public.school_access_requests for select
@@ -703,7 +958,62 @@ with check (
   )
 );
 
+create policy "Assigned school reviewers can view routed school access requests"
+on public.school_access_requests for select
+to authenticated
+using (
+  status = 'pending'
+  and approval_route = 'school_admin'
+  and assigned_reviewer_user_id = auth.uid()
+  and exists (
+    select 1
+    from public.user_profiles reviewer
+    where reviewer.id = auth.uid()
+      and reviewer.role = 'athletic_director'
+      and reviewer.status = 'approved'
+      and reviewer.archived_at is null
+      and reviewer.school_id = school_access_requests.school_id
+  )
+);
+
 -- Public inserts now flow through auth.users signup + handle_school_account_signup().
 -- Do not recreate an anon/authenticated insert policy here, or the app can drift back into request-only behavior.
 
+drop policy if exists "Athletic directors can manage approved school staff" on public.user_profiles;
+
+create policy "Athletic directors can manage approved school staff"
+on public.user_profiles for update
+to authenticated
+using (
+  id <> auth.uid()
+  and exists (
+    select 1
+    from public.user_profiles viewer
+    where viewer.id = auth.uid()
+      and viewer.status = 'approved'
+      and viewer.role = 'athletic_director'
+      and viewer.school_id = user_profiles.school_id
+  )
+)
+with check (
+  id <> auth.uid()
+  and school_id = (
+    select viewer.school_id
+    from public.user_profiles viewer
+    where viewer.id = auth.uid()
+  )
+  and role = any (
+    array[
+      'assistant_ad',
+      'coach',
+      'stats_staff',
+      'volunteer',
+      'school_staff',
+      'former_staff'
+    ]
+  )
+  and status = any (array['approved', 'archived'])
+);
+
 grant execute on function public.complete_school_access_activation(uuid) to authenticated;
+grant execute on function public.get_school_admin_state(text) to anon, authenticated;

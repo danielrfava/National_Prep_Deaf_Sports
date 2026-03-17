@@ -33,7 +33,7 @@
           <p class="public-kicker">School Dashboard Access</p>
           <h1 class="portal-login-title">Create Account</h1>
           <p class="portal-login-subline">
-            Create your school account now. Portal access will stay locked until your athletic director approves it.
+            Create your school account now. Portal access will stay locked until your request is approved.
           </p>
 
           <div id="alert" class="portal-alert" hidden></div>
@@ -105,8 +105,11 @@
               <div class="portal-field">
                 <label class="portal-label" for="role">Role</label>
                 <select id="role" name="role" required>
-                  <option value="">Select role</option>
+                  <option value="">Select school first</option>
                 </select>
+                <p id="roleRoutingHelp" class="portal-field-help" aria-live="polite">
+                  Select a school to see available roles.
+                </p>
               </div>
 
               <div class="portal-field">
@@ -159,11 +162,11 @@
           </form>
 
           <div id="successState" hidden>
-            <p class="portal-card-note">
+            <p id="successMessagePrimary" class="portal-card-note">
               Your account request has been submitted and is now pending review by your athletic director.
             </p>
-            <p class="portal-card-note">
-              You’ll be able to sign in fully once your athletic director approves your account.
+            <p id="successMessageSecondary" class="portal-card-note">
+              You'll be able to sign in fully once your athletic director approves your account.
             </p>
             <div class="portal-auth-actions">
               <a id="accountStatusLink" class="portal-secondary-action" href="account-status.html" hidden>View Account Status</a>

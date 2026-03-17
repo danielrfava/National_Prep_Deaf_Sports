@@ -18,19 +18,27 @@ const FOOTER_ITEMS = [
 function wireResponsiveNav(host) {
   const backdrop = host.querySelector("[data-public-nav-backdrop]");
   const closeButton = host.querySelector("[data-public-nav-close]");
+  const drawerShell = host.querySelector("[data-public-nav-drawer-shell]");
+  const drawer = host.querySelector("[data-public-nav-drawer]");
   const toggle = host.querySelector("[data-public-nav-toggle]");
-  const nav = host.querySelector("[data-public-nav-menu]");
+  const drawerLinks = host.querySelector("[data-public-nav-drawer-links]");
+  const root = document.documentElement;
 
-  if (!toggle || !nav || !backdrop) {
+  if (!toggle || !drawer || !drawerShell || !backdrop || !drawerLinks) {
     return;
   }
 
   const setOpen = (isOpen) => {
     toggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
-    nav.classList.toggle("is-open", isOpen);
+    drawer.setAttribute("aria-hidden", isOpen ? "false" : "true");
+    drawerShell.setAttribute("aria-hidden", isOpen ? "false" : "true");
+    backdrop.setAttribute("aria-hidden", isOpen ? "false" : "true");
+    drawerShell.classList.toggle("is-open", isOpen);
+    drawer.classList.toggle("is-open", isOpen);
     backdrop.hidden = !isOpen;
     backdrop.classList.toggle("is-open", isOpen);
     host.classList.toggle("is-nav-open", isOpen);
+    root.classList.toggle("public-nav-open", isOpen);
     document.body.classList.toggle("public-nav-open", isOpen);
   };
 
@@ -63,16 +71,8 @@ function wireResponsiveNav(host) {
   closeButton?.addEventListener("click", () => closeMenu(true));
   backdrop.addEventListener("click", () => closeMenu(true));
 
-  nav.querySelectorAll("a").forEach((link) => {
+  drawerLinks.querySelectorAll("a").forEach((link) => {
     link.addEventListener("click", () => closeMenu());
-  });
-
-  document.addEventListener("click", (event) => {
-    if (!(event.target instanceof Node) || host.contains(event.target)) {
-      return;
-    }
-
-    closeMenu();
   });
 
   document.addEventListener("keydown", (event) => {
@@ -86,6 +86,9 @@ function wireResponsiveNav(host) {
       closeMenu();
     }
   });
+
+  window.addEventListener("popstate", () => closeMenu());
+  window.addEventListener("pagehide", () => setOpen(false));
 }
 
 export function mountPublicTopNav(options = {}) {
@@ -126,24 +129,40 @@ export function mountPublicTopNav(options = {}) {
         <span></span>
       </button>
 
-      <div class="public-nav-backdrop" data-public-nav-backdrop hidden></div>
-
-      <nav class="nav public-nav" id="${menuId}" aria-label="Primary" data-public-nav-menu>
-        <div class="public-nav-panel-head">
-          <div>
-            <p class="public-nav-panel-kicker">Menu</p>
-            <p class="public-nav-panel-title">National Prep Deaf Sports</p>
-          </div>
-          <button class="public-nav-close" type="button" data-public-nav-close>
-            <span class="sr-only">Close navigation</span>
-            <span aria-hidden="true">+</span>
-          </button>
-        </div>
+      <nav class="nav public-nav public-nav-desktop" aria-label="Primary">
         ${NAV_ITEMS.map((item) => {
           const isActive = item.key === active;
           return `<a class="nav-link${isActive ? " nav-link-active" : ""}" data-nav-key="${item.key}" href="${basePath}${item.href}"${isActive ? ' aria-current="page"' : ""}>${item.label}</a>`;
         }).join("")}
       </nav>
+
+      <div class="public-nav-backdrop" data-public-nav-backdrop hidden></div>
+
+      <div class="public-nav-drawer-shell" data-public-nav-drawer-shell>
+        <nav
+          class="public-nav-drawer"
+          id="${menuId}"
+          aria-label="Primary"
+          data-public-nav-drawer
+        >
+          <div class="public-nav-panel-head">
+            <div>
+              <p class="public-nav-panel-kicker">Menu</p>
+              <p class="public-nav-panel-title">National Prep Deaf Sports</p>
+            </div>
+            <button class="public-nav-close" type="button" data-public-nav-close>
+              <span class="sr-only">Close navigation</span>
+              <span aria-hidden="true">+</span>
+            </button>
+          </div>
+          <div class="public-nav-drawer-links" data-public-nav-drawer-links>
+            ${NAV_ITEMS.map((item) => {
+              const isActive = item.key === active;
+              return `<a class="nav-link public-nav-drawer-link${isActive ? " nav-link-active" : ""}" data-nav-key="${item.key}" href="${basePath}${item.href}"${isActive ? ' aria-current="page"' : ""}>${item.label}</a>`;
+            }).join("")}
+          </div>
+        </nav>
+      </div>
     </div>
   `;
 

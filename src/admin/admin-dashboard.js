@@ -426,7 +426,7 @@ async function fetchPendingUsers() {
   const { data, error } = await supabase
     .from("school_access_requests")
     .select(
-      "id, auth_user_id, created_at, email, full_name, school_id, school_name, role, approved_role, status, job_title, reference_ad_name, reference_ad_email, verification_notes, rejection_reason, reviewed_at, approved_at, activation_email_sent_at, activated_at"
+      "id, auth_user_id, created_at, email, full_name, school_id, school_name, role, approved_role, status, job_title, reference_ad_name, reference_ad_email, verification_notes, rejection_reason, reviewed_at, approved_at, activation_email_sent_at, activated_at, approval_route, assigned_reviewer_user_id, approval_source, acting_admin_user_id, acted_at, override_reason"
     )
     .in("status", ["pending", "approved"])
     .is("activated_at", null)
@@ -495,6 +495,7 @@ function renderPendingUserCard(user) {
       <span class="meta-pill">${escapeHtml(user.school_name || user.school_id || "No school selected")}</span>
       <span class="meta-pill">${escapeHtml(model.rolePillLabel)}: ${escapeHtml(roleLabel(model.roleValue))}</span>
       <span class="meta-pill">${escapeHtml(model.statusMetaLabel)}</span>
+      <span class="meta-pill">${escapeHtml(model.routeLabel)}</span>
     </div>
 
     <div class="issue-stack">
@@ -510,6 +511,9 @@ function renderPendingUserCard(user) {
         buildReferenceValue(user.reference_ad_name, user.reference_ad_email)
       )}
       ${renderDetailCard("School ID", user.school_id || "Not set")}
+      ${renderDetailCard("Default Route", model.routeLabel)}
+      ${renderDetailCard("Review Source", model.reviewSourceLabel)}
+      ${renderDetailCard("Override Note", model.overrideReasonLabel)}
       ${renderDetailCard("Verification Notes", user.verification_notes || "None provided")}
       ${renderDetailCard("Approved At", user.approved_at ? displayDate(user.approved_at, true) : "Not approved yet")}
       ${renderDetailCard(model.accountLinkLabel, model.accountLinkValue)}
@@ -545,10 +549,36 @@ function renderPendingUserCard(user) {
   </article>`;
 }
 
+function buildRequestRouteLabel(user) {
+  return normalizeRole(user?.approval_route) === "school_admin"
+    ? "Default route: School AD review"
+    : "Default route: NPDS review";
+}
+
+function buildReviewSourceLabel(user) {
+  const source = normalizeRole(user?.approval_source);
+
+  if (source === "school_admin") {
+    return "School AD review";
+  }
+
+  if (source === "npds_bootstrap") {
+    return "NPDS bootstrap review";
+  }
+
+  if (source === "npds_admin_override") {
+    return "NPDS admin override";
+  }
+
+  return normalizeStatus(user?.status) === "approved" ? "Review source not recorded" : "Pending review";
+}
+
 function buildPendingUserReviewModel(user, roleOverride = "") {
   const status = normalizeStatus(user?.status);
   const requestedRole = normalizeRole(roleOverride || user?.approved_role || user?.role) || "school_staff";
   const hasLinkedAuthUser = Boolean(String(user?.auth_user_id || "").trim());
+  const routeLabel = buildRequestRouteLabel(user);
+  const reviewSourceLabel = buildReviewSourceLabel(user);
   const blockingReasons = [];
   const reviewNotes = [];
   const showRoleSelect = status === "pending";
@@ -594,6 +624,12 @@ function buildPendingUserReviewModel(user, roleOverride = "") {
         ? "Auth account already exists. Approval will unlock portal access immediately."
         : "Legacy request without a linked auth user. Approval will send an activation email."
     );
+
+    if (normalizeRole(user?.approval_route) === "school_admin") {
+      reviewNotes.push("This request normally routes to the assigned school reviewer. NPDS can still override if needed.");
+    } else {
+      reviewNotes.push("This request is already on the NPDS review path by default.");
+    }
   }
 
   if (String(user?.verification_notes || "").trim()) {
@@ -611,6 +647,10 @@ function buildPendingUserReviewModel(user, roleOverride = "") {
         : "This request is approved but no activation email timestamp is recorded yet."
     );
     reviewNotes.push("Use resend activation only if the requester still needs the NPDS activation email.");
+  }
+
+  if (normalizeRole(user?.approval_source) === "npds_admin_override") {
+    reviewNotes.push("This request was handled by NPDS as an override of the normal school review path.");
   }
 
   return {
@@ -649,8 +689,13 @@ function buildPendingUserReviewModel(user, roleOverride = "") {
       : user.activation_email_sent_at
       ? `Activation email sent ${displayDate(user.activation_email_sent_at, true)}`
       : "No linked auth user yet",
+    overrideReasonLabel: user?.override_reason || (normalizeRole(user?.approval_source) === "npds_admin_override"
+      ? "No override note recorded"
+      : "Not needed"),
+    reviewSourceLabel,
     rolePillLabel: status === "approved" ? "Approved Role" : "Requested Role",
     roleValue: status === "approved" ? user?.approved_role || requestedRole : requestedRole,
+    routeLabel,
     statusLabel: status === "approved" ? "Approved" : canApprove && blockingReasons.length === 0 ? "Ready" : "Blocked",
     statusMetaLabel: status === "approved"
       ? `Approved ${displayDate(user?.approved_at, true)}`
@@ -1585,6 +1630,7 @@ async function approvePendingUser(userId, requestedRole, button) {
   const safeRole = STAFF_ROLE_OPTIONS.some((option) => option.value === requestedRole)
     ? requestedRole
     : "school_staff";
+  const isOverrideRoute = normalizeRole(request?.approval_route) === "school_admin";
 
   if (reviewModel && !reviewModel.canApprove) {
     alert(`Approval is blocked: ${reviewModel.blockingReasons.join(" | ")}`);
@@ -1592,12 +1638,29 @@ async function approvePendingUser(userId, requestedRole, button) {
   }
 
   const approvalPrompt =
-    request?.auth_user_id
+    isOverrideRoute
+      ? request?.auth_user_id
+        ? "Approve this school-routed request as an NPDS admin override and unlock portal access for the linked account?"
+        : "Approve this school-routed legacy request as an NPDS admin override and send the NPDS activation email?"
+      : request?.auth_user_id
       ? "Approve this school account request and unlock portal access for the linked account?"
       : "Approve this legacy school access request and send the NPDS activation email?";
 
   if (!confirm(approvalPrompt)) {
     return;
+  }
+
+  let overrideReason = "";
+  if (isOverrideRoute) {
+    const enteredReason = window.prompt(
+      "Optional override note for this NPDS admin action. Leave blank and press OK to continue, or press Cancel to abort."
+    );
+
+    if (enteredReason === null) {
+      return;
+    }
+
+    overrideReason = String(enteredReason || "").trim();
   }
 
   const originalLabel = button.textContent;
@@ -1623,6 +1686,7 @@ async function approvePendingUser(userId, requestedRole, button) {
       body: JSON.stringify({
         requestId: userId,
         approvedRole: safeRole,
+        overrideReason,
       }),
     });
 
@@ -1641,9 +1705,17 @@ async function approvePendingUser(userId, requestedRole, button) {
 
     await loadDashboard();
     if (result?.flow === "legacy_activation") {
-      alert("Request approved and legacy activation email sent.");
+      alert(
+        result?.approvalSource === "npds_admin_override"
+          ? "NPDS override approved and legacy activation email sent."
+          : "Request approved and legacy activation email sent."
+      );
     } else {
-      alert("Request approved and portal access unlocked.");
+      alert(
+        result?.approvalSource === "npds_admin_override"
+          ? "NPDS override approved and portal access unlocked."
+          : "Request approved and portal access unlocked."
+      );
     }
   } catch (error) {
     console.error("User approval failed:", error);
@@ -1764,10 +1836,16 @@ async function handleReject(event) {
   submitButton.textContent = "Saving...";
 
   try {
+    let didSave = false;
     if (rejectContext.type === "submission") {
       await rejectSubmission(rejectContext.id, reason);
+      didSave = true;
     } else {
-      await rejectUserRequest(rejectContext.id, reason);
+      didSave = await rejectUserRequest(rejectContext.id, reason);
+    }
+
+    if (!didSave) {
+      return;
     }
 
     closeRejectModal();
@@ -1799,46 +1877,49 @@ async function rejectSubmission(submissionId, reason) {
 
 async function rejectUserRequest(userId, reason) {
   const existing = pendingUsers.find((user) => user.id === userId);
-  const note = appendAdminReviewNote(existing?.verification_notes, reason);
-  const timestamp = new Date().toISOString();
+  const isOverrideRoute = normalizeRole(existing?.approval_route) === "school_admin";
+  let overrideReason = "";
 
-  const { error } = await supabase
-    .from("school_access_requests")
-    .update({
-      rejection_reason: reason,
-      reviewed_at: timestamp,
-      reviewed_by: currentUser.id,
-      status: "rejected",
-      updated_at: timestamp,
-      verification_notes: note,
-    })
-    .eq("id", userId);
+  if (isOverrideRoute) {
+    const enteredReason = window.prompt(
+      "Optional override note for this NPDS admin rejection. Leave blank and press OK to continue, or press Cancel to abort."
+    );
 
-  if (error) {
-    throw error;
-  }
-
-  if (existing?.email) {
-    const { error: profileError } = await supabase
-      .from("user_profiles")
-      .update({
-        status: "rejected",
-        updated_at: timestamp,
-        verification_notes: note,
-      })
-      .eq("email", existing.email)
-      .neq("role", "admin");
-
-    if (profileError) {
-      throw profileError;
+    if (enteredReason === null) {
+      return false;
     }
-  }
-}
 
-function appendAdminReviewNote(existingNotes, reason) {
-  const stamp = new Date().toISOString().split("T")[0];
-  const prefix = `[Admin review ${stamp}] Rejected: ${reason}`;
-  return [String(existingNotes || "").trim(), prefix].filter(Boolean).join("\n\n");
+    overrideReason = String(enteredReason || "").trim();
+  }
+
+  const {
+    data: { session },
+    error: sessionError,
+  } = await supabase.auth.getSession();
+
+  if (sessionError || !session?.access_token) {
+    throw sessionError || new Error("Admin session could not be verified.");
+  }
+
+  const response = await fetch("/.netlify/functions/reject-school-access-request", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${session.access_token}`,
+    },
+    body: JSON.stringify({
+      requestId: userId,
+      reason,
+      overrideReason,
+    }),
+  });
+
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(result?.error || "Could not reject school access.");
+  }
+
+  return true;
 }
 
 function renderDetailCard(label, value) {

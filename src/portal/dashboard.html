@@ -86,6 +86,17 @@
     .staff-action-btn.restore { border-color: rgba(23,184,151,.42); color: #bcf7ea; }
     .staff-note-pill { display: inline-flex; border: 1px solid #2f4257; border-radius: 999px; background: #0f1926; color: #9fb3c7; padding: 5px 8px; font-size: .71rem; font-weight: 700; }
     .staff-extra { margin: 0; color: #9fb4c8; font-size: .76rem; line-height: 1.35; }
+    .access-request-list { display: grid; gap: 8px; }
+    .access-request-row { border: 1px solid #2a3b4f; border-radius: 11px; background: #111d2b; padding: 11px; display: grid; gap: 8px; }
+    .access-request-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; flex-wrap: wrap; }
+    .access-request-name { margin: 0; font-size: .9rem; font-weight: 800; color: #eef6fd; }
+    .access-request-email { margin: 3px 0 0; color: #a9bbcd; font-size: .76rem; overflow-wrap: anywhere; }
+    .access-request-meta { display: flex; flex-wrap: wrap; gap: 6px; }
+    .access-request-notes { margin: 0; color: #b8c9d9; font-size: .78rem; line-height: 1.4; }
+    .access-request-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    .access-request-btn { border: 1px solid #2f4359; border-radius: 8px; background: #132233; color: #eaf4fd; padding: 8px 10px; font-size: .75rem; font-weight: 700; cursor: pointer; }
+    .access-request-btn:hover { border-color: var(--accent); }
+    .access-request-btn.reject { border-color: rgba(242,139,130,.42); color: #ffd5cf; }
     .limited-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
     .limited-card { border: 1px solid #2a3b4f; border-radius: 12px; background: #111d2b; padding: 11px; display: grid; gap: 6px; }
     .limited-card-label { margin: 0; color: #95aac0; font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; font-weight: 700; }
@@ -153,6 +164,19 @@
           <div class="head"><h2>School Intelligence</h2><p>What needs attention now.</p></div>
           <div class="body">
             <ul id="insights" class="insights"><li>Loading insights...</li></ul>
+          </div>
+        </section>
+
+        <section id="pendingAccessPanel" class="panel" hidden>
+          <div class="head">
+            <h2>Pending Access Requests</h2>
+            <p>School-routed account requests waiting on Athletic Director review.</p>
+          </div>
+          <div class="body">
+            <div id="pendingAccessMessage" class="staff-banner" hidden></div>
+            <div id="pendingAccessList" class="access-request-list">
+              <div class="empty">Loading school access requests...</div>
+            </div>
           </div>
         </section>
 

@@ -71,6 +71,19 @@ async function supabaseRest(path, options = {}) {
   return parseResponse(response);
 }
 
+async function callRpc(name, payload = {}) {
+  const data = await supabaseRest(`/rest/v1/rpc/${name}`, {
+    method: "POST",
+    body: payload,
+  });
+
+  if (Array.isArray(data)) {
+    return data[0] || null;
+  }
+
+  return data || null;
+}
+
 async function getUserFromAccessToken(accessToken) {
   ensureEnv();
 
@@ -91,10 +104,31 @@ async function getUserFromAccessToken(accessToken) {
 
 async function getUserProfile(userId) {
   const rows = await supabaseRest("/rest/v1/user_profiles", {
-    query: `?id=eq.${encodeURIComponent(userId)}&select=id,email,full_name,role,status&limit=1`,
+    query: `?id=eq.${encodeURIComponent(
+      userId
+    )}&select=id,email,full_name,role,status,school_id,school_name,archived_at&limit=1`,
   });
 
   return Array.isArray(rows) ? rows[0] || null : null;
+}
+
+async function getSchoolAdminState(schoolId) {
+  const requestedSchoolId = String(schoolId || "").trim();
+  if (!requestedSchoolId) {
+    return {
+      hasVerifiedSchoolAdmin: false,
+      primarySchoolAdminUserId: null,
+    };
+  }
+
+  const row = await callRpc("get_school_admin_state", {
+    requested_school_id: requestedSchoolId,
+  });
+
+  return {
+    hasVerifiedSchoolAdmin: Boolean(row?.has_verified_school_admin),
+    primarySchoolAdminUserId: String(row?.primary_school_admin_user_id || "").trim() || null,
+  };
 }
 
 async function upsertUserProfile(payload) {
@@ -184,6 +218,7 @@ function respond(statusCode, payload) {
 
 module.exports = {
   SUPABASE_URL,
+  getSchoolAdminState,
   getSchoolAccessRequest,
   getUserFromAccessToken,
   getUserProfile,

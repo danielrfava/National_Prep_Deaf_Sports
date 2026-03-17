@@ -5,13 +5,22 @@ const REQUEST_ACCESS_LOG_PREFIX = "[request-school-access]";
 
 export const REQUEST_ACCESS_STEPS = Object.freeze({
   schoolLookup: "school_lookup",
+  schoolAdminState: "school_admin_state",
   authSignup: "auth_signup",
 });
 
 const REQUEST_ACCESS_STEP_LABELS = Object.freeze({
   [REQUEST_ACCESS_STEPS.schoolLookup]: "school lookup",
+  [REQUEST_ACCESS_STEPS.schoolAdminState]: "school admin routing",
   [REQUEST_ACCESS_STEPS.authSignup]: "account creation",
 });
+
+const AUTHORITY_VALIDATION_MESSAGES = Object.freeze([
+  "Athletic Director access is already assigned for this school. Contact NPDS if this needs to be updated.",
+  "Assistant AD access can only be requested after a verified school administrator is established for this school.",
+  "Select a valid school before submitting.",
+  "Non-Athletic Director requests require Athletic Director name and email.",
+]);
 
 function cleanValue(value) {
   return String(value || "").trim();
@@ -166,6 +175,44 @@ export async function loadRequestSchoolOptions() {
   }
 }
 
+export async function loadSchoolAdminState(schoolId) {
+  const requestedSchoolId = cleanValue(schoolId);
+
+  if (!requestedSchoolId) {
+    return {
+      hasVerifiedSchoolAdmin: false,
+      primarySchoolAdminUserId: null,
+    };
+  }
+
+  try {
+    const { data, error } = await supabase.rpc("get_school_admin_state", {
+      requested_school_id: requestedSchoolId,
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    const row = Array.isArray(data) ? data[0] || null : data || null;
+
+    return {
+      hasVerifiedSchoolAdmin: Boolean(row?.has_verified_school_admin),
+      primarySchoolAdminUserId: cleanValue(row?.primary_school_admin_user_id) || null,
+    };
+  } catch (error) {
+    logRequestAccessError(REQUEST_ACCESS_STEPS.schoolAdminState, error, {
+      school_id: requestedSchoolId,
+    });
+
+    throw buildRequestAccessError(
+      REQUEST_ACCESS_STEPS.schoolAdminState,
+      "Could not verify which roles are available for this school. Step: school admin routing.",
+      error
+    );
+  }
+}
+
 export async function submitSchoolAccessRequest(payload) {
   const email = cleanValue(payload?.email).toLowerCase();
   const password = String(payload?.password || "");
@@ -237,6 +284,15 @@ export async function submitSchoolAccessRequest(payload) {
     }
 
     const normalizedMessage = getErrorMessage(error).toLowerCase();
+    const exactMessage = getErrorMessage(error);
+
+    if (AUTHORITY_VALIDATION_MESSAGES.some((message) => message.toLowerCase() === normalizedMessage)) {
+      throw buildRequestAccessError(
+        REQUEST_ACCESS_STEPS.authSignup,
+        exactMessage,
+        error
+      );
+    }
 
     if (
       normalizedMessage.includes("already registered") ||

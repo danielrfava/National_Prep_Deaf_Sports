@@ -2,7 +2,7 @@ import { supabase } from "../supabaseClient.js";
 import {
   buildAccountStatusHref,
   buildActivationHref,
-  STAFF_ROLE_OPTIONS,
+  SCHOOL_MANAGED_STAFF_ROLE_OPTIONS,
   fetchCurrentSessionProfile,
   getBlockedAccessMessage,
   isAdminProfile,
@@ -45,6 +45,7 @@ let currentUser = null;
 let allSubmissions = [];
 let sportsWithData = new Set();
 let schoolStaff = [];
+let pendingAccessRequests = [];
 let submissionFilter = "all";
 let showArchivedStaff = false;
 
@@ -63,6 +64,9 @@ const elements = {
   limitedDashboardMeta: document.getElementById("limitedDashboardMeta"),
   limitedDashboardPanel: document.getElementById("limitedDashboardPanel"),
   logout: document.getElementById("logoutBtn"),
+  pendingAccessList: document.getElementById("pendingAccessList"),
+  pendingAccessMessage: document.getElementById("pendingAccessMessage"),
+  pendingAccessPanel: document.getElementById("pendingAccessPanel"),
   readinessChip: document.getElementById("readinessChip"),
   schoolChip: document.getElementById("schoolChip"),
   schoolDataLink: document.getElementById("schoolDataLink"),
@@ -126,6 +130,7 @@ async function init() {
     showArchivedStaff = !showArchivedStaff;
     renderStaff();
   });
+  elements.pendingAccessList?.addEventListener("click", handlePendingAccessActionClick);
   elements.staffList?.addEventListener("click", handleStaffActionClick);
 
   await loadData();
@@ -153,7 +158,7 @@ function renderLimitedDashboard(profile) {
   const isPending = status === "pending";
   const isInvited = status === "invited";
   const message = isPending
-    ? "Your account is pending review. You’ll be able to access the school portal after your athletic director approves your request."
+    ? "Your account is pending review. You'll be able to access the school portal after your account is approved."
     : isInvited
     ? "Your account was approved under the legacy activation flow. Finish the activation email steps before using the school dashboard."
     : getBlockedAccessMessage(profile);
@@ -229,29 +234,40 @@ async function loadData() {
   elements.submissions.innerHTML = '<div class="empty">Loading submissions...</div>';
   elements.insights.innerHTML = "<li>Loading insights...</li>";
   elements.staffList.innerHTML = '<div class="empty">Loading school staff...</div>';
+  if (elements.pendingAccessList) {
+    elements.pendingAccessList.innerHTML = '<div class="empty">Loading school access requests...</div>';
+  }
   setStaffMessage("", "");
+  setPendingAccessMessage("", "");
 
   try {
-    const [submissions, sportSet, staff] = await Promise.all([
+    const [submissions, sportSet, staff, accessRequests] = await Promise.all([
       fetchSubmissions(),
       fetchSportsWithData(),
       fetchSchoolStaff(),
+      fetchPendingAccessRequests(),
     ]);
 
     allSubmissions = submissions;
     sportsWithData = sportSet;
     schoolStaff = staff;
+    pendingAccessRequests = accessRequests;
     updateKpis();
     updateReadiness();
     renderInsights();
     renderSubmissions();
+    renderPendingAccessRequests();
     renderStaff();
   } catch (error) {
     console.error(error);
     elements.insights.innerHTML = '<li class="danger">Could not load school insights.</li>';
     elements.submissions.innerHTML = '<div class="empty">Could not load submissions.</div>';
     elements.staffList.innerHTML = '<div class="empty">Could not load school staff.</div>';
+    if (elements.pendingAccessList) {
+      elements.pendingAccessList.innerHTML = '<div class="empty">Could not load access requests.</div>';
+    }
     setStaffMessage("School staff could not be loaded right now.", "error");
+    setPendingAccessMessage("Access requests could not be loaded right now.", "error");
   }
 }
 
@@ -337,6 +353,28 @@ async function fetchSchoolStaff() {
   return data || [];
 }
 
+async function fetchPendingAccessRequests() {
+  if (normalizeRole(currentUser?.role) !== "athletic_director") {
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from("school_access_requests")
+    .select(
+      "id, created_at, email, full_name, school_id, school_name, role, job_title, reference_ad_name, reference_ad_email, verification_notes, approval_route, assigned_reviewer_user_id"
+    )
+    .eq("status", "pending")
+    .eq("approval_route", "school_admin")
+    .eq("assigned_reviewer_user_id", currentUser.id)
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    throw error;
+  }
+
+  return data || [];
+}
+
 function updateKpis() {
   const pending = allSubmissions.filter((submission) => statusKey(submission.status) === "pending").length;
   const approved = allSubmissions.filter((submission) => statusKey(submission.status) === "approved").length;
@@ -384,6 +422,15 @@ function renderInsights() {
     text: `${activeStaffCount} approved staff account${activeStaffCount === 1 ? "" : "s"} active`,
   });
 
+  if (normalizeRole(currentUser?.role) === "athletic_director") {
+    items.push({
+      tone: pendingAccessRequests.length ? "warn" : "ok",
+      text: pendingAccessRequests.length
+        ? `${pendingAccessRequests.length} school access request${pendingAccessRequests.length === 1 ? "" : "s"} waiting`
+        : "No school access requests waiting on you",
+    });
+  }
+
   if (rejected) {
     items.push({ tone: "danger", text: `${rejected} rejected submission${rejected === 1 ? "" : "s"}` });
   }
@@ -430,6 +477,171 @@ function renderSubmissions() {
   }
 
   elements.submissions.innerHTML = rows.map(renderSubmission).join("");
+}
+
+function renderPendingAccessRequests() {
+  const canReviewAccess = normalizeRole(currentUser?.role) === "athletic_director";
+
+  if (elements.pendingAccessPanel) {
+    elements.pendingAccessPanel.hidden = !canReviewAccess;
+  }
+
+  if (!canReviewAccess || !elements.pendingAccessList) {
+    return;
+  }
+
+  if (!pendingAccessRequests.length) {
+    elements.pendingAccessList.innerHTML =
+      '<div class="empty">No school access requests are waiting on your review.</div>';
+    return;
+  }
+
+  elements.pendingAccessList.innerHTML = pendingAccessRequests.map(renderPendingAccessRequestRow).join("");
+}
+
+function renderPendingAccessRequestRow(request) {
+  const meta = [
+    `Requested role: ${roleLabel(request.role)}`,
+    `Job title: ${request.job_title || "Not provided"}`,
+    `Submitted: ${displayDate(request.created_at)}`,
+  ];
+  const reference = request.reference_ad_name || request.reference_ad_email
+    ? `${request.reference_ad_name || "Name not provided"}${request.reference_ad_email ? ` | ${request.reference_ad_email}` : ""}`
+    : "Not provided";
+
+  return `<article class="access-request-row" data-access-request-id="${escapeHtmlAttr(request.id)}">
+    <div class="access-request-top">
+      <div>
+        <h3 class="access-request-name">${escapeHtml(request.full_name || "Unnamed Request")}</h3>
+        <p class="access-request-email">${escapeHtml(request.email || "No email on file")}</p>
+      </div>
+      <span class="badge pending">Pending</span>
+    </div>
+    <div class="access-request-meta">
+      ${meta.map((item) => `<span class="pill">${escapeHtml(item)}</span>`).join("")}
+    </div>
+    <p class="access-request-notes"><strong>AD reference:</strong> ${escapeHtml(reference)}</p>
+    ${
+      request.verification_notes
+        ? `<p class="access-request-notes"><strong>Notes:</strong> ${escapeHtml(request.verification_notes)}</p>`
+        : ""
+    }
+    <div class="access-request-actions">
+      <button type="button" class="access-request-btn" data-access-action="approve">Approve Access</button>
+      <button type="button" class="access-request-btn reject" data-access-action="reject">Reject</button>
+    </div>
+  </article>`;
+}
+
+async function handlePendingAccessActionClick(event) {
+  const button = event.target.closest("button[data-access-action]");
+  if (!button || normalizeRole(currentUser?.role) !== "athletic_director") {
+    return;
+  }
+
+  const row = button.closest("[data-access-request-id]");
+  const requestId = row?.dataset.accessRequestId || "";
+  const request = pendingAccessRequests.find((item) => item.id === requestId);
+  if (!request) {
+    return;
+  }
+
+  const originalLabel = button.textContent;
+  const action = button.dataset.accessAction;
+  button.disabled = true;
+  button.textContent = action === "approve" ? "Approving..." : "Rejecting...";
+
+  try {
+    let completed = false;
+    let successMessage = "";
+    if (action === "approve") {
+      completed = await approvePendingAccessRequest(request);
+      if (completed) {
+        successMessage = "Access request approved.";
+      }
+    } else if (action === "reject") {
+      completed = await rejectPendingAccessRequest(request);
+      if (completed) {
+        successMessage = "Access request rejected.";
+      }
+    }
+
+    if (completed) {
+      await loadData();
+      if (successMessage) {
+        setPendingAccessMessage(successMessage, "success");
+      }
+    }
+  } catch (error) {
+    console.error(error);
+    setPendingAccessMessage(error.message || "Could not update this access request.", "error");
+  } finally {
+    button.disabled = false;
+    button.textContent = originalLabel;
+  }
+}
+
+async function approvePendingAccessRequest(request) {
+  if (!confirm(`Approve ${request.full_name || request.email || "this account request"} for portal access?`)) {
+    return false;
+  }
+
+  await postAccessReviewAction("/.netlify/functions/approve-school-access-request", {
+    requestId: request.id,
+    approvedRole: normalizeRole(request.role),
+  });
+
+  return true;
+}
+
+async function rejectPendingAccessRequest(request) {
+  const reason = window.prompt(
+    `Add a short reason for rejecting ${request.full_name || request.email || "this request"}.`
+  );
+
+  if (!reason || !reason.trim()) {
+    return false;
+  }
+
+  await postAccessReviewAction("/.netlify/functions/reject-school-access-request", {
+    requestId: request.id,
+    reason: reason.trim(),
+  });
+
+  return true;
+}
+
+async function postAccessReviewAction(url, payload) {
+  const accessToken = await getSessionAccessToken();
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(payload),
+  });
+  const result = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const blockerText = Array.isArray(result?.blockers) ? ` ${result.blockers.join(" | ")}` : "";
+    throw new Error(`${result?.error || "Could not update this access request."}${blockerText}`.trim());
+  }
+
+  return result;
+}
+
+async function getSessionAccessToken() {
+  const {
+    data: { session },
+    error,
+  } = await supabase.auth.getSession();
+
+  if (error || !session?.access_token) {
+    throw error || new Error("Your session could not be verified.");
+  }
+
+  return session.access_token;
 }
 
 function renderSubmission(submission) {
@@ -545,7 +757,7 @@ function renderStaffMenu(staff, isArchived) {
     <div class="staff-menu-panel">
       <label class="staff-menu-label" for="role-${escapeHtmlAttr(staff.id)}">Role</label>
       <select id="role-${escapeHtmlAttr(staff.id)}" data-role-select>
-        ${STAFF_ROLE_OPTIONS.map(
+        ${SCHOOL_MANAGED_STAFF_ROLE_OPTIONS.map(
           (option) => `<option value="${escapeHtmlAttr(option.value)}" ${
             normalizeRole(staff.role) === option.value ? "selected" : ""
           }>${escapeHtml(option.label)}</option>`
@@ -659,6 +871,23 @@ function setStaffMessage(message, tone) {
   elements.staffMessage.hidden = false;
   elements.staffMessage.className = `staff-banner${tone ? ` ${tone}` : ""}`;
   elements.staffMessage.textContent = message;
+}
+
+function setPendingAccessMessage(message, tone) {
+  if (!elements.pendingAccessMessage) {
+    return;
+  }
+
+  if (!message) {
+    elements.pendingAccessMessage.hidden = true;
+    elements.pendingAccessMessage.className = "staff-banner";
+    elements.pendingAccessMessage.textContent = "";
+    return;
+  }
+
+  elements.pendingAccessMessage.hidden = false;
+  elements.pendingAccessMessage.className = `staff-banner${tone ? ` ${tone}` : ""}`;
+  elements.pendingAccessMessage.textContent = message;
 }
 
 function scopeKey(submission) {

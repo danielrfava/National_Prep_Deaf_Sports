@@ -1,19 +1,19 @@
 import { mountPublicTopNav } from "../components/publicTopNav.js";
 import {
   buildAccountStatusHref,
-  CREATE_ACCOUNT_ROLE_OPTIONS,
+  buildCreateAccountSuccessCopy,
+  getCreateAccountRoleHelpText,
+  getCreateAccountRoleOptionsForSchool,
   requiresAthleticDirectorReference,
 } from "./schoolAccessShared.js";
 import {
   describeRequestAccessError,
   loadRequestSchoolOptions,
+  loadSchoolAdminState,
   submitSchoolAccessRequest,
 } from "./requestSchoolAccess.js";
 
 mountPublicTopNav({ active: "login", basePath: "../" });
-
-const SUCCESS_MESSAGE =
-  "Your account request has been submitted and is now pending review by your athletic director.";
 
 const form = document.getElementById("requestForm");
 const alertBox = document.getElementById("alert");
@@ -27,8 +27,11 @@ const schoolSearchInput = document.getElementById("schoolSearch");
 const schoolValueInput = document.getElementById("school");
 const schoolOptionsList = document.getElementById("schoolOptionsList");
 const roleSelect = document.getElementById("role");
+const roleRoutingHelp = document.getElementById("roleRoutingHelp");
 const referenceAdNameInput = document.getElementById("referenceAdName");
 const referenceAdEmailInput = document.getElementById("referenceAdEmail");
+const successMessagePrimary = document.getElementById("successMessagePrimary");
+const successMessageSecondary = document.getElementById("successMessageSecondary");
 const verificationNotesInput = document.getElementById("verificationNotes");
 const referenceNameHelp = document.getElementById("referenceNameHelp");
 const referenceEmailHelp = document.getElementById("referenceEmailHelp");
@@ -37,11 +40,14 @@ const verificationHelp = document.getElementById("verificationHelp");
 let schoolOptions = [];
 let filteredSchoolOptions = [];
 let activeSchoolIndex = -1;
+let currentSchoolAdminState = null;
+let roleLookupRequestId = 0;
 
 window.addEventListener("DOMContentLoaded", init);
 
 async function init() {
-  populateRoleOptions();
+  populateRoleOptions([], "Select school first");
+  updateRoleRoutingHelp();
   try {
     await populateSchoolOptions();
   } catch (error) {
@@ -60,18 +66,95 @@ async function init() {
   form?.addEventListener("submit", handleSubmit);
 }
 
-function populateRoleOptions() {
+function populateRoleOptions(options = [], placeholder = "Select role", preferredValue = "") {
   if (!roleSelect) {
     return;
   }
 
-  roleSelect.innerHTML = '<option value="">Select role</option>';
-  CREATE_ACCOUNT_ROLE_OPTIONS.forEach((option) => {
+  roleSelect.innerHTML = `<option value="">${escapeHtml(placeholder)}</option>`;
+  options.forEach((option) => {
     const element = document.createElement("option");
     element.value = option.value;
     element.textContent = option.label;
     roleSelect.appendChild(element);
   });
+
+  const hasOptions = options.length > 0;
+  const resolvedValue = hasOptions && options.some((option) => option.value === preferredValue)
+    ? preferredValue
+    : "";
+
+  roleSelect.disabled = !hasOptions;
+  roleSelect.value = resolvedValue;
+  roleSelect.setCustomValidity(hasOptions ? "" : placeholder);
+}
+
+function updateRoleRoutingHelp(adminState = null, errorMessage = "") {
+  if (!roleRoutingHelp) {
+    return;
+  }
+
+  if (errorMessage) {
+    roleRoutingHelp.textContent = errorMessage;
+    return;
+  }
+
+  if (!schoolValueInput?.value) {
+    roleRoutingHelp.textContent = "Select a school to see available roles.";
+    return;
+  }
+
+  roleRoutingHelp.textContent = getCreateAccountRoleHelpText(adminState);
+}
+
+function resetRoleOptions(placeholder = "Select school first") {
+  currentSchoolAdminState = null;
+  populateRoleOptions([], placeholder);
+  updateRoleRoutingHelp();
+  syncConditionalFields();
+}
+
+async function refreshRoleOptionsForSelectedSchool() {
+  const selectedSchool = findSelectedSchool();
+  const requestId = ++roleLookupRequestId;
+  const selectedRole = roleSelect?.value || "";
+
+  if (!selectedSchool) {
+    resetRoleOptions();
+    return;
+  }
+
+  populateRoleOptions([], "Checking available roles...");
+  updateRoleRoutingHelp(null, "Checking available roles for this school...");
+  syncConditionalFields();
+
+  try {
+    const schoolAdminState = await loadSchoolAdminState(selectedSchool.id);
+    if (requestId !== roleLookupRequestId) {
+      return;
+    }
+
+    currentSchoolAdminState = schoolAdminState;
+    populateRoleOptions(
+      getCreateAccountRoleOptionsForSchool(schoolAdminState),
+      "Select role",
+      selectedRole
+    );
+    updateRoleRoutingHelp(schoolAdminState);
+    hideAlert();
+  } catch (error) {
+    if (requestId !== roleLookupRequestId) {
+      return;
+    }
+
+    const { userMessage } = describeRequestAccessError(error);
+    currentSchoolAdminState = null;
+    populateRoleOptions([], "Could not load available roles");
+    updateRoleRoutingHelp(null, "We couldn't verify which roles are available for this school.");
+    showAlert(userMessage);
+  } finally {
+    syncConditionalFields();
+  }
 }
 
 async function populateSchoolOptions() {
@@ -90,20 +173,27 @@ async function populateSchoolOptions() {
 }
 
 function syncConditionalFields() {
+  const selectedRole = roleSelect?.value || "";
   const requireAdReference = requiresAthleticDirectorReference(roleSelect?.value);
 
   referenceAdNameInput.required = requireAdReference;
   referenceAdEmailInput.required = requireAdReference;
 
-  referenceNameHelp.textContent = requireAdReference
+  referenceNameHelp.textContent = !selectedRole
+    ? "Required after you choose a non-Athletic Director role."
+    : requireAdReference
     ? "Required for non-Athletic Director requests."
     : "Optional if you are the Athletic Director.";
 
-  referenceEmailHelp.textContent = requireAdReference
+  referenceEmailHelp.textContent = !selectedRole
+    ? "Required after you choose a non-Athletic Director role."
+    : requireAdReference
     ? "Required for non-Athletic Director requests."
     : "Optional if you are the Athletic Director.";
 
-  verificationHelp.textContent = requireAdReference
+  verificationHelp.textContent = !selectedRole
+    ? "Optional, but useful for manual review."
+    : requireAdReference
     ? "Optional, but include why you are helping with submissions if it will help review."
     : "Optional if you are the Athletic Director.";
 }
@@ -174,6 +264,8 @@ function bindSchoolCombobox() {
 
   schoolSearchInput.addEventListener("input", () => {
     schoolValueInput.value = "";
+    roleLookupRequestId += 1;
+    resetRoleOptions();
     filterSchoolOptions(schoolSearchInput.value);
     if (schoolSearchInput.value.trim() && filteredSchoolOptions.length) {
       openSchoolOptions();
@@ -327,6 +419,7 @@ function selectSchoolOption(option) {
   activeSchoolIndex = -1;
   closeSchoolOptions();
   syncSchoolValidity();
+  void refreshRoleOptionsForSelectedSchool();
 }
 
 function openSchoolOptions() {
@@ -391,6 +484,20 @@ function syncPasswordValidity() {
   }
 }
 
+function renderSuccessStateMessages(adminState) {
+  const copy = buildCreateAccountSuccessCopy(adminState);
+
+  if (successMessagePrimary) {
+    successMessagePrimary.textContent = copy.primary;
+  }
+
+  if (successMessageSecondary) {
+    successMessageSecondary.textContent = copy.secondary;
+  }
+
+  return copy;
+}
+
 async function handleSubmit(event) {
   event.preventDefault();
   hideAlert();
@@ -405,6 +512,12 @@ async function handleSubmit(event) {
   const selectedSchool = findSelectedSchool();
   if (!selectedSchool) {
     showAlert("Select your school before submitting.");
+    return;
+  }
+
+  if (roleSelect?.disabled || !roleSelect?.value) {
+    showAlert("Choose an available role for this school before submitting.");
+    roleSelect?.focus();
     return;
   }
 
@@ -427,6 +540,7 @@ async function handleSubmit(event) {
     };
 
     const result = await submitSchoolAccessRequest(payload);
+    const successCopy = renderSuccessStateMessages(currentSchoolAdminState);
 
     form.hidden = true;
     successState.hidden = false;
@@ -435,7 +549,7 @@ async function handleSubmit(event) {
       accountStatusLink.hidden = !hasSession;
       accountStatusLink.href = buildAccountStatusHref();
     }
-    showAlert(SUCCESS_MESSAGE, "success");
+    showAlert(successCopy.primary, "success");
   } catch (error) {
     const { userMessage } = describeRequestAccessError(error);
     showAlert(userMessage);

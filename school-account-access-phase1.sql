@@ -273,7 +273,6 @@ with check (
   )
   and role = any (
     array[
-      'athletic_director',
       'assistant_ad',
       'coach',
       'stats_staff',

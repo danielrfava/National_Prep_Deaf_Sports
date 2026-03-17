@@ -115,7 +115,7 @@ function buildStateModel(profile) {
   if (status === "pending") {
     return {
       title: "Your account is pending review.",
-      subline: "You’ll be able to access the school portal after your athletic director approves your request.",
+      subline: "You'll be able to access the school portal after your account is approved.",
       banner: blockedMessage,
       tone: "success",
     };
