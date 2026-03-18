@@ -34,7 +34,7 @@ async function handleSubmit(event) {
     }
 
     showAlert(
-      "Check your email for the NPDS password reset link. If it does not arrive, confirm the address and try again.",
+      "Check your email for the NPDS password reset link. It should open the secure reset page on www.nationalprepdeafsports.com.",
       "success"
     );
   } catch (error) {

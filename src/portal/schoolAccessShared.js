@@ -1,4 +1,5 @@
 export const FLASH_STORAGE_KEY = "npds_portal_flash";
+export const CANONICAL_PUBLIC_ORIGIN = "https://www.nationalprepdeafsports.com";
 
 export const ACTIVE_SCHOOL_ROLE_OPTIONS = Object.freeze([
   { label: "Athletic Director", value: "athletic_director" },
@@ -188,7 +189,7 @@ export function buildAccountStatusHref() {
 }
 
 export function buildPasswordResetHref() {
-  return new URL("reset-password.html", window.location.href).toString();
+  return new URL("/portal/reset-password.html", CANONICAL_PUBLIC_ORIGIN).toString();
 }
 
 export function setPortalFlash(message, type = "error") {

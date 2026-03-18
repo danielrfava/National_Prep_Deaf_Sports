@@ -1,5 +1,6 @@
 import { mountPublicTopNav } from "../components/publicTopNav.js";
 import { supabase } from "../supabaseClient.js";
+import { buildPasswordResetHref, setPortalFlash } from "./schoolAccess.js";
 
 mountPublicTopNav({ active: "login", basePath: "../" });
 
@@ -14,11 +15,18 @@ const submitBtn = document.getElementById("submitBtn");
 window.addEventListener("DOMContentLoaded", init);
 
 async function init() {
-  const session = await waitForSession();
+  if (redirectToCanonicalResetHost()) {
+    return;
+  }
+
+  const recoveryState = await establishRecoverySession();
+  const session = recoveryState.session;
 
   if (!session?.user?.id) {
-    resetSummary.textContent =
-      "Open the password reset email from NPDS to continue. If the link expired, request a new reset email from the login page.";
+    resetSummary.textContent = recoveryState.message;
+    if (recoveryState.alertMessage) {
+      showAlert(recoveryState.alertMessage);
+    }
     return;
   }
 
@@ -27,24 +35,124 @@ async function init() {
   resetForm.addEventListener("submit", handleSubmit);
 }
 
-async function waitForSession(maxAttempts = 12) {
-  for (let index = 0; index < maxAttempts; index += 1) {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    if (session?.user?.id) {
-      return session;
-    }
-
-    await delay(400);
+function redirectToCanonicalResetHost() {
+  if (window.location.hostname.toLowerCase() !== "nationalprepdeafsports.com") {
+    return false;
   }
 
-  return null;
+  const canonicalHref = new URL(buildPasswordResetHref());
+  canonicalHref.search = window.location.search;
+  canonicalHref.hash = window.location.hash;
+  window.location.replace(canonicalHref.toString());
+  return true;
 }
 
-function delay(ms) {
-  return new Promise((resolve) => window.setTimeout(resolve, ms));
+async function establishRecoverySession() {
+  try {
+    const searchParams = new URLSearchParams(window.location.search);
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+    const errorCode = hashParams.get("error_code") || searchParams.get("error_code") || "";
+    const errorDescription =
+      hashParams.get("error_description") || searchParams.get("error_description") || "";
+    const errorName = hashParams.get("error") || searchParams.get("error") || "";
+
+    if (errorCode || errorName || errorDescription) {
+      return buildRecoveryFailure(formatRecoveryError(errorCode, errorName, errorDescription));
+    }
+
+    const existingSession = await getCurrentSession();
+    if (existingSession?.user?.id) {
+      clearRecoveryUrl();
+      return { session: existingSession, message: "" };
+    }
+
+    const code = searchParams.get("code");
+    if (code) {
+      const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+      if (error) {
+        return buildRecoveryFailure(formatRecoveryError(error.code, error.name, error.message));
+      }
+
+      clearRecoveryUrl();
+      return {
+        session: data?.session || (await getCurrentSession()),
+        message: "",
+      };
+    }
+
+    const accessToken = hashParams.get("access_token");
+    const refreshToken = hashParams.get("refresh_token");
+    if (accessToken && refreshToken) {
+      const { data, error } = await supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      });
+
+      if (error) {
+        return buildRecoveryFailure(formatRecoveryError(error.code, error.name, error.message));
+      }
+
+      clearRecoveryUrl();
+      return {
+        session: data?.session || (await getCurrentSession()),
+        message: "",
+      };
+    }
+  } catch (error) {
+    return buildRecoveryFailure(formatRecoveryError(error?.code, error?.name, error?.message));
+  }
+
+  return buildRecoveryFailure(
+    "Open the newest NPDS password reset email to continue. If the link expired, request a fresh reset email from the login page."
+  );
+}
+
+async function getCurrentSession() {
+  const {
+    data: { session },
+    error,
+  } = await supabase.auth.getSession();
+
+  if (error) {
+    throw error;
+  }
+
+  return session;
+}
+
+function clearRecoveryUrl() {
+  window.history.replaceState({}, document.title, window.location.pathname);
+}
+
+function buildRecoveryFailure(alertMessage) {
+  return {
+    session: null,
+    alertMessage,
+    message:
+      "This password reset link is not active anymore. Request a fresh reset email and open the newest link directly from your inbox.",
+  };
+}
+
+function formatRecoveryError(errorCode = "", errorName = "", errorMessage = "") {
+  const detail = [errorCode, errorName, errorMessage].join(" ").toLowerCase();
+
+  if (detail.includes("otp_expired") || detail.includes("expired")) {
+    return "This password reset link has expired. Request a fresh reset email and open the newest link right away.";
+  }
+
+  if (detail.includes("access_denied")) {
+    return "This password reset link was denied or is no longer valid. Request a new reset email and use the newest link only once.";
+  }
+
+  if (detail.includes("invalid") || detail.includes("verification")) {
+    return "This password reset link is invalid. Request a new reset email and try again.";
+  }
+
+  if (errorMessage) {
+    return errorMessage;
+  }
+
+  return "Could not verify this password reset link. Request a fresh reset email and try again.";
 }
 
 function renderResetSummary(user) {
@@ -82,9 +190,18 @@ async function handleSubmit(event) {
       throw error;
     }
 
+    setPortalFlash("Password updated. Sign in with your new password.", "success");
+    try {
+      await supabase.auth.signOut();
+    } catch (signOutError) {
+      console.warn("Password updated, but sign-out cleanup failed:", signOutError);
+    }
     resetForm.hidden = true;
     resetDone.hidden = false;
     showAlert("Password updated successfully.", "success");
+    window.setTimeout(() => {
+      window.location.href = "login.html";
+    }, 1600);
   } catch (error) {
     console.error("Password reset failed:", error);
     showAlert(error.message || "Could not update the password right now.");
