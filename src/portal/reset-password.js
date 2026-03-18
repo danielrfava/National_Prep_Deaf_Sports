@@ -60,12 +60,6 @@ async function establishRecoverySession() {
       return buildRecoveryFailure(formatRecoveryError(errorCode, errorName, errorDescription));
     }
 
-    const existingSession = await getCurrentSession();
-    if (existingSession?.user?.id) {
-      clearRecoveryUrl();
-      return { session: existingSession, message: "" };
-    }
-
     const code = searchParams.get("code");
     if (code) {
       const { data, error } = await supabase.auth.exchangeCodeForSession(code);
@@ -97,6 +91,12 @@ async function establishRecoverySession() {
         session: data?.session || (await getCurrentSession()),
         message: "",
       };
+    }
+
+    const existingSession = await getCurrentSession();
+    if (existingSession?.user?.id) {
+      clearRecoveryUrl();
+      return { session: existingSession, message: "" };
     }
   } catch (error) {
     return buildRecoveryFailure(formatRecoveryError(error?.code, error?.name, error?.message));

@@ -98,13 +98,23 @@
 
       mountPublicTopNav({ active: "login", basePath: "../" });
 
+      const recoveryHash = window.location.hash;
+      const recoverySearch = window.location.search;
       const isRecoveryFlow =
-        window.location.hash.includes("type=recovery") || window.location.search.includes("type=recovery");
+        recoveryHash.includes("type=recovery") ||
+        recoverySearch.includes("type=recovery") ||
+        recoverySearch.includes("code=") ||
+        recoveryHash.includes("access_token=") ||
+        recoveryHash.includes("refresh_token=") ||
+        recoveryHash.includes("error=") ||
+        recoveryHash.includes("error_code=") ||
+        recoverySearch.includes("error=") ||
+        recoverySearch.includes("error_code=");
 
       if (isRecoveryFlow) {
         const resetHref = new URL(buildPasswordResetHref());
-        resetHref.search = window.location.search;
-        resetHref.hash = window.location.hash;
+        resetHref.search = recoverySearch;
+        resetHref.hash = recoveryHash;
         window.location.replace(resetHref.toString());
       }
 
